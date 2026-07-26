@@ -1,0 +1,82 @@
+{
+  "task_id": "M1-T01",
+  "phase": "M1",
+  "baseline_main_commit": "9eb8d8d4e4482ff2a05346a8fdad5b86780ea6cf",
+  "validated_implementation_commit": "d0e0eafdbbbd2e49f54757fdbe3d7ce6e7d1a09e",
+  "generated_at_utc": "2026-07-26T13:36:40Z",
+  "python_version": "3.12.10",
+  "red_light": [
+    {
+      "command": "py -3.12 -m pytest tests/unit/test_intent_clarification.py tests/unit/test_query_planner.py tests/contract/test_m1_t01_contracts.py -q",
+      "exit_code": 1,
+      "summary": "3 collection errors: app.adapters and M1 core modules were absent before implementation."
+    },
+    {
+      "command": "py -3.12 -m pytest tests/contract/test_evidence_report.py -q",
+      "exit_code": 1,
+      "summary": "1 failed, 23 passed: the historical M0 validator rejected legal M1 IN_PROGRESS 1/4 status before the minimal compatibility change."
+    }
+  ],
+  "green_light": [
+    {
+      "name": "m1_t01_focused_tests",
+      "command": "py -3.12 -m pytest tests/unit/test_intent_clarification.py tests/unit/test_query_planner.py tests/contract/test_m1_t01_contracts.py -q",
+      "exit_code": 0,
+      "summary": "15 passed"
+    },
+    {
+      "name": "full_regression",
+      "command": "py -3.12 -m pytest -q",
+      "exit_code": 0,
+      "summary": "131 passed"
+    },
+    {
+      "name": "ruff",
+      "command": "py -3.12 -m ruff check app evaluation scripts tests",
+      "exit_code": 0,
+      "summary": "All checks passed"
+    },
+    {
+      "name": "mypy",
+      "command": "py -3.12 -m mypy app evaluation scripts",
+      "exit_code": 0,
+      "summary": "Success: no issues found in 19 source files"
+    },
+    {
+      "name": "project_docs_validation",
+      "command": "py -3.12 scripts/validate_project_docs.py",
+      "exit_code": 0,
+      "summary": "31 phase tasks indexed and local links resolved"
+    },
+    {
+      "name": "m0_historical_validation",
+      "command": "py -3.12 scripts/validate_phase.py M0",
+      "exit_code": 0,
+      "summary": "M0 evidence report, inputs, git ancestry, and status gate valid"
+    },
+    {
+      "name": "pip_check",
+      "command": "py -3.12 -m pip check",
+      "exit_code": 0,
+      "summary": "No broken requirements found"
+    }
+  ],
+  "input_sha256": {
+    "app/adapters/llm.py": "29281e6c038d44bcb288ae2cb913747fc0b04324336276b657a8abb3bbb62761",
+    "app/core/intent.py": "e90d5f015f4a0a13127240cc33ea7c5609814a0e256fb25011946dd20300d9d2",
+    "app/core/query_planner.py": "ffdb2ee110988d7a9b274c262b04a0d4e0da0af21a66c5e4ed9852164f873339",
+    "app/models/planning.py": "b17e4cccdc3aff806dd8458a405e7c1c5a31df764ef7a8ab9fdee4294b2ee512",
+    "tests/contract/test_m1_t01_contracts.py": "1a1a6e447878de074fad311ec9bd1bf962e1fcecacd02487056fe553427b6941",
+    "tests/unit/test_intent_clarification.py": "576e67a355ba6e7cd4e514f3202ba42a5a687d4f30bbffd5a6fd6f19b963a5ac",
+    "tests/unit/test_query_planner.py": "df86f87261cf1cc66cbccee71276ed837408f049fc9aaf21ddd00ffa6f962d95"
+  },
+  "external_boundaries": {
+    "arxiv_external_network": "not_run",
+    "real_model_download_or_inference": "not_run",
+    "platform_api_or_deployment": "not_run",
+    "cnki": "not_run",
+    "human_judgment": "not_run",
+    "real_source_pool_freeze": "not_run"
+  },
+  "scope_note": "M1-T01 implements only deterministic intent draft validation, clarification selection, LLM-fake validation, and four-branch query planning. It makes no network request or model call and introduces no M1-T02, M2, persistence, or platform object."
+}
