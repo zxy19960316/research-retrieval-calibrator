@@ -14,7 +14,7 @@
 
 | 阶段 | 状态 | 已通过任务 | 阶段证据 |
 |---|---|---:|---|
-| M0 产品与评测契约 | IN_PROGRESS | 1/4 | M0-T01 domain contracts validated |
+| M0 产品与评测契约 | IN_PROGRESS | 2/4 | M0-T01 domain contracts and M0-T02 state-machine guard validated |
 | M1 首轮真实召回 | BLOCKED_BY_M0 | 0/4 | 尚未生成 |
 | M2 首轮排序与选择 | BLOCKED_BY_M1 | 0/5 | 尚未生成 |
 | M3 反馈与第二轮校准 | BLOCKED_BY_M2 | 0/5 | 尚未生成 |
@@ -32,4 +32,4 @@
 
 ## 下一动作
 
-`M0-T01` 已完成：领域枚举与 Pydantic 数据契约的先红后绿验证已通过。下一动作：`M0-T02`；不得在该任务开始前执行其他任务。
+`M0-T01` 与 `M0-T02` 已完成：领域枚举、Pydantic 数据契约与状态机的先红后绿验证已通过。下一动作：`M0-T03`；不得在该任务开始前执行其他任务。
