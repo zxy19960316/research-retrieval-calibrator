@@ -40,6 +40,10 @@ def _as_relevance(value: Relevance | str) -> Relevance:
         raise ValueError(f"Unknown relevance: {value!r}") from error
 
 
+def _relevance_grade(value: Relevance | str) -> int:
+    return _GRADES[_as_relevance(value)]
+
+
 def precision_at_k(
     relevances: Sequence[Relevance | str], k: int, *, inclusive: bool = False
 ) -> float:
@@ -71,7 +75,7 @@ def ndcg_at_k(
         default_ideal: list[Relevance] = [_as_relevance(value) for value in relevances[:k]]
         ideal_relevances = sorted(
             default_ideal,
-            key=lambda relevance: _GRADES[relevance],
+            key=_relevance_grade,
             reverse=True,
         )
     idcg = _dcg(ideal_relevances, k)
