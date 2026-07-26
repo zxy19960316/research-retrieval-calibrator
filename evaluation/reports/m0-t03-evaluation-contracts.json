@@ -1,0 +1,72 @@
+{
+  "task_id": "M0-T03",
+  "phase": "M0",
+  "baseline_main_commit": "1bc7355d700c0075d3f28242aa7eb1afbaa924a6",
+  "validated_implementation_commit": "4d6fa5441aff3eb961c6e864c032db163e194fd6",
+  "generated_at_utc": "2026-07-26T10:14:18Z",
+  "environment": {
+    "python": "3.12.10",
+    "dependencies": {
+      "PyYAML": "6.0.3",
+      "jsonschema": "4.26.0",
+      "mypy": "1.20.2",
+      "pydantic": "2.13.4",
+      "pytest": "8.4.2",
+      "ruff": "0.16.0"
+    }
+  },
+  "red_light": {
+    "command": "py -3.12 -m pytest tests/contract/test_evaluation_dataset.py tests/unit/test_retrieval_metrics.py -q",
+    "exit_code": 1,
+    "failure_summary": "ModuleNotFoundError: No module named 'evaluation.metrics' during collection of tests/unit/test_retrieval_metrics.py."
+  },
+  "green_light": {
+    "focused_tests": {
+      "command": "py -3.12 -m pytest tests/contract/test_evaluation_dataset.py tests/unit/test_retrieval_metrics.py -q",
+      "exit_code": 0,
+      "passed": 24
+    },
+    "full_tests": {
+      "command": "py -3.12 -m pytest -q",
+      "exit_code": 0,
+      "passed": 71
+    },
+    "ruff": {
+      "command": "py -3.12 -m ruff check app evaluation scripts tests",
+      "exit_code": 0,
+      "summary": "All checks passed."
+    },
+    "mypy": {
+      "command": "py -3.12 -m mypy app evaluation scripts",
+      "exit_code": 0,
+      "summary": "Success: no issues found in 13 source files."
+    },
+    "project_docs": {
+      "command": "py -3.12 scripts/validate_project_docs.py",
+      "exit_code": 0,
+      "summary": "PASS: project docs are complete; 31 phase tasks are indexed; local links resolve."
+    },
+    "pip_check": {
+      "command": "py -3.12 -m pip check",
+      "exit_code": 0,
+      "summary": "No broken requirements found."
+    }
+  },
+  "input_sha256": {
+    "evaluation/datasets/questions.v0.1.yaml": "3f98a39443625d278effaffe63672021415e039627491e487e73ee1ddd05fe0c",
+    "evaluation/datasets/questions.schema.json": "d6c61be0cd6bc5ab57343127bf92a6eb691028f93988f1c0dbff619b324cf354",
+    "evaluation/metrics/retrieval.py": "7da9d7fc15921d903be5c8a652295663822d7fc0368d82f857f9230cd3374a3f",
+    "tests/contract/test_evaluation_dataset.py": "429a2ae44a9ebbc827f8b2ca7d31779a1b2a8251d4978edfb51dd65345923c54",
+    "tests/unit/test_retrieval_metrics.py": "ed290f61ea784935478d684404f7ac111cf40b7f71751519934a5beb7c04ba52",
+    "docs/evaluation.md": "6373ca867ff4924e34e5c67c4043eb86521cc145932b10ffe396ebe5deb66976"
+  },
+  "not_run": {
+    "external_network": "not_run",
+    "model_download_or_inference": "not_run",
+    "platform_api": "not_run",
+    "CNKI": "not_run",
+    "human_judgment": "not_run",
+    "real_source_pool_freeze": "not_run"
+  },
+  "residual_risks_and_m4_freeze_responsibility": "The ten questions are unjudged templates only. M4 must acquire lawful source snapshots, assign human judges and a judgment version, freeze labels and source_pool_snapshot values, and preserve those inputs before reporting any real evaluation result."
+}
