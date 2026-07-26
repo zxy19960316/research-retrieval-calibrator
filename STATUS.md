@@ -4,18 +4,18 @@
 
 ## 当前门禁
 
-- 当前阶段：`M0`
-- 当前状态：`IN_PROGRESS`
-- 当前入口：`docs/phases/M0-product-and-evaluation-contracts.md`
-- 允许执行：仅 M0 范围与契约任务
-- 禁止执行：M1-M6 实现、模型下载、平台部署、CNKI 自动化
+- 当前阶段：`M1`
+- 当前状态：`READY`
+- 当前入口：`docs/phases/M1-real-first-round-retrieval.md`
+- 允许执行：仅 M1 范围内且从 M1-T01 开始的任务
+- 禁止执行：M2-M6 实现、模型下载、平台部署、CNKI 自动化
 
 ## 阶段状态
 
 | 阶段 | 状态 | 已通过任务 | 阶段证据 |
 |---|---|---:|---|
-| M0 产品与评测契约 | IN_PROGRESS | 3/4 | M0-T01 domain contracts, M0-T02 state-machine guard, and M0-T03 evaluation contracts validated |
-| M1 首轮真实召回 | BLOCKED_BY_M0 | 0/4 | 尚未生成 |
+| M0 产品与评测契约 | COMPLETE | 4/4 | M0-T01 domain contracts, M0-T02 state-machine guard, M0-T03 evaluation contracts, and M0-T04 evidence gate validated |
+| M1 首轮真实召回 | READY | 0/4 | 尚未开始 |
 | M2 首轮排序与选择 | BLOCKED_BY_M1 | 0/5 | 尚未生成 |
 | M3 反馈与第二轮校准 | BLOCKED_BY_M2 | 0/5 | 尚未生成 |
 | M4 十题离线评测 | BLOCKED_BY_M3 | 0/4 | 尚未生成 |
@@ -32,4 +32,4 @@
 
 ## 下一动作
 
-`M0-T01`、`M0-T02` 与 `M0-T03` 已完成：领域枚举、Pydantic 数据契约、状态机及十题评测模板与六项指标契约的先红后绿验证已通过。阶段证据：`evaluation/reports/m0-t03-evaluation-contracts.json`。下一动作：`M0-T04`；不得在该任务开始前执行其他任务。
+M0-T01、M0-T02、M0-T03、M0-T03R 与 M0-T04 已完成：领域契约、状态机、十题评测模板与指标、负向抑制修正，以及机器可读的证据报告和阶段自校验均已通过。下一动作：`M1-T01`；开始前必须从最新 `main` 创建任务分支，并遵守 M1 的真实来源与证据边界。

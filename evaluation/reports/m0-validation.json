@@ -1,0 +1,87 @@
+{
+  "schema_version": "0.1",
+  "phase": "M0",
+  "validated_commit": "51cd3a4f4f145dc0ff5266064bc3158c4cc46c61",
+  "generated_at_utc": "2026-07-26T10:56:01Z",
+  "python_version": "3.12.10",
+  "task_evidence": [
+    {
+      "task_id": "M0-T01",
+      "status": "passed",
+      "source_reports": ["evaluation/reports/m0-t01r-acceptance-fix.json"],
+      "source_report_sha256": [{"path": "evaluation/reports/m0-t01r-acceptance-fix.json", "sha256": "13fc3d28734381ebbde8543c4bdd81767901bb617d5d298c76e80ab95032840d"}]
+    },
+    {
+      "task_id": "M0-T02",
+      "status": "passed",
+      "source_reports": ["evaluation/reports/m0-t02-state-machine.json"],
+      "source_report_sha256": [{"path": "evaluation/reports/m0-t02-state-machine.json", "sha256": "d1ad50a9bcef5d63d34c4543d22e73bdbef478c04f1195cf1a93b138ec3330c6"}]
+    },
+    {
+      "task_id": "M0-T03",
+      "status": "passed",
+      "source_reports": ["evaluation/reports/m0-t03-evaluation-contracts.json", "evaluation/reports/m0-t03r-contract-fix.json"],
+      "source_report_sha256": [
+        {"path": "evaluation/reports/m0-t03-evaluation-contracts.json", "sha256": "c1fd1e53faf2bf1a3183f05badb8e9a45ed6f35efee3b30002833d8c15925f78"},
+        {"path": "evaluation/reports/m0-t03r-contract-fix.json", "sha256": "915ba59994182c2feeb935a7400068da8695d15b817a5b44c5339b95461978b0"}
+      ]
+    },
+    {"task_id": "M0-T04", "status": "passed", "source_reports": [], "source_report_sha256": []}
+  ],
+  "checks": [
+    {"name": "domain_contract_tests", "evidence_type": "automated", "status": "passed", "command": "py -3.12 -m pytest tests/contract/test_domain_models.py -q", "exit_code": 0, "observed_at_utc": "2026-07-26T10:55:23Z"},
+    {"name": "state_machine_tests", "evidence_type": "automated", "status": "passed", "command": "py -3.12 -m pytest tests/unit/test_state_machine.py -q", "exit_code": 0, "observed_at_utc": "2026-07-26T10:55:23Z"},
+    {"name": "evaluation_dataset_contract_tests", "evidence_type": "automated", "status": "passed", "command": "py -3.12 -m pytest tests/contract/test_evaluation_dataset.py -q", "exit_code": 0, "observed_at_utc": "2026-07-26T10:55:23Z"},
+    {"name": "retrieval_metrics_tests", "evidence_type": "automated", "status": "passed", "command": "py -3.12 -m pytest tests/unit/test_retrieval_metrics.py -q", "exit_code": 0, "observed_at_utc": "2026-07-26T10:55:23Z"},
+    {"name": "evidence_report_contract_tests", "evidence_type": "automated", "status": "passed", "command": "py -3.12 -m pytest tests/contract/test_evidence_report.py -q", "exit_code": 0, "observed_at_utc": "2026-07-26T10:55:23Z"},
+    {"name": "full_regression", "evidence_type": "automated", "status": "passed", "command": "py -3.12 -m pytest -q", "exit_code": 0, "observed_at_utc": "2026-07-26T10:55:23Z"},
+    {"name": "ruff", "evidence_type": "automated", "status": "passed", "command": "py -3.12 -m ruff check app evaluation scripts tests", "exit_code": 0, "observed_at_utc": "2026-07-26T10:55:23Z"},
+    {"name": "mypy", "evidence_type": "automated", "status": "passed", "command": "py -3.12 -m mypy app evaluation scripts", "exit_code": 0, "observed_at_utc": "2026-07-26T10:55:23Z"},
+    {"name": "project_docs_validation", "evidence_type": "automated", "status": "passed", "command": "py -3.12 scripts/validate_project_docs.py", "exit_code": 0, "observed_at_utc": "2026-07-26T10:55:23Z"},
+    {"name": "pip_check", "evidence_type": "automated", "status": "passed", "command": "py -3.12 -m pip check", "exit_code": 0, "observed_at_utc": "2026-07-26T10:55:23Z"}
+  ],
+  "validated_inputs": [
+    {"path": "PRODUCT_SPEC.md", "sha256": "8d31b8f75885effdf284df55b7ff10f4d98c9f9aedbcb1c192cbc633bab57e52"},
+    {"path": "PROJECT_PLAN.md", "sha256": "14474db8ff154d392ee42b2ae3ca24ca85b6f4b381310a85f409cd91f5d13da8"},
+    {"path": "docs/data_model.md", "sha256": "af33b3c15c4b7a7a9b0c71010af6a1aa7c8e2919cc92caea09ff3626f29e9eef"},
+    {"path": "docs/evaluation.md", "sha256": "1a61e78dbb4cd6b9853fcf6b6db01d4ac968b7d82fa86825ac4187dc4fc7a816"},
+    {"path": "docs/phases/M0-product-and-evaluation-contracts.md", "sha256": "a20448733564b90c3d8d7c544f28b439a4de585293507773f6534482b9a4bb30"},
+    {"path": "docs/superpowers/plans/2026-07-26-research-retrieval-calibrator-m0.md", "sha256": "ddfac308b5fb5c8134ad34a0412d06b6903f3c15e05f37a2cdec3911b81a8a71"},
+    {"path": "app/models/__init__.py", "sha256": "8023ec446e74dfb483a089f32c2ecd45fe9375da465a0233545e9c460bd60f00"},
+    {"path": "app/models/enums.py", "sha256": "25a0f237729076dc31e01e65242b7bf40a12c971d92d38c38eeacb2581b2720e"},
+    {"path": "app/models/feedback.py", "sha256": "e57fc54b0258507f6fd5b8b2842aa52b941e6baa8f96c74253dda68e156b917c"},
+    {"path": "app/models/paper.py", "sha256": "a1f088883a7158d6991f5112ae65c1ef14fa4455649acdc8fd417402e31669d4"},
+    {"path": "app/models/project.py", "sha256": "b673028edd0415633a798f1444b59a82d1dc77423a20b69fb886acdc12d556c6"},
+    {"path": "app/models/query.py", "sha256": "9c8bf9ff2b14dc0aeebbdda37d5e6ff64a622ea29cccbec219720bfb61997eee"},
+    {"path": "app/core/state_machine.py", "sha256": "d3aa7341bb7306f86daf0577c57a8b959ca02e65f20be707d4a17e59c6ce2c05"},
+    {"path": "evaluation/datasets/questions.schema.json", "sha256": "da2f388592e20887d51331105f4201a9eeaa2083af81eb282d2da7d4e0590862"},
+    {"path": "evaluation/datasets/questions.v0.1.yaml", "sha256": "3f98a39443625d278effaffe63672021415e039627491e487e73ee1ddd05fe0c"},
+    {"path": "evaluation/metrics/retrieval.py", "sha256": "8c1082071e51d9f83885ffc74b10bed107d856982f8b29725a193024f645cc47"},
+    {"path": "tests/contract/test_domain_models.py", "sha256": "8f945840f0d740cd1aae5e68b58d0727a4879ca566bfc382c39d088e88582772"},
+    {"path": "tests/contract/test_project_docs_validation.py", "sha256": "484bfbe8815f2ad09183c5c7ae8485d611c713e463c70b70c87381877ac44fcb"},
+    {"path": "tests/contract/fixtures/m0_t01_public_contracts.schema.json", "sha256": "778901e3130e4e70c85611418d591a8d58034129890f181848158a4c9fde7fce"},
+    {"path": "tests/unit/test_state_machine.py", "sha256": "23712041917d83abd0644103aba63ccf522821712b05378d4367cbdad2ca4182"},
+    {"path": "tests/contract/test_evaluation_dataset.py", "sha256": "7d0fd11780d93bd4435bbcb6280f7aa6f7b90172e3f192eea0bdb5e68bafc717"},
+    {"path": "tests/unit/test_retrieval_metrics.py", "sha256": "c2838146dcf9454a8c81c5f2322f8947618ae20be4ea5ce334b01460fa9a8851"},
+    {"path": "tests/contract/test_evidence_report.py", "sha256": "f3029286ed7b9419f64a39eb8c06e1def713858fed2ffb24138ac9b5dbdf9307"},
+    {"path": "evaluation/report.schema.json", "sha256": "e9bcc5cf9074f9ed8b6c99271716576b51998596188d32d1e356b10ad4e49504"},
+    {"path": "scripts/validate_phase.py", "sha256": "17957b36707ef81a0b228dceafbaddbef7fecd4ab58d8946a47b89feef8802bc"},
+    {"path": ".github/workflows/docs-validation.yml", "sha256": "94826590cb0ed9694592065ed5cd5e047932e40a0d70a74c01850d9d59813cf7"},
+    {"path": "evaluation/reports/m0-t01r-acceptance-fix.json", "sha256": "13fc3d28734381ebbde8543c4bdd81767901bb617d5d298c76e80ab95032840d"},
+    {"path": "evaluation/reports/m0-t02-state-machine.json", "sha256": "d1ad50a9bcef5d63d34c4543d22e73bdbef478c04f1195cf1a93b138ec3330c6"},
+    {"path": "evaluation/reports/m0-t03-evaluation-contracts.json", "sha256": "c1fd1e53faf2bf1a3183f05badb8e9a45ed6f35efee3b30002833d8c15925f78"},
+    {"path": "evaluation/reports/m0-t03r-contract-fix.json", "sha256": "915ba59994182c2feeb935a7400068da8695d15b817a5b44c5339b95461978b0"}
+  ],
+  "external_boundaries": [
+    {"name": "arxiv_external_network", "evidence_type": "not_run", "status": "not_run", "reason": "M0-T04 is a network-free evidence gate."},
+    {"name": "real_model_download_or_inference", "evidence_type": "not_run", "status": "not_run", "reason": "M0-T04 does not download or run models."},
+    {"name": "platform_api_or_deployment", "evidence_type": "not_run", "status": "not_run", "reason": "M0-T04 does not start an API or deployment."},
+    {"name": "cnki", "evidence_type": "not_run", "status": "not_run", "reason": "M0-T04 does not access CNKI."},
+    {"name": "human_judgment", "evidence_type": "not_run", "status": "not_run", "reason": "M0 preserves unjudged evaluation templates."},
+    {"name": "real_source_pool_freeze", "evidence_type": "not_run", "status": "not_run", "reason": "Source-pool freezing belongs to later real evaluation work."}
+  ],
+  "status_transition": {
+    "from": {"current_phase": "M0", "current_status": "IN_PROGRESS", "m0_tasks": "3/4", "m1_status": "BLOCKED_BY_M0", "m1_tasks": "0/4"},
+    "to": {"current_phase": "M1", "current_status": "READY", "m0_tasks": "4/4", "m1_status": "READY", "m1_tasks": "0/4"}
+  }
+}
