@@ -22,6 +22,8 @@ data/runtime/
 
 # Models and large artifacts
 models/
+!app/models/
+!app/models/*.py
 artifacts/
 *.onnx
 *.pt
