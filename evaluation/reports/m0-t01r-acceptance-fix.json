@@ -1,0 +1,103 @@
+{
+  "task_id": "M0-T01R",
+  "phase": "M0",
+  "validated_commit": "864ca0fa51a36335589a8ae93a8c8a8b2616ef0f",
+  "baseline_commit": "dafcb844ed5b9ec8d510533c481a93f59a91fe22",
+  "generated_at_utc": "2026-07-26T07:30:35Z",
+  "environment": {
+    "python": "3.12.10",
+    "dependencies": {
+      "pydantic": "2.13.4",
+      "pytest": "8.4.2",
+      "ruff": "0.16.0",
+      "mypy": "1.20.2",
+      "jsonschema": "4.26.0",
+      "PyYAML": "6.0.3"
+    }
+  },
+  "checks": [
+    {
+      "name": "pre_fix_docs_validation",
+      "evidence_type": "automated",
+      "status": "failed_as_expected",
+      "command": "py -3.12 scripts/validate_project_docs.py",
+      "exit_code": 1,
+      "summary": "The baseline rejected STATUS.md because M0 was IN_PROGRESS with 1/4 tasks instead of READY with 0/4 tasks."
+    },
+    {
+      "name": "focused_m0_contract_tests",
+      "evidence_type": "automated",
+      "status": "passed",
+      "command": "py -3.12 -m pytest tests/contract -q",
+      "exit_code": 0,
+      "test_summary": "17 passed"
+    },
+    {
+      "name": "full_regression",
+      "evidence_type": "automated",
+      "status": "passed",
+      "command": "py -3.12 -m pytest -q",
+      "exit_code": 0,
+      "test_summary": "17 passed"
+    },
+    {
+      "name": "ruff",
+      "evidence_type": "automated",
+      "status": "passed",
+      "command": "py -3.12 -m ruff check app scripts tests",
+      "exit_code": 0
+    },
+    {
+      "name": "mypy",
+      "evidence_type": "automated",
+      "status": "passed",
+      "command": "py -3.12 -m mypy app scripts",
+      "exit_code": 0
+    },
+    {
+      "name": "docs_validation",
+      "evidence_type": "automated",
+      "status": "passed",
+      "command": "py -3.12 scripts/validate_project_docs.py",
+      "exit_code": 0
+    }
+  ],
+  "validated_inputs": [
+    {
+      "path": "tests/contract/fixtures/retrieval_project.schema.json",
+      "sha256": "688988742c710ae1972812d84d220c5e27e8fe7b47b60c7f691196bac7161c1b",
+      "purpose": "version-controlled normalized RetrievalProject JSON Schema snapshot"
+    },
+    {
+      "path": "STATUS.md",
+      "sha256": "2ddbae8a402ea6811afc988854dd9639d2d536f7ad32cf5eb08bbe01079b86cd",
+      "purpose": "M0 IN_PROGRESS, 1/4 task-count status input"
+    }
+  ],
+  "not_run": [
+    {
+      "name": "arXiv retrieval",
+      "status": "not_run",
+      "reason": "M0-T01R is a network-free acceptance repair."
+    },
+    {
+      "name": "model download or inference",
+      "status": "not_run",
+      "reason": "M0-T01R does not implement model work."
+    },
+    {
+      "name": "platform API or service",
+      "status": "not_run",
+      "reason": "M0-T01R does not implement platform work."
+    },
+    {
+      "name": "CNKI workflow",
+      "status": "not_run",
+      "reason": "M0-T01R does not implement CNKI work."
+    }
+  ],
+  "residual_risks": [
+    "GitHub Actions has not yet executed this branch; CI status is pending until the push creates the workflow run.",
+    "The schema snapshot intentionally locks the current Pydantic 2.13.4 output; intentional contract changes require an explicit snapshot review."
+  ]
+}
