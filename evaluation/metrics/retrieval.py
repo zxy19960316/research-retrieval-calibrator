@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from math import log2
-from typing import Sequence
 
 from app.models.enums import EvidenceSlot, Relevance
 

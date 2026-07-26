@@ -8,7 +8,6 @@ import jsonschema
 import pytest
 import yaml
 
-
 ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_PATH = ROOT / "evaluation" / "datasets" / "questions.schema.json"
 DATASET_PATH = ROOT / "evaluation" / "datasets" / "questions.v0.1.yaml"
