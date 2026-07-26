@@ -40,6 +40,7 @@ M0-T03 冻结以下六项指标的数学语义；实现不得在函数内部四�
 - `gain = 2^grade - 1`；第 1 名开始的 `discount = log2(rank + 1)`。
 - 缺失位置贡献 0，IDCG 为 0 时返回 0，`k` 必须大于 0。
 - 接口允许显式提供理想相关性序列；未提供时才可将当前返回的前 `k` 条按等级排序作为默认理想序列。
+- 显式 `ideal_relevances` 的 IDCG 不得小于观测 DCG；否则拒绝输入并抛出 `ValueError`，不得返回大于 1 的 NDCG。
 
 ### Evidence Coverage
 
@@ -49,9 +50,12 @@ M0-T03 冻结以下六项指标的数学语义；实现不得在函数内部四�
 
 ### Negative Suppression
 
-- 定义为“第一轮前 `k` 的负向暴露率 - 第二轮前 `k` 的负向暴露率”。
-- 两个暴露率的分母均固定为 `k`，返回不足 `k` 条时缺失位置不构成负向暴露。
-- `k` 必须大于 0；结果允许为负数，负数表示第二轮恶化，禁止取绝对值掩盖恶化。
+- 接口为 `negative_suppression(round_one_negative_exposure: Sequence[bool], round_two_negative_exposure: Sequence[bool], k: int) -> float`。
+- 每个布尔值对应一个排序位置。`True` 表示候选命中了一个来源可追溯的用户负反馈方向；`False` 表示未命中。
+- 指标为“第一轮前 `k` 的 `True` 数 / `k` - 第二轮前 `k` 的 `True` 数 / `k`”。返回不足 `k` 条时，缺失位置按 `False` 处理。
+- `k` 必须是非 `bool` 的正整数；输入中任何非 `bool` 值均抛出 `TypeError`，不得以 `bool(value)` 转换字符串、整数或对象。结果允许为负数，负数表示第二轮恶化，禁止取绝对值掩盖恶化。
+- **相关性判定与负向方向暴露不同。** `Relevance.IRRELEVANT` 只记录候选与问题的相关性 judgement，不能自动证明它命中了用户明确否定的方向，因而不得自动等同于负向方向暴露。
+- 负向方向将在 M3 从用户反馈、demoted terms、查询变化来源或等价的可审计机制中产生。M0-T03R 只冻结这个指标的输入接口和数学语义，不实现方向判定算法。
 
 ### New Useful Papers
 

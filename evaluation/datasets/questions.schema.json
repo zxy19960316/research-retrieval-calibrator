@@ -69,6 +69,13 @@
               "judgment_version": {"$ref": "#/$defs/non_empty_string"},
               "source_pool_snapshot": {"$ref": "#/$defs/non_empty_string"}
             }
+          },
+          "else": {
+            "properties": {
+              "judge": {"type": "null"},
+              "judgment_version": {"type": "null"},
+              "source_pool_snapshot": {"type": "null"}
+            }
           }
         }
       ]

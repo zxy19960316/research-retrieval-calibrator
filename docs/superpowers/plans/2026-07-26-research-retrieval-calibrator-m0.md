@@ -624,3 +624,36 @@ Expected: commit succeeds and the worktree is clean.
 - Enum and field names match `docs/data_model.md`.
 - Evidence categories remain separate.
 - The status transition occurs only after the validator succeeds.
+
+### M0-T03R: Negative Suppression and unjudged metadata corrective contract
+
+**Files:**
+
+- Modify: `evaluation/metrics/retrieval.py`
+- Modify: `evaluation/datasets/questions.schema.json`
+- Modify: `tests/unit/test_retrieval_metrics.py`
+- Modify: `tests/contract/test_evaluation_dataset.py`
+- Modify: `docs/evaluation.md`
+
+**Interfaces:**
+
+- Produces: `negative_suppression(round_one_negative_exposure: Sequence[bool], round_two_negative_exposure: Sequence[bool], k: int) -> float`.
+- Produces: a single conditional question schema: `frozen` requires non-empty judgment metadata; `unjudged` requires all three metadata fields to be `null`.
+
+- [x] **Step 1: Add red tests for the corrected contracts**
+
+  The metric tests use only boolean negative-direction exposure, preserve the fixed `k` denominator, reject non-boolean exposure values, reject non-positive, boolean, and non-integer `k`, and reject explicit NDCG ideals whose IDCG is below observed DCG. Dataset tests assert the ten current questions are unjudged with three null metadata fields and exercise both branches of the schema condition.
+
+- [x] **Step 2: Preserve the red result**
+
+  Run: `py -3.12 -m pytest tests/contract/test_evaluation_dataset.py tests/unit/test_retrieval_metrics.py -q`
+
+  Expected before the repair: exit 1, proving that `IRRELEVANT` cannot satisfy the new boolean interface, unjudged metadata is not locked to null, and unsafe explicit NDCG ideals are accepted.
+
+- [x] **Step 3: Apply the minimal repair**
+
+  Validate exposure values with `type(value) is bool`; count `True` entries only in each top-`k` window; add JSON Schema `if` / `then` / `else`; and reject explicit ideals that would make NDCG exceed 1. Do not implement M3 feedback-direction recognition.
+
+- [x] **Step 4: Verify focused and full checks, then record acceptance evidence**
+
+  Run the required pytest, Ruff, mypy, documentation, and dependency checks. Record actual commands, exits, test counts, hashes, and separately labelled `not_run` items in `evaluation/reports/m0-t03r-contract-fix.json` using the two-commit evidence pattern.

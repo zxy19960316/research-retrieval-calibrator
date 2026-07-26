@@ -79,6 +79,8 @@ def ndcg_at_k(
             reverse=True,
         )
     idcg = _dcg(ideal_relevances, k)
+    if dcg > idcg:
+        raise ValueError("ideal_relevances must produce an IDCG at least as large as observed DCG")
     return 0.0 if idcg == 0 else dcg / idcg
 
 
@@ -95,13 +97,24 @@ def evidence_coverage(slots: Sequence[EvidenceSlot | str]) -> float:
 
 
 def negative_suppression(
-    round_one: Sequence[Relevance | str], round_two: Sequence[Relevance | str], k: int
+    round_one_negative_exposure: Sequence[bool],
+    round_two_negative_exposure: Sequence[bool],
+    k: int,
 ) -> float:
-    """Return round-one minus round-two negative exposure; regressions stay negative."""
+    """Return reduction in source-traceable negative-direction exposure.
+
+    Each boolean represents one rank: ``True`` means the candidate matches a
+    user-negative direction and ``False`` means it does not. M3 will produce
+    these source-traceable directions; this metric intentionally does not infer
+    them from relevance judgements.
+    """
 
     _require_k(k)
-    first_exposure = sum(_as_relevance(value) is Relevance.IRRELEVANT for value in round_one[:k]) / k
-    second_exposure = sum(_as_relevance(value) is Relevance.IRRELEVANT for value in round_two[:k]) / k
+    for exposures in (round_one_negative_exposure, round_two_negative_exposure):
+        if any(type(exposure) is not bool for exposure in exposures):
+            raise TypeError("negative-direction exposure values must be bool")
+    first_exposure = sum(round_one_negative_exposure[:k]) / k
+    second_exposure = sum(round_two_negative_exposure[:k]) / k
     return first_exposure - second_exposure
 
 
