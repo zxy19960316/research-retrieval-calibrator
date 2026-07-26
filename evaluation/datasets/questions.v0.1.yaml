@@ -1,0 +1,142 @@
+schema_version: "0.1"
+questions:
+  - question_id: RRC-Q01
+    domain: nuclear_engineering
+    question_zh: 如何评估先进反应堆中辐射屏蔽材料的多尺度建模研究范围？
+    question_en: How should the scope of multiscale modelling for radiation shielding materials in advanced reactors be evaluated?
+    scope: [advanced reactors, radiation shielding, multiscale modelling]
+    exclusions: [medical radiation therapy, non-engineering policy studies]
+    judging_guide:
+      high: Directly addresses the stated reactor, shielding, and modelling scope.
+      partial: Contributes a clearly transferable material, method, or benchmark component.
+      irrelevant: Does not materially inform the stated retrieval scope.
+    label_status: unjudged
+    judge: null
+    judgment_version: null
+    source_pool_snapshot: null
+  - question_id: RRC-Q02
+    domain: nuclear_engineering
+    question_zh: 反应堆压力容器辐照脆化研究应如何限定材料、载荷与寿期范围？
+    question_en: How should material, loading, and lifetime scope be bounded for reactor pressure-vessel irradiation embrittlement research?
+    scope: [pressure vessels, irradiation embrittlement, lifetime assessment]
+    exclusions: [non-irradiation corrosion only, consumer product steels]
+    judging_guide:
+      high: Directly supports the bounded embrittlement research question.
+      partial: Supplies a transferable measurement, model, or comparison basis.
+      irrelevant: Falls outside the stated material, loading, or lifetime scope.
+    label_status: unjudged
+    judge: null
+    judgment_version: null
+    source_pool_snapshot: null
+  - question_id: RRC-Q03
+    domain: nuclear_engineering
+    question_zh: 核设施退役中的辐射场重建与不确定性量化应检索哪些研究？
+    question_en: Which studies should be retrieved for radiation-field reconstruction and uncertainty quantification in nuclear decommissioning?
+    scope: [nuclear decommissioning, radiation-field reconstruction, uncertainty quantification]
+    exclusions: [general demolition planning, clinical imaging workflows]
+    judging_guide:
+      high: Directly addresses reconstruction or uncertainty in nuclear decommissioning.
+      partial: Offers a transferable inverse method, detector approach, or uncertainty treatment.
+      irrelevant: Does not support the stated decommissioning evaluation scope.
+    label_status: unjudged
+    judge: null
+    judgment_version: null
+    source_pool_snapshot: null
+  - question_id: RRC-Q04
+    domain: nuclear_engineering
+    question_zh: 熔盐堆结构材料在腐蚀与辐照耦合条件下的失效评估应如何界定？
+    question_en: How should failure assessment be delimited for molten-salt-reactor structural materials under coupled corrosion and irradiation?
+    scope: [molten salt reactors, structural materials, coupled degradation]
+    exclusions: [battery electrolytes, uncoupled room-temperature corrosion]
+    judging_guide:
+      high: Directly examines coupled degradation for the specified reactor-material context.
+      partial: Provides a transferable degradation mechanism, test method, or model.
+      irrelevant: Does not contribute to the bounded coupled-degradation question.
+    label_status: unjudged
+    judge: null
+    judgment_version: null
+    source_pool_snapshot: null
+  - question_id: RRC-Q05
+    domain: nuclear_engineering
+    question_zh: 聚变装置中面向等离子体材料的氚滞留预测研究应覆盖哪些证据？
+    question_en: Which evidence should be covered when retrieving tritium-retention prediction studies for plasma-facing materials in fusion devices?
+    scope: [fusion devices, plasma-facing materials, tritium retention]
+    exclusions: [fission fuel cycle accounting, non-material tritium policy]
+    judging_guide:
+      high: Directly supports tritium-retention prediction in plasma-facing materials.
+      partial: Provides a transferable material model, diagnostic, or validation basis.
+      irrelevant: Does not materially inform the stated fusion-material scope.
+    label_status: unjudged
+    judge: null
+    judgment_version: null
+    source_pool_snapshot: null
+  - question_id: RRC-Q06
+    domain: cross_domain_stem
+    question_zh: 面向海上风电结构的物理信息机器学习疲劳预测应如何限定研究范围？
+    question_en: How should the research scope be bounded for physics-informed machine-learning fatigue prediction in offshore wind structures?
+    scope: [offshore wind, structural fatigue, physics-informed machine learning]
+    exclusions: [purely financial forecasting, onshore-only maintenance logistics]
+    judging_guide:
+      high: Directly addresses fatigue prediction for the stated offshore structural setting.
+      partial: Supplies a transferable physics-informed method, dataset, or validation approach.
+      irrelevant: Does not support the defined engineering prediction scope.
+    label_status: unjudged
+    judge: null
+    judgment_version: null
+    source_pool_snapshot: null
+  - question_id: RRC-Q07
+    domain: cross_domain_stem
+    question_zh: 城市洪涝遥感监测与水动力模型耦合研究应检索哪些证据？
+    question_en: Which evidence should be retrieved for coupling remote sensing with hydrodynamic models in urban flood monitoring?
+    scope: [urban flooding, remote sensing, hydrodynamic modelling]
+    exclusions: [river ecology only, non-urban agricultural irrigation]
+    judging_guide:
+      high: Directly supports the stated urban flood monitoring and coupling question.
+      partial: Contributes a transferable sensor, assimilation method, or hydrodynamic component.
+      irrelevant: Does not materially inform the defined urban flood scope.
+    label_status: unjudged
+    judge: null
+    judgment_version: null
+    source_pool_snapshot: null
+  - question_id: RRC-Q08
+    domain: cross_domain_stem
+    question_zh: 钠离子电池低温性能的电极设计与机理研究范围应如何限定？
+    question_en: How should electrode-design and mechanism research be scoped for low-temperature sodium-ion battery performance?
+    scope: [sodium-ion batteries, low-temperature performance, electrode design]
+    exclusions: [lithium-ion-only systems, grid market policy]
+    judging_guide:
+      high: Directly addresses the specified sodium-ion low-temperature mechanism or design scope.
+      partial: Provides a transferable characterization method, material principle, or benchmark.
+      irrelevant: Does not support the defined battery research question.
+    label_status: unjudged
+    judge: null
+    judgment_version: null
+    source_pool_snapshot: null
+  - question_id: RRC-Q09
+    domain: cross_domain_stem
+    question_zh: 面向桥梁健康监测的分布式光纤传感与损伤识别研究应如何评测？
+    question_en: How should distributed-fibre sensing and damage-identification research be evaluated for bridge structural health monitoring?
+    scope: [bridge monitoring, distributed fibre sensing, damage identification]
+    exclusions: [medical fibre optics, non-structural consumer sensors]
+    judging_guide:
+      high: Directly supports bridge damage identification using the stated sensing approach.
+      partial: Supplies a transferable sensing, signal-processing, or validation contribution.
+      irrelevant: Does not materially inform the bounded bridge-monitoring question.
+    label_status: unjudged
+    judge: null
+    judgment_version: null
+    source_pool_snapshot: null
+  - question_id: RRC-Q10
+    domain: cross_domain_stem
+    question_zh: 农业机器人在果园场景中的视觉导航与不确定性估计研究应检索哪些工作？
+    question_en: Which work should be retrieved for visual navigation and uncertainty estimation of agricultural robots in orchards?
+    scope: [agricultural robotics, orchards, visual navigation, uncertainty estimation]
+    exclusions: [indoor warehouse robots, crop economics]
+    judging_guide:
+      high: Directly addresses orchard visual navigation with uncertainty estimation.
+      partial: Provides a transferable perception, navigation, or uncertainty method.
+      irrelevant: Does not materially support the stated orchard-robotics scope.
+    label_status: unjudged
+    judge: null
+    judgment_version: null
+    source_pool_snapshot: null
