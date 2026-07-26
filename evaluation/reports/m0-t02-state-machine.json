@@ -1,0 +1,138 @@
+{
+  "task_id": "M0-T02",
+  "phase": "M0",
+  "validated_commit": "a79a55377a7b645f3b97a26bf7bd9fd3974ac8df",
+  "baseline_commit": "cdd7dde678c9c9d1b31f0a0852fecfa844fa3e18",
+  "generated_at_utc": "2026-07-26T09:16:20Z",
+  "environment": {
+    "python": "3.12.10",
+    "dependencies": {
+      "pydantic": "2.13.4",
+      "pytest": "8.4.2",
+      "ruff": "0.16.0",
+      "mypy": "1.20.2",
+      "jsonschema": "4.26.0",
+      "PyYAML": "6.0.3"
+    }
+  },
+  "checks": [
+    {
+      "name": "red_state_machine_tests",
+      "evidence_type": "automated",
+      "status": "failed_as_expected",
+      "command": "py -3.12 -m pytest tests/unit/test_state_machine.py -q",
+      "exit_code": 1,
+      "test_summary": "collection error: ModuleNotFoundError: No module named 'app.core'",
+      "summary": "The tests were added before app.core existed."
+    },
+    {
+      "name": "state_machine_tests",
+      "evidence_type": "automated",
+      "status": "passed",
+      "command": "py -3.12 -m pytest tests/unit/test_state_machine.py -q",
+      "exit_code": 0,
+      "test_summary": "18 passed"
+    },
+    {
+      "name": "full_regression",
+      "evidence_type": "automated",
+      "status": "passed",
+      "command": "py -3.12 -m pytest -q",
+      "exit_code": 0,
+      "test_summary": "44 passed"
+    },
+    {
+      "name": "ruff",
+      "evidence_type": "automated",
+      "status": "passed",
+      "command": "py -3.12 -m ruff check app scripts tests",
+      "exit_code": 0
+    },
+    {
+      "name": "mypy",
+      "evidence_type": "automated",
+      "status": "passed",
+      "command": "py -3.12 -m mypy app scripts",
+      "exit_code": 0
+    },
+    {
+      "name": "docs_validation",
+      "evidence_type": "automated",
+      "status": "passed",
+      "command": "py -3.12 scripts/validate_project_docs.py",
+      "exit_code": 0
+    }
+  ],
+  "ci_status": {
+    "main_merge_precondition": {
+      "workflow": "docs-validation",
+      "commit": "cdd7dde678c9c9d1b31f0a0852fecfa844fa3e18",
+      "status": "passed",
+      "run_url": "https://github.com/zxy19960316/research-retrieval-calibrator/actions/runs/30196040345"
+    },
+    "m0_t02_branch": {
+      "commit": "271b213dfc492e106af7aa58fe8b74abf707d4f4",
+      "status": "passed",
+      "runs": [
+        {
+          "workflow": "docs-validation",
+          "event": "push",
+          "run_url": "https://github.com/zxy19960316/research-retrieval-calibrator/actions/runs/30196205402"
+        },
+        {
+          "workflow": "docs-validation",
+          "event": "pull_request",
+          "run_url": "https://github.com/zxy19960316/research-retrieval-calibrator/actions/runs/30196207480"
+        }
+      ]
+    }
+  },
+  "validated_inputs": [
+    {
+      "path": "app/core/__init__.py",
+      "sha256": "7dcac6fa6e1a89697022b6d4f2e5ce8dffaf0c9837e6cd9b70be5aff4b1fcd3f"
+    },
+    {
+      "path": "app/core/state_machine.py",
+      "sha256": "edea1551b8f2311c296fb2c6d9483aaf65e5af38e94909ea91442e547803bb7e"
+    },
+    {
+      "path": "tests/unit/test_state_machine.py",
+      "sha256": "c061ce72024333a582ca171f5ba2e23f9962c25c8fc815a0873b5aa5afa3a1ef"
+    }
+  ],
+  "not_run": [
+    {
+      "name": "external network",
+      "status": "not_run",
+      "reason": "M0-T02 is a dependency-free state-machine contract."
+    },
+    {
+      "name": "model download or inference",
+      "status": "not_run",
+      "reason": "M0-T02 does not implement model work."
+    },
+    {
+      "name": "platform API or service",
+      "status": "not_run",
+      "reason": "M0-T02 does not implement platform work."
+    },
+    {
+      "name": "CNKI workflow",
+      "status": "not_run",
+      "reason": "M0-T02 does not implement CNKI work."
+    }
+  ],
+  "error_codes": [
+    "INVALID_TRANSITION",
+    "INSUFFICIENT_FEEDBACK",
+    "FINALIZED_TERMINAL",
+    "ALREADY_APPLIED",
+    "STALE_STATE"
+  ],
+  "concurrency_boundary": {
+    "guarantee": "transition_if_expected rejects a request when its expected stage differs from the supplied actual stage.",
+    "residual_risk": "The pure guard is not an atomic compare-and-set operation and cannot independently prevent races between concurrent processes.",
+    "future_persistence_requirement": "A persistence layer must perform one atomic conditional update, such as WHERE stage = expected_stage, and report STALE_STATE when no row is updated."
+  }
+}
