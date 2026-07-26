@@ -1,9 +1,9 @@
 {
   "task_id": "M0-T01R",
   "phase": "M0",
-  "validated_commit": "864ca0fa51a36335589a8ae93a8c8a8b2616ef0f",
+  "validated_commit": "3e4a5f47b7e0cd2bdd95aa05c5fe0d635a511acf",
   "baseline_commit": "dafcb844ed5b9ec8d510533c481a93f59a91fe22",
-  "generated_at_utc": "2026-07-26T07:30:35Z",
+  "generated_at_utc": "2026-07-26T07:35:12Z",
   "environment": {
     "python": "3.12.10",
     "dependencies": {
@@ -62,6 +62,20 @@
       "exit_code": 0
     }
   ],
+  "github_actions": [
+    {
+      "workflow": "docs-validation",
+      "event": "push",
+      "run_url": "https://github.com/zxy19960316/research-retrieval-calibrator/actions/runs/30193050360",
+      "status": "passed"
+    },
+    {
+      "workflow": "docs-validation",
+      "event": "pull_request",
+      "run_url": "https://github.com/zxy19960316/research-retrieval-calibrator/actions/runs/30193052054",
+      "status": "passed"
+    }
+  ],
   "validated_inputs": [
     {
       "path": "tests/contract/fixtures/retrieval_project.schema.json",
@@ -97,7 +111,6 @@
     }
   ],
   "residual_risks": [
-    "GitHub Actions has not yet executed this branch; CI status is pending until the push creates the workflow run.",
     "The schema snapshot intentionally locks the current Pydantic 2.13.4 output; intentional contract changes require an explicit snapshot review."
   ]
 }
