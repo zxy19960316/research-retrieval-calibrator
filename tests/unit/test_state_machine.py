@@ -81,6 +81,13 @@ def test_finalized_cannot_roll_back() -> None:
     assert error.value.code is TransitionErrorCode.FINALIZED_TERMINAL
 
 
+def test_reapplying_finalized_is_reported_as_already_applied() -> None:
+    with pytest.raises(InvalidTransition) as error:
+        transition(ProjectStage.FINALIZED, ProjectStage.FINALIZED, 6)
+
+    assert error.value.code is TransitionErrorCode.ALREADY_APPLIED
+
+
 def test_reapplying_an_already_applied_transition_is_rejected() -> None:
     with pytest.raises(InvalidTransition) as error:
         transition(ProjectStage.CLARIFYING, ProjectStage.CLARIFYING, 0)
@@ -153,3 +160,36 @@ def test_expected_state_guard_rejects_a_concurrent_duplicate_request() -> None:
 
     assert error.value.code is TransitionErrorCode.STALE_STATE
     assert actual_stage is ProjectStage.CLARIFYING
+
+
+def test_expected_state_guard_delegates_when_expected_state_matches_actual_state() -> None:
+    assert (
+        transition_if_expected(
+            actual_stage=ProjectStage.INIT,
+            expected_stage=ProjectStage.INIT,
+            target=ProjectStage.CLARIFYING,
+            valid_feedback_count=0,
+        )
+        is ProjectStage.CLARIFYING
+    )
+
+
+def test_sequential_duplicate_request_with_stale_expected_state_is_rejected() -> None:
+    actual_stage = ProjectStage.INIT
+
+    actual_stage = transition_if_expected(
+        actual_stage=actual_stage,
+        expected_stage=ProjectStage.INIT,
+        target=ProjectStage.CLARIFYING,
+        valid_feedback_count=0,
+    )
+
+    with pytest.raises(InvalidTransition) as error:
+        transition_if_expected(
+            actual_stage=actual_stage,
+            expected_stage=ProjectStage.INIT,
+            target=ProjectStage.CLARIFYING,
+            valid_feedback_count=0,
+        )
+
+    assert error.value.code is TransitionErrorCode.STALE_STATE

@@ -45,10 +45,10 @@ def transition(
     valid_feedback_count: int,
 ) -> ProjectStage:
     """Return one legal next stage or raise an error with a stable code."""
-    if current is ProjectStage.FINALIZED:
-        raise InvalidTransition(TransitionErrorCode.FINALIZED_TERMINAL)
     if target is current:
         raise InvalidTransition(TransitionErrorCode.ALREADY_APPLIED)
+    if current is ProjectStage.FINALIZED:
+        raise InvalidTransition(TransitionErrorCode.FINALIZED_TERMINAL)
     if _NEXT_STAGE.get(current) is not target:
         raise InvalidTransition(TransitionErrorCode.INVALID_TRANSITION)
     if target is ProjectStage.ROUND2_SEARCHING and valid_feedback_count < 6:
