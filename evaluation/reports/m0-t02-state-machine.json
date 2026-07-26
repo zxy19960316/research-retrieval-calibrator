@@ -71,8 +71,20 @@
       "run_url": "https://github.com/zxy19960316/research-retrieval-calibrator/actions/runs/30196040345"
     },
     "m0_t02_branch": {
-      "status": "not_run",
-      "reason": "The branch had not been pushed when this local evidence was generated."
+      "commit": "271b213dfc492e106af7aa58fe8b74abf707d4f4",
+      "status": "passed",
+      "runs": [
+        {
+          "workflow": "docs-validation",
+          "event": "push",
+          "run_url": "https://github.com/zxy19960316/research-retrieval-calibrator/actions/runs/30196205402"
+        },
+        {
+          "workflow": "docs-validation",
+          "event": "pull_request",
+          "run_url": "https://github.com/zxy19960316/research-retrieval-calibrator/actions/runs/30196207480"
+        }
+      ]
     }
   },
   "validated_inputs": [
