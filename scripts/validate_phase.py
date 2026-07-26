@@ -323,6 +323,10 @@ def _validate_status(payload: dict[str, Any], repo_root: Path, errors: list[str]
         "current_phase": "M1", "current_status": "READY", "m0_tasks": "4/4",
         "m1_status": "READY", "m1_tasks": "0/4",
     }
+    m1_t01_after = {
+        "current_phase": "M1", "current_status": "IN_PROGRESS", "m0_tasks": "4/4",
+        "m1_status": "IN_PROGRESS", "m1_tasks": "1/4",
+    }
     if transition.get("from") != before or transition.get("to") != after:
         errors.append("report status_transition does not declare the M0-to-M1 gate")
     status = _status_snapshot(repo_root)
@@ -330,8 +334,8 @@ def _validate_status(payload: dict[str, Any], repo_root: Path, errors: list[str]
         errors.append("STATUS.md cannot be parsed for M0 gate")
         return
     live = {key: status[key] for key in before}
-    if live not in (before, after):
-        errors.append("STATUS.md is neither the pre-transition nor final M0 gate state")
+    if live not in (before, after, m1_t01_after):
+        errors.append("STATUS.md is not a legal M0 gate or M1-T01 post-gate state")
     expected_later = {
         "m2_status": "BLOCKED_BY_M1", "m3_status": "BLOCKED_BY_M2", "m4_status": "BLOCKED_BY_M3",
         "m5_status": "BLOCKED_BY_M4", "m6_status": "BLOCKED_BY_M5",

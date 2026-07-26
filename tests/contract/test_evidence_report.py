@@ -401,6 +401,18 @@ def test_validator_recomputes_validated_input_hashes(valid_report: tuple[Any, Pa
     assert any("validated input hash mismatch" in error for error in _errors(validator, root, payload))
 
 
+def test_historical_m0_validator_allows_legal_m1_t01_in_progress_status(
+    valid_report: tuple[Any, Path, dict[str, Any]],
+) -> None:
+    validator, root, payload = valid_report
+    m1_status = _status(final=True)
+    m1_status = m1_status.replace("- 当前状态：`READY`", "- 当前状态：`IN_PROGRESS`")
+    m1_status = m1_status.replace("| M1 phase | READY | 0/4 |", "| M1 phase | IN_PROGRESS | 1/4 |")
+    _write(root, "STATUS.md", m1_status)
+
+    assert _errors(validator, root, payload) == []
+
+
 def test_historical_report_uses_validated_commit_blobs_after_later_shared_input_change(
     tmp_path: Path,
 ) -> None:
