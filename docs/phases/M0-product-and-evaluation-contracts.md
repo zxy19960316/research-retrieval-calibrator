@@ -13,6 +13,8 @@
 
 ### M0-T01：领域枚举与数据契约
 
+本任务只交付 `Query` 和 `QueryRevision` 的最小溯源接口；完整 `QueryPlan` 属于 M1、`RankedPaper` 属于 M2、完整 `QueryRevision` 属于 M3。这些后续对象不在 M0-T01 实现范围内。
+
 创建：
 
 - `pyproject.toml`

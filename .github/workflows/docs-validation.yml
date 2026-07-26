@@ -15,5 +15,18 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Install validation dependencies
+        run: >
+          python -m pip install
+          "pydantic>=2.9,<3"
+          "pytest>=8.3,<9"
+          "ruff>=0.6,<1"
+          "mypy>=1.11,<2"
+      - name: Run tests
+        run: python -m pytest -q
+      - name: Lint with Ruff
+        run: python -m ruff check app scripts tests
+      - name: Type check with mypy
+        run: python -m mypy app scripts
       - name: Validate project plan and phase files
         run: python scripts/validate_project_docs.py

@@ -1,0 +1,121 @@
+{
+  "task_id": "M0-T01R",
+  "phase": "M0",
+  "validated_commit": "453dcce4ee7b53963ee3dd150f1e912dc87f50dc",
+  "baseline_commit": "f005f33e9ba74afa8ba5168191f877698dc11afa",
+  "generated_at_utc": "2026-07-26T08:56:37Z",
+  "ci_evidence_boundary": {
+    "validated_commit_scope": "This report records local checks for the implementation commit above.",
+    "final_pr_head_scope": "The authoritative result for the final pushed PR head is the GitHub Checks for its push and pull_request events; do not rewrite this report solely to chase a later evidence-only commit hash."
+  },
+  "environment": {
+    "python": "3.12.10",
+    "dependencies": {
+      "pydantic": "2.13.4",
+      "pytest": "8.4.2",
+      "ruff": "0.16.0",
+      "mypy": "1.20.2",
+      "jsonschema": "4.26.0",
+      "PyYAML": "6.0.3"
+    }
+  },
+  "checks": [
+    {
+      "name": "pre_fix_acceptance_tests",
+      "evidence_type": "automated",
+      "status": "failed_as_expected",
+      "command": "py -3.12 -m pytest tests/contract/test_project_docs_validation.py tests/contract/test_domain_models.py -q",
+      "exit_code": 1,
+      "test_summary": "7 failed, 18 passed",
+      "summary": "Before the minimal implementation, M4 NO_GO handling, status-count constraints, and the merged public-contract schema snapshot were not accepted."
+    },
+    {
+      "name": "focused_m0_t01r_contract_tests",
+      "evidence_type": "automated",
+      "status": "passed",
+      "command": "py -3.12 -m pytest tests/contract/test_project_docs_validation.py tests/contract/test_domain_models.py -q",
+      "exit_code": 0,
+      "test_summary": "26 passed"
+    },
+    {
+      "name": "full_regression",
+      "evidence_type": "automated",
+      "status": "passed",
+      "command": "py -3.12 -m pytest -q",
+      "exit_code": 0,
+      "test_summary": "26 passed"
+    },
+    {
+      "name": "ruff",
+      "evidence_type": "automated",
+      "status": "passed",
+      "command": "py -3.12 -m ruff check app scripts tests",
+      "exit_code": 0
+    },
+    {
+      "name": "mypy",
+      "evidence_type": "automated",
+      "status": "passed",
+      "command": "py -3.12 -m mypy app scripts",
+      "exit_code": 0
+    },
+    {
+      "name": "docs_validation",
+      "evidence_type": "automated",
+      "status": "passed",
+      "command": "py -3.12 scripts/validate_project_docs.py",
+      "exit_code": 0
+    }
+  ],
+  "github_actions": [
+    {
+      "workflow": "docs-validation",
+      "event": "push",
+      "run_url": "https://github.com/zxy19960316/research-retrieval-calibrator/actions/runs/30193050360",
+      "status": "passed"
+    },
+    {
+      "workflow": "docs-validation",
+      "event": "pull_request",
+      "run_url": "https://github.com/zxy19960316/research-retrieval-calibrator/actions/runs/30193052054",
+      "status": "passed"
+    }
+  ],
+  "validated_inputs": [
+    {
+      "path": "tests/contract/fixtures/m0_t01_public_contracts.schema.json",
+      "sha256": "7781e91625a6178a8f9e8a01de4adb89d800a4ad53e6c488f5de140f4174f631",
+      "purpose": "version-controlled, key-sorted merged JSON Schema snapshot for all public M0-T01 contracts"
+    },
+    {
+      "path": "STATUS.md",
+      "sha256": "2ddbae8a402ea6811afc988854dd9639d2d536f7ad32cf5eb08bbe01079b86cd",
+      "purpose": "M0 IN_PROGRESS, 1/4 task-count status input"
+    }
+  ],
+  "not_run": [
+    {
+      "name": "arXiv retrieval",
+      "status": "not_run",
+      "reason": "M0-T01R is a network-free acceptance repair."
+    },
+    {
+      "name": "model download or inference",
+      "status": "not_run",
+      "reason": "M0-T01R does not implement model work."
+    },
+    {
+      "name": "platform API or service",
+      "status": "not_run",
+      "reason": "M0-T01R does not implement platform work."
+    },
+    {
+      "name": "CNKI workflow",
+      "status": "not_run",
+      "reason": "M0-T01R does not implement CNKI work."
+    }
+  ],
+  "residual_risks": [
+    "The merged schema snapshot intentionally locks the current Pydantic 2.13.4 output for all six public M0-T01 contracts; intentional contract changes require an explicit snapshot review."
+  ]
+}
