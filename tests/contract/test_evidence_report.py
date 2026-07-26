@@ -87,7 +87,47 @@ def _sha256(path: Path) -> str:
 def _write(root: Path, relative_path: str, contents: str = "fixture\n") -> None:
     path = root / relative_path
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(contents, encoding="utf-8")
+    path.write_bytes(contents.encode("utf-8"))
+
+
+def _git(root: Path, *arguments: str) -> str:
+    result = subprocess.run(
+        ["git", *arguments], cwd=root, text=True, capture_output=True, check=False
+    )
+    assert result.returncode == 0, result.stderr
+    return result.stdout.strip()
+
+
+def _commit(root: Path, message: str) -> str:
+    _git(root, "add", "--all")
+    _git(
+        root,
+        "-c",
+        "user.name=Evidence Test",
+        "-c",
+        "user.email=evidence-test@example.invalid",
+        "commit",
+        "-m",
+        message,
+    )
+    return _git(root, "rev-parse", "HEAD")
+
+
+def _seed_historical_report_repository(root: Path) -> tuple[dict[str, Any], str, str]:
+    _git(root, "init", "--quiet")
+    _seed_repository(root)
+    validated_commit = _commit(root, "seed validated inputs")
+
+    payload = _report(root)
+    payload["validated_commit"] = validated_commit
+    _write(root, "STATUS.md", _status(final=True))
+    _write(
+        root,
+        "evaluation/reports/m0-validation.json",
+        json.dumps(payload, indent=2) + "\n",
+    )
+    report_commit = _commit(root, "add M0 validation report")
+    return payload, validated_commit, report_commit
 
 
 def _status(*, final: bool = False) -> str:
@@ -225,7 +265,19 @@ def valid_report(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Any, 
             return subprocess.CompletedProcess(arguments, 0, "", "")
         return subprocess.CompletedProcess(arguments, 0, "a" * 40 + "\n", "")
 
+    def fake_git_bytes(*arguments: str, cwd: Path) -> subprocess.CompletedProcess[bytes]:
+        if arguments[0] == "show":
+            relative_path = arguments[1].split(":", maxsplit=1)[1]
+            path = cwd / relative_path
+            if path.is_file():
+                return subprocess.CompletedProcess(arguments, 0, path.read_bytes(), b"")
+            return subprocess.CompletedProcess(arguments, 1, b"", b"missing fixture blob")
+        if arguments[:2] == ("cat-file", "-t"):
+            return subprocess.CompletedProcess(arguments, 0, b"blob\n", b"")
+        return subprocess.CompletedProcess(arguments, 0, b"", b"")
+
     monkeypatch.setattr(validator, "run_git", fake_git)
+    monkeypatch.setattr(validator, "run_git_bytes", fake_git_bytes)
     return validator, tmp_path, _report(tmp_path)
 
 
@@ -347,6 +399,146 @@ def test_validator_recomputes_validated_input_hashes(valid_report: tuple[Any, Pa
     validator, root, payload = valid_report
     payload["validated_inputs"][0]["sha256"] = "0" * 64
     assert any("validated input hash mismatch" in error for error in _errors(validator, root, payload))
+
+
+def test_historical_report_uses_validated_commit_blobs_after_later_shared_input_change(
+    tmp_path: Path,
+) -> None:
+    validator = _load_validator()
+    _, validated_commit, report_commit = _seed_historical_report_repository(tmp_path)
+
+    assert validator.validate_report_file("M0", repo_root=tmp_path) == []
+    report_bytes = (tmp_path / "evaluation/reports/m0-validation.json").read_bytes()
+
+    _write(tmp_path, "PRODUCT_SPEC.md", "legal later M1 change\n")
+    later_commit = _commit(tmp_path, "change shared input after M0")
+
+    assert report_commit != later_commit
+    assert (tmp_path / "evaluation/reports/m0-validation.json").read_bytes() == report_bytes
+    assert validator.validate_report_file("M0", repo_root=tmp_path) == []
+    assert _git(tmp_path, "merge-base", "--is-ancestor", validated_commit, "HEAD") == ""
+
+
+def test_historical_source_reports_use_validated_commit_blobs(tmp_path: Path) -> None:
+    validator = _load_validator()
+    _, _, _ = _seed_historical_report_repository(tmp_path)
+
+    _write(
+        tmp_path,
+        "evaluation/reports/m0-t02-state-machine.json",
+        json.dumps({"task_id": "M1-T01", "phase": "M1"}) + "\n",
+    )
+    _commit(tmp_path, "change historical source report in a later phase")
+
+    assert validator.validate_report_file("M0", repo_root=tmp_path) == []
+
+
+def test_historical_report_rejects_uncommitted_report_or_status_changes(tmp_path: Path) -> None:
+    validator = _load_validator()
+    _seed_historical_report_repository(tmp_path)
+
+    report_path = tmp_path / "evaluation/reports/m0-validation.json"
+    report_path.write_bytes(report_path.read_bytes() + b"\n")
+    assert "M0 report has uncommitted changes" in validator.validate_report_file(
+        "M0", repo_root=tmp_path
+    )
+
+    _git(tmp_path, "restore", "evaluation/reports/m0-validation.json")
+    status_path = tmp_path / "STATUS.md"
+    status_path.write_bytes(status_path.read_bytes() + b"\n")
+    assert "STATUS.md has uncommitted changes" in validator.validate_report_file(
+        "M0", repo_root=tmp_path
+    )
+
+
+def test_historical_report_rejects_hash_mismatch_against_validated_commit_blob(
+    tmp_path: Path,
+) -> None:
+    validator = _load_validator()
+    payload, _, _ = _seed_historical_report_repository(tmp_path)
+    payload["validated_inputs"][0]["sha256"] = "0" * 64
+    _write(
+        tmp_path,
+        "evaluation/reports/m0-validation.json",
+        json.dumps(payload, indent=2) + "\n",
+    )
+    _commit(tmp_path, "commit mismatched M0 report")
+
+    assert any(
+        "validated input hash mismatch: PRODUCT_SPEC.md" in error
+        for error in validator.validate_report_file("M0", repo_root=tmp_path)
+    )
+
+
+def test_historical_report_rejects_input_missing_from_validated_commit(
+    tmp_path: Path,
+) -> None:
+    validator = _load_validator()
+    payload, _, _ = _seed_historical_report_repository(tmp_path)
+    _write(tmp_path, "added-after-m0.txt", "only exists after validated commit\n")
+    payload["validated_inputs"].append(
+        {"path": "added-after-m0.txt", "sha256": _sha256(tmp_path / "added-after-m0.txt")}
+    )
+    _write(
+        tmp_path,
+        "evaluation/reports/m0-validation.json",
+        json.dumps(payload, indent=2) + "\n",
+    )
+    _commit(tmp_path, "add invalid historical input")
+
+    assert any(
+        "validated input is missing from validated_commit: added-after-m0.txt" in error
+        for error in validator.validate_report_file("M0", repo_root=tmp_path)
+    )
+
+
+def test_historical_report_rejects_nonancestor_validated_commit(tmp_path: Path) -> None:
+    validator = _load_validator()
+    _git(tmp_path, "init", "--quiet")
+    _seed_repository(tmp_path)
+    common_commit = _commit(tmp_path, "seed shared inputs")
+
+    _git(tmp_path, "switch", "--quiet", "-c", "nonancestor")
+    _write(tmp_path, "PRODUCT_SPEC.md", "nonancestor input\n")
+    nonancestor_commit = _commit(tmp_path, "create nonancestor commit")
+    _git(tmp_path, "switch", "--quiet", "-")
+
+    payload = _report(tmp_path)
+    payload["validated_commit"] = nonancestor_commit
+    payload["validated_inputs"][0]["sha256"] = _sha256(tmp_path / "PRODUCT_SPEC.md")
+    _write(tmp_path, "STATUS.md", _status(final=True))
+    _write(
+        tmp_path,
+        "evaluation/reports/m0-validation.json",
+        json.dumps(payload, indent=2) + "\n",
+    )
+    _commit(tmp_path, "add report with nonancestor commit")
+
+    assert common_commit != nonancestor_commit
+    assert any(
+        "validated_commit is not an ancestor of HEAD" in error
+        for error in validator.validate_report_file("M0", repo_root=tmp_path)
+    )
+
+
+@pytest.mark.parametrize("invalid_path", ["C:/outside.txt", "../outside.txt"])
+def test_historical_report_rejects_unsafe_input_paths_with_real_git(
+    tmp_path: Path, invalid_path: str
+) -> None:
+    validator = _load_validator()
+    payload, _, _ = _seed_historical_report_repository(tmp_path)
+    payload["validated_inputs"][0]["path"] = invalid_path
+    _write(
+        tmp_path,
+        "evaluation/reports/m0-validation.json",
+        json.dumps(payload, indent=2) + "\n",
+    )
+    _commit(tmp_path, "add unsafe historical input path")
+
+    assert any(
+        f"unsafe validated input path: {invalid_path}" in error
+        for error in validator.validate_report_file("M0", repo_root=tmp_path)
+    )
 
 
 @pytest.mark.parametrize(
