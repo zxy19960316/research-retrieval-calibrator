@@ -6,8 +6,8 @@ import pytest
 from pydantic import TypeAdapter, ValidationError
 
 from app.models.enums import (
-    FeedbackAspect,
     EvidenceSlot,
+    FeedbackAspect,
     ProjectStage,
     QueryBranch,
     Relevance,
