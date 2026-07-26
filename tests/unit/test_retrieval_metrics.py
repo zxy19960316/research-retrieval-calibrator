@@ -50,6 +50,15 @@ def test_ndcg_returns_zero_when_idcg_is_zero() -> None:
     assert ndcg_at_k([Relevance.IRRELEVANT], 10, ideal_relevances=[Relevance.IRRELEVANT]) == 0.0
 
 
+def test_ndcg_rejects_explicit_ideal_that_would_produce_a_score_above_one() -> None:
+    with pytest.raises(ValueError, match="ideal_relevances"):
+        ndcg_at_k(
+            [Relevance.HIGH, Relevance.PARTIAL],
+            2,
+            ideal_relevances=[Relevance.PARTIAL, Relevance.IRRELEVANT],
+        )
+
+
 def test_evidence_coverage_uses_five_fixed_slots_and_deduplicates() -> None:
     assert evidence_coverage(
         [
@@ -67,17 +76,41 @@ def test_evidence_coverage_rejects_unknown_slot() -> None:
 
 
 def test_negative_suppression_reports_improvement() -> None:
-    first = [Relevance.IRRELEVANT] * 4 + [Relevance.HIGH] * 6
-    second = [Relevance.IRRELEVANT] + [Relevance.HIGH] * 9
+    first = [True] * 4 + [False] * 6
+    second = [True] + [False] * 9
 
     assert negative_suppression(first, second, 10) == pytest.approx(0.3)
 
 
 def test_negative_suppression_allows_negative_regression() -> None:
-    first = [Relevance.IRRELEVANT] + [Relevance.HIGH] * 9
-    second = [Relevance.IRRELEVANT] * 4 + [Relevance.HIGH] * 6
+    first = [True] + [False] * 9
+    second = [True] * 4 + [False] * 6
 
     assert negative_suppression(first, second, 10) == pytest.approx(-0.3)
+
+
+def test_negative_suppression_keeps_k_as_the_denominator_for_short_inputs() -> None:
+    assert negative_suppression([True], [], 4) == 0.25
+
+
+def test_negative_suppression_is_zero_without_negative_direction_exposure() -> None:
+    assert negative_suppression([False, False], [False], 10) == 0.0
+
+
+@pytest.mark.parametrize("k", [0, -1, True, False, 1.5, "1"])
+def test_negative_suppression_rejects_invalid_k(k: object) -> None:
+    with pytest.raises(ValueError):
+        negative_suppression([], [], k)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("invalid_exposure", [1, 0, "True", "", object()])
+def test_negative_suppression_rejects_non_boolean_exposure_values(
+    invalid_exposure: object,
+) -> None:
+    with pytest.raises(TypeError, match="bool"):
+        negative_suppression([invalid_exposure], [], 1)  # type: ignore[list-item]
+    with pytest.raises(TypeError, match="bool"):
+        negative_suppression([], [invalid_exposure], 1)  # type: ignore[list-item]
 
 
 def test_new_useful_papers_counts_unique_new_relevant_papers() -> None:
@@ -118,7 +151,6 @@ def test_metadata_hallucination_rate_is_zero_without_visible_records() -> None:
     [
         lambda: precision_at_k([], 0),
         lambda: ndcg_at_k([], 0),
-        lambda: negative_suppression([], [], 0),
         lambda: new_useful_papers([], [], 0),
     ],
 )

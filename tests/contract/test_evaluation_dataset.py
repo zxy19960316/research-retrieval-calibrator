@@ -63,6 +63,13 @@ def test_current_m0_template_is_entirely_unjudged() -> None:
     assert [question["label_status"] for question in questions] == ["unjudged"] * 10
 
 
+def test_current_unjudged_template_has_null_judgment_metadata() -> None:
+    questions = _load_dataset()["questions"]
+    assert isinstance(questions, list)
+    for metadata_name in ("judge", "judgment_version", "source_pool_snapshot"):
+        assert [question[metadata_name] for question in questions] == [None] * 10
+
+
 def test_schema_rejects_duplicate_ids_and_wrong_domain_split() -> None:
     duplicate_ids = copy.deepcopy(_load_dataset())
     duplicate_ids["questions"][1]["question_id"] = "RRC-Q01"
@@ -88,3 +95,35 @@ def test_schema_rejects_empty_questions_missing_frozen_metadata_and_extra_fields
     extra_field = copy.deepcopy(_load_dataset())
     extra_field["questions"][0]["undeclared"] = "forbidden"
     assert _validation_errors(extra_field)
+
+
+@pytest.mark.parametrize("metadata_name", ["judge", "judgment_version", "source_pool_snapshot"])
+def test_schema_rejects_unjudged_questions_with_judgment_metadata(metadata_name: str) -> None:
+    unjudged_with_metadata = copy.deepcopy(_load_dataset())
+    unjudged_with_metadata["questions"][0][metadata_name] = "must be null"
+
+    assert _validation_errors(unjudged_with_metadata)
+
+
+def test_schema_accepts_frozen_question_with_complete_nonempty_metadata() -> None:
+    frozen_with_metadata = copy.deepcopy(_load_dataset())
+    question = frozen_with_metadata["questions"][0]
+    question["label_status"] = "frozen"
+    question["judge"] = "reviewer-01"
+    question["judgment_version"] = "v1"
+    question["source_pool_snapshot"] = "snapshot-2026-07-26"
+
+    assert _validation_errors(frozen_with_metadata) == []
+
+
+@pytest.mark.parametrize("metadata_name", ["judge", "judgment_version", "source_pool_snapshot"])
+def test_schema_rejects_frozen_question_missing_required_metadata(metadata_name: str) -> None:
+    frozen_without_metadata = copy.deepcopy(_load_dataset())
+    question = frozen_without_metadata["questions"][0]
+    question["label_status"] = "frozen"
+    question["judge"] = "reviewer-01"
+    question["judgment_version"] = "v1"
+    question["source_pool_snapshot"] = "snapshot-2026-07-26"
+    question[metadata_name] = None
+
+    assert _validation_errors(frozen_without_metadata)
