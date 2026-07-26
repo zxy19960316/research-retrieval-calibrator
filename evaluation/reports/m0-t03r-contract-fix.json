@@ -1,0 +1,72 @@
+{
+  "task_id": "M0-T03R",
+  "phase": "M0",
+  "baseline_commit": "ba3c3cd80a311065a27b58959198fcc5d42b1600",
+  "validated_implementation_commit": "520f69e1014968d1bd8b084de6fbb1ec4df886de",
+  "generated_at_utc": "2026-07-26T10:31:58Z",
+  "environment": {
+    "python": "3.12.10",
+    "dependencies": {
+      "PyYAML": "6.0.3",
+      "jsonschema": "4.26.0",
+      "mypy": "1.20.2",
+      "pydantic": "2.13.4",
+      "pytest": "8.4.2",
+      "ruff": "0.16.0"
+    }
+  },
+  "red_light": {
+    "command": "py -3.12 -m pytest tests/contract/test_evaluation_dataset.py tests/unit/test_retrieval_metrics.py -q",
+    "exit_code": 1,
+    "failure_summary": "13 failed, 32 passed: unjudged questions accepted non-null judge, judgment_version, and source_pool_snapshot; explicit NDCG ideals could yield a score above 1; and negative_suppression still consumed Relevance.IRRELEVANT instead of boolean negative-direction exposure."
+  },
+  "green_light": {
+    "focused_tests": {
+      "command": "py -3.12 -m pytest tests/contract/test_evaluation_dataset.py tests/unit/test_retrieval_metrics.py -q",
+      "exit_code": 0,
+      "passed": 45
+    },
+    "full_tests": {
+      "command": "py -3.12 -m pytest -q",
+      "exit_code": 0,
+      "passed": 92
+    },
+    "ruff": {
+      "command": "py -3.12 -m ruff check app evaluation scripts tests",
+      "exit_code": 0,
+      "summary": "All checks passed."
+    },
+    "mypy": {
+      "command": "py -3.12 -m mypy app evaluation scripts",
+      "exit_code": 0,
+      "summary": "Success: no issues found in 13 source files."
+    },
+    "project_docs": {
+      "command": "py -3.12 scripts/validate_project_docs.py",
+      "exit_code": 0,
+      "summary": "PASS: project docs are complete; 31 phase tasks are indexed; local links resolve."
+    },
+    "pip_check": {
+      "command": "py -3.12 -m pip check",
+      "exit_code": 0,
+      "summary": "No broken requirements found."
+    }
+  },
+  "input_sha256": {
+    "docs/evaluation.md": "1a61e78dbb4cd6b9853fcf6b6db01d4ac968b7d82fa86825ac4187dc4fc7a816",
+    "docs/superpowers/plans/2026-07-26-research-retrieval-calibrator-m0.md": "ddfac308b5fb5c8134ad34a0412d06b6903f3c15e05f37a2cdec3911b81a8a71",
+    "evaluation/datasets/questions.schema.json": "da2f388592e20887d51331105f4201a9eeaa2083af81eb282d2da7d4e0590862",
+    "evaluation/metrics/retrieval.py": "8c1082071e51d9f83885ffc74b10bed107d856982f8b29725a193024f645cc47",
+    "tests/contract/test_evaluation_dataset.py": "7d0fd11780d93bd4435bbcb6280f7aa6f7b90172e3f192eea0bdb5e68bafc717",
+    "tests/unit/test_retrieval_metrics.py": "c2838146dcf9454a8c81c5f2322f8947618ae20be4ea5ce334b01460fa9a8851"
+  },
+  "not_run": {
+    "external_network": "not_run",
+    "model": "not_run",
+    "platform_api": "not_run",
+    "CNKI": "not_run",
+    "human_judgment": "not_run",
+    "source_pool_freeze": "not_run"
+  },
+  "scope_note": "M0-T03R freezes only the boolean negative-direction exposure interface and its mathematics. It does not implement M3 user-feedback direction identification. STATUS.md remains M0 IN_PROGRESS, 3/4, with M0-T04 as the next action."
+}
