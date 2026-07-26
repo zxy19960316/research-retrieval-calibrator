@@ -33,3 +33,7 @@
 ## 下一动作
 
 M0-T01、M0-T02、M0-T03、M0-T03R 与 M0-T04 已完成：领域契约、状态机、十题评测模板与指标、负向抑制修正，以及机器可读的证据报告和阶段自校验均已通过。M1-T01 已完成：意图 IR、澄清问题、严格 LLM fake 边界和四路线三宽度查询规划均已验证。下一动作：`M1-T02`；继续遵守 M1 的真实来源与证据边界。
+
+## M1-T01R repair evidence
+
+PR #6 now contains the M1-T01R repair evidence: fake-provider raw-question preparation, unmapped-Chinese refusal, 12 canonical arXiv grammar queries, exact term evidence, and historical M0 validation are automated. M1 remains `IN_PROGRESS 1/4`; M1-T02 is explicitly not started and outside this repair scope.

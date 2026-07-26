@@ -1,82 +1,45 @@
 {
-  "task_id": "M1-T01",
+  "task_id": "M1-T01R",
   "phase": "M1",
   "baseline_main_commit": "9eb8d8d4e4482ff2a05346a8fdad5b86780ea6cf",
-  "validated_implementation_commit": "d0e0eafdbbbd2e49f54757fdbe3d7ce6e7d1a09e",
-  "generated_at_utc": "2026-07-26T13:36:40Z",
+  "validated_implementation_commit": "5ccaf5951330612ed5b89cc6b8dd5f6a4a30056b",
+  "generated_at_utc": "2026-07-26T15:24:49Z",
   "python_version": "3.12.10",
   "red_light": [
-    {
-      "command": "py -3.12 -m pytest tests/unit/test_intent_clarification.py tests/unit/test_query_planner.py tests/contract/test_m1_t01_contracts.py -q",
-      "exit_code": 1,
-      "summary": "3 collection errors: app.adapters and M1 core modules were absent before implementation."
-    },
-    {
-      "command": "py -3.12 -m pytest tests/contract/test_evidence_report.py -q",
-      "exit_code": 1,
-      "summary": "1 failed, 23 passed: the historical M0 validator rejected legal M1 IN_PROGRESS 1/4 status before the minimal compatibility change."
-    }
+    {"command": "py -3.12 -m pytest tests/contract/test_evidence_report.py tests/contract/test_project_docs_validation.py tests/contract/test_m1_t01_contracts.py -q", "exit_code": 1, "summary": "3 failures: legal M1 IN_PROGRESS 2/4 and 3/4 were rejected, and IntentDraft accepted incomplete multi-term evidence."},
+    {"command": "py -3.12 -m pytest tests/unit/test_intent_clarification.py tests/unit/test_query_planner.py tests/contract/test_m1_t01_contracts.py -q", "exit_code": 1, "summary": "2 collection errors before implementation: prepare_intent and QueryExpansion were absent."}
   ],
   "green_light": [
-    {
-      "name": "m1_t01_focused_tests",
-      "command": "py -3.12 -m pytest tests/unit/test_intent_clarification.py tests/unit/test_query_planner.py tests/contract/test_m1_t01_contracts.py -q",
-      "exit_code": 0,
-      "summary": "15 passed"
-    },
-    {
-      "name": "full_regression",
-      "command": "py -3.12 -m pytest -q",
-      "exit_code": 0,
-      "summary": "131 passed"
-    },
-    {
-      "name": "ruff",
-      "command": "py -3.12 -m ruff check app evaluation scripts tests",
-      "exit_code": 0,
-      "summary": "All checks passed"
-    },
-    {
-      "name": "mypy",
-      "command": "py -3.12 -m mypy app evaluation scripts",
-      "exit_code": 0,
-      "summary": "Success: no issues found in 19 source files"
-    },
-    {
-      "name": "project_docs_validation",
-      "command": "py -3.12 scripts/validate_project_docs.py",
-      "exit_code": 0,
-      "summary": "31 phase tasks indexed and local links resolved"
-    },
-    {
-      "name": "m0_historical_validation",
-      "command": "py -3.12 scripts/validate_phase.py M0",
-      "exit_code": 0,
-      "summary": "M0 evidence report, inputs, git ancestry, and status gate valid"
-    },
-    {
-      "name": "pip_check",
-      "command": "py -3.12 -m pip check",
-      "exit_code": 0,
-      "summary": "No broken requirements found"
-    }
+    {"name": "m1_t01r_focused_tests", "command": "py -3.12 -m pytest tests/unit/test_intent_clarification.py tests/unit/test_query_planner.py tests/contract/test_m1_t01_contracts.py tests/contract/test_evidence_report.py -q", "exit_code": 0, "summary": "51 passed in 78.74s; covers fake-provider preparation, unmapped Chinese refusal, 12 canonical queries, expansion filtering, evidence integrity, and M0 lifecycle."},
+    {"name": "full_regression", "command": "py -3.12 -m pytest -q", "exit_code": 0, "summary": "148 passed in 78.69s"},
+    {"name": "ruff", "command": "py -3.12 -m ruff check app evaluation scripts tests", "exit_code": 0, "summary": "All checks passed"},
+    {"name": "mypy", "command": "py -3.12 -m mypy app evaluation scripts", "exit_code": 0, "summary": "Success: no issues found in 19 source files"},
+    {"name": "project_docs_validation", "command": "py -3.12 scripts/validate_project_docs.py", "exit_code": 0, "summary": "31 phase tasks indexed; legal M1 states and invalid dependencies are covered by contract tests."},
+    {"name": "m0_historical_validation", "command": "py -3.12 scripts/validate_phase.py M0", "exit_code": 0, "summary": "M0 evidence, blob hashes, ancestry, historical completion, and dependency gate are valid."},
+    {"name": "pip_check", "command": "py -3.12 -m pip check", "exit_code": 0, "summary": "No broken requirements found"}
   ],
   "input_sha256": {
-    "app/adapters/llm.py": "29281e6c038d44bcb288ae2cb913747fc0b04324336276b657a8abb3bbb62761",
-    "app/core/intent.py": "e90d5f015f4a0a13127240cc33ea7c5609814a0e256fb25011946dd20300d9d2",
-    "app/core/query_planner.py": "ffdb2ee110988d7a9b274c262b04a0d4e0da0af21a66c5e4ed9852164f873339",
-    "app/models/planning.py": "b17e4cccdc3aff806dd8458a405e7c1c5a31df764ef7a8ab9fdee4294b2ee512",
-    "tests/contract/test_m1_t01_contracts.py": "1a1a6e447878de074fad311ec9bd1bf962e1fcecacd02487056fe553427b6941",
-    "tests/unit/test_intent_clarification.py": "576e67a355ba6e7cd4e514f3202ba42a5a687d4f30bbffd5a6fd6f19b963a5ac",
-    "tests/unit/test_query_planner.py": "df86f87261cf1cc66cbccee71276ed837408f049fc9aaf21ddd00ffa6f962d95"
+    "app/adapters/__init__.py": "98cbf531cf3ba648f45ba3f3485698edcc0d86b79af7c5976f42f0976f7f5b77",
+    "app/adapters/llm.py": "dc1fae74d83736887dd61adcb8adae99089d3d831f7465ffa82493564d045a12",
+    "app/core/intent.py": "0d86adbe6d02ad35165d7150d0bbe24651cee0202b4e76972562a052a26114eb",
+    "app/core/query_planner.py": "11929e389c047741c29a4d70eacfee5493936c80e83301de72ecf6534e02ee47",
+    "app/models/__init__.py": "c3a1d713c83916db852880051a4e6dda822daf50bbb1c06464e1efe837d79341",
+    "app/models/planning.py": "fed674e184cecf659680864c0c4bbffec7293596964ccd565fd963252fde98a0",
+    "scripts/validate_phase.py": "7734d71257140fbaf256aaaaca2b7a7869e6b9466ba828f91a62a33e2cc54504",
+    "tests/contract/test_evidence_report.py": "54a42338f6c23ff6e54ebeb213ab25694ff78bf5faae820d88ea4b7524f7bf54",
+    "tests/contract/test_m1_t01_contracts.py": "5b207f058b0e5f7215453d45a1d3c77ee88d642b582dd599297055df10fd4d92",
+    "tests/contract/test_project_docs_validation.py": "63441198d922595b40b485d3e18fee1a43d51c403d23ef7ca7e57c21f4bd0fae",
+    "tests/unit/test_intent_clarification.py": "8bc2a123f74c5957b6f399abca8f849f256ddbf5eb30bb2d90c619e45f72b2ed",
+    "tests/unit/test_query_planner.py": "bb934694b7f639180e2c1a858306cdd3c010361ac02314efbcc0742a79998f93",
+    "docs/superpowers/plans/2026-07-26-research-retrieval-calibrator-m1-t01.md": "9a24b723522da6835febdada6ddda02cacfb7551911c808801951369b25c7854"
   },
-  "external_boundaries": {
-    "arxiv_external_network": "not_run",
-    "real_model_download_or_inference": "not_run",
-    "platform_api_or_deployment": "not_run",
-    "cnki": "not_run",
-    "human_judgment": "not_run",
-    "real_source_pool_freeze": "not_run"
-  },
-  "scope_note": "M1-T01 implements only deterministic intent draft validation, clarification selection, LLM-fake validation, and four-branch query planning. It makes no network request or model call and introduces no M1-T02, M2, persistence, or platform object."
+  "external_boundaries": [
+    {"name": "arxiv_external_network", "evidence_type": "not_run", "status": "not_run", "reason": "M1-T01R produces canonical query text only; HTTP, Atom, pagination, caching, and real arXiv requests are M1-T02 scope."},
+    {"name": "real_model_download_or_inference", "evidence_type": "not_run", "status": "not_run", "reason": "Only deterministic fake providers were exercised; no real model was configured or called."},
+    {"name": "platform_api_or_deployment", "evidence_type": "not_run", "status": "not_run", "reason": "Outside M1-T01R."},
+    {"name": "cnki", "evidence_type": "not_run", "status": "not_run", "reason": "Outside M1-T01R."},
+    {"name": "human_judgment", "evidence_type": "not_run", "status": "not_run", "reason": "Deterministic contract coverage only."},
+    {"name": "real_source_pool_freeze", "evidence_type": "not_run", "status": "not_run", "reason": "No external retrieval or source-pool operation occurs in M1-T01R."}
+  ],
+  "scope_note": "M1-T01R repairs deterministic intent preparation, strict fake validation, provenance-bearing retrieval mapping, clarification/freeze handling, canonical unencoded arXiv planning, expansion application, evidence integrity, and M0 historical validation boundaries. M1-T02 is not started."
 }
