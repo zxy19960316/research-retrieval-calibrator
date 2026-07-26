@@ -34,3 +34,5 @@ jobs:
         run: python -m mypy app evaluation scripts
       - name: Validate project plan and phase files
         run: python scripts/validate_project_docs.py
+      - name: Validate completed M0 evidence
+        run: python scripts/validate_phase.py M0
