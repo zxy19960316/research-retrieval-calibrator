@@ -3,13 +3,15 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
-from pydantic import ValidationError
+from pydantic import TypeAdapter, ValidationError
 
 from app.models.enums import (
     FeedbackAspect,
+    EvidenceSlot,
     ProjectStage,
     QueryBranch,
     Relevance,
+    SupportLevel,
 )
 from app.models.feedback import FeedbackRecord
 from app.models.paper import PaperRecord
@@ -64,6 +66,16 @@ def test_pydantic_models_reject_unknown_enum_values(
         model.model_validate(payload)
 
     assert error.value.errors()[0]["loc"] == (field,)
+    assert error.value.errors()[0]["type"] == "enum"
+
+
+@pytest.mark.parametrize("enum_type", [EvidenceSlot, SupportLevel])
+def test_type_adapter_rejects_unknown_public_contract_enum_values(
+    enum_type: type[EvidenceSlot] | type[SupportLevel],
+) -> None:
+    with pytest.raises(ValidationError) as error:
+        TypeAdapter(enum_type).validate_python("NOT_A_VALID_VALUE")
+
     assert error.value.errors()[0]["type"] == "enum"
 
 
@@ -182,7 +194,7 @@ def test_project_rejects_stage_and_round_mismatch() -> None:
         )
 
 
-def test_valid_models_export_stable_json_schema() -> None:
+def test_public_m0_t01_contracts_export_stable_json_schemas() -> None:
     intent = ResearchIntent(
         object_terms=["shielding"],
         task_terms=["design"],
@@ -206,9 +218,22 @@ def test_valid_models_export_stable_json_schema() -> None:
     )
 
     assert project.project_id == "RRC-2026-0001"
-    snapshot_path = Path(__file__).parent / "fixtures" / "retrieval_project.schema.json"
+    snapshot_path = Path(__file__).parent / "fixtures" / "m0_t01_public_contracts.schema.json"
     expected_schema = json.loads(snapshot_path.read_text(encoding="utf-8"))
-    normalized_actual = json.loads(json.dumps(RetrievalProject.model_json_schema(), sort_keys=True))
+    public_models = {
+        "FeedbackRecord": FeedbackRecord,
+        "PaperRecord": PaperRecord,
+        "Query": Query,
+        "QueryRevision": QueryRevision,
+        "ResearchIntent": ResearchIntent,
+        "RetrievalProject": RetrievalProject,
+    }
+    normalized_actual = json.loads(
+        json.dumps(
+            {name: model.model_json_schema() for name, model in sorted(public_models.items())},
+            sort_keys=True,
+        )
+    )
     normalized_expected = json.loads(json.dumps(expected_schema, sort_keys=True))
     assert normalized_actual == normalized_expected
     assert set(RetrievalProject.model_json_schema()["properties"]) == {

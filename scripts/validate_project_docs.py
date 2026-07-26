@@ -121,8 +121,22 @@ def validate_status_text(status: str, errors: list[str]) -> None:
                 f"{phase} task count must be within 0/{expected_total} to {expected_total}/{expected_total}; "
                 f"observed {completed}/{total}"
             )
+        if phase_status == "READY" and completed != 0:
+            errors.append(f"{phase} is READY but declares {completed}/{total} tasks")
+        if phase_status.startswith("BLOCKED_BY_") and completed != 0:
+            errors.append(f"{phase} is {phase_status} but declares {completed}/{total} tasks")
+        if phase_status == "IN_PROGRESS" and completed >= expected_total:
+            errors.append(f"{phase} is IN_PROGRESS but declares all {completed}/{total} tasks")
         if phase_status == "COMPLETE" and completed != total:
             errors.append(f"{phase} is COMPLETE but declares only {completed}/{total} tasks")
+        if phase_status == "NO_GO":
+            if phase != "M4":
+                errors.append(f"{phase} is NO_GO but only M4 may be NO_GO")
+            if (completed, total) != (expected_total, expected_total):
+                errors.append(
+                    f"{phase} is NO_GO but must declare {expected_total}/{expected_total} tasks; "
+                    f"observed {completed}/{total}"
+                )
         if phase_status in ACTIVE_STATUSES:
             active_phases.append(phase)
         if index:
@@ -145,7 +159,15 @@ def validate_status_text(status: str, errors: list[str]) -> None:
             f"current status mismatch for {current_phase}: "
             f"header is {current_status}, table is {by_phase[current_phase][0]}"
         )
-    if active_phases != [current_phase]:
+    if current_status == "NO_GO":
+        if current_phase != "M4":
+            errors.append("STATUS.md may declare NO_GO only for current phase M4")
+        if active_phases:
+            errors.append(
+                "STATUS.md with current NO_GO must not have an active phase; "
+                f"observed {active_phases}"
+            )
+    elif active_phases != [current_phase]:
         errors.append(
             f"STATUS.md must have exactly one active phase matching its header; "
             f"observed {active_phases}"
