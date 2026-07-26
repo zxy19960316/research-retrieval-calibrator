@@ -85,8 +85,14 @@ def run_git(*arguments: str, cwd: Path) -> subprocess.CompletedProcess[str]:
     )
 
 
-def sha256_file(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+def run_git_bytes(*arguments: str, cwd: Path) -> subprocess.CompletedProcess[bytes]:
+    return subprocess.run(
+        ["git", *arguments], cwd=cwd, text=False, capture_output=True, check=False
+    )
+
+
+def sha256_bytes(contents: bytes) -> str:
+    return hashlib.sha256(contents).hexdigest()
 
 
 def _schema_errors(payload: dict[str, Any], repo_root: Path) -> list[str]:
@@ -109,6 +115,25 @@ def _safe_relative_path(value: str, repo_root: Path) -> Path | None:
     except ValueError:
         return None
     return resolved
+
+
+def _read_git_blob(
+    commit: str, relative_path: str, repo_root: Path
+) -> tuple[bytes | None, str | None]:
+    git_path = relative_path.replace("\\", "/")
+    object_name = f"{commit}:{git_path}"
+    exists = run_git_bytes("cat-file", "-e", object_name, cwd=repo_root)
+    if exists.returncode != 0:
+        return None, "missing"
+    object_type = run_git_bytes("cat-file", "-t", object_name, cwd=repo_root)
+    if object_type.returncode != 0:
+        return None, "unreadable"
+    if object_type.stdout.strip() != b"blob":
+        return None, "not_blob"
+    contents = run_git_bytes("show", object_name, cwd=repo_root)
+    if contents.returncode != 0:
+        return None, "unreadable"
+    return contents.stdout, None
 
 
 def _validate_checks(payload: dict[str, Any], errors: list[str]) -> None:
@@ -150,7 +175,12 @@ def _validate_boundaries(payload: dict[str, Any], errors: list[str]) -> None:
             errors.append(f"not_run boundary must not declare exit_code: {name}")
 
 
-def _validate_task_evidence(payload: dict[str, Any], repo_root: Path, errors: list[str]) -> None:
+def _validate_task_evidence(
+    payload: dict[str, Any],
+    repo_root: Path,
+    validated_commit: str | None,
+    errors: list[str],
+) -> None:
     evidence = payload.get("task_evidence", [])
     ids = [item.get("task_id") for item in evidence if isinstance(item, dict)]
     duplicates = {task_id for task_id in ids if ids.count(task_id) > 1}
@@ -183,15 +213,27 @@ def _validate_task_evidence(payload: dict[str, Any], repo_root: Path, errors: li
         observed_source_ids: set[str] = set()
         for report_path in reports:
             resolved = _safe_relative_path(report_path, repo_root)
-            if resolved is None or not resolved.is_file():
+            if resolved is None:
                 errors.append(f"source report is missing or unsafe: {report_path}")
                 continue
+            if validated_commit is None:
+                continue
+            contents, failure = _read_git_blob(validated_commit, report_path, repo_root)
+            if failure == "missing":
+                errors.append(f"source report is missing from validated_commit: {report_path}")
+                continue
+            if failure == "not_blob":
+                errors.append(f"source report is not a blob in validated_commit: {report_path}")
+                continue
+            if failure is not None or contents is None:
+                errors.append(f"cannot read source report from validated_commit: {report_path}")
+                continue
             expected_hash = hashes.get(report_path)
-            if sha256_file(resolved) != expected_hash:
+            if sha256_bytes(contents) != expected_hash:
                 errors.append(f"source report hash mismatch: {report_path}")
             try:
-                source_payload = json.loads(resolved.read_text(encoding="utf-8"))
-            except (OSError, json.JSONDecodeError) as error:
+                source_payload = json.loads(contents.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError) as error:
                 errors.append(f"source report is not valid JSON: {report_path}: {error}")
                 continue
             if source_payload.get("phase") != "M0":
@@ -203,7 +245,12 @@ def _validate_task_evidence(payload: dict[str, Any], repo_root: Path, errors: li
             errors.append(f"source report task IDs do not match declaration: {task_id}")
 
 
-def _validate_inputs(payload: dict[str, Any], repo_root: Path, errors: list[str]) -> set[str]:
+def _validate_inputs(
+    payload: dict[str, Any],
+    repo_root: Path,
+    validated_commit: str | None,
+    errors: list[str],
+) -> None:
     inputs = payload.get("validated_inputs", [])
     paths = [item.get("path") for item in inputs if isinstance(item, dict)]
     duplicates = {path for path in paths if paths.count(path) > 1}
@@ -212,7 +259,6 @@ def _validate_inputs(payload: dict[str, Any], repo_root: Path, errors: list[str]
     missing = REQUIRED_INPUTS - set(paths)
     for path in sorted(missing):
         errors.append(f"missing required validated input: {path}")
-    valid_paths: set[str] = set()
     for item in inputs:
         if not isinstance(item, dict) or not isinstance(item.get("path"), str):
             continue
@@ -221,13 +267,20 @@ def _validate_inputs(payload: dict[str, Any], repo_root: Path, errors: list[str]
         if resolved is None:
             errors.append(f"unsafe validated input path: {relative_path}")
             continue
-        if not resolved.is_file():
-            errors.append(f"validated input is not a regular file: {relative_path}")
+        if validated_commit is None:
             continue
-        valid_paths.add(relative_path)
-        if sha256_file(resolved) != item.get("sha256"):
+        contents, failure = _read_git_blob(validated_commit, relative_path, repo_root)
+        if failure == "missing":
+            errors.append(f"validated input is missing from validated_commit: {relative_path}")
+            continue
+        if failure == "not_blob":
+            errors.append(f"validated input is not a blob in validated_commit: {relative_path}")
+            continue
+        if failure is not None or contents is None:
+            errors.append(f"cannot read validated input from validated_commit: {relative_path}")
+            continue
+        if sha256_bytes(contents) != item.get("sha256"):
             errors.append(f"validated input hash mismatch: {relative_path}")
-    return valid_paths
 
 
 def _status_snapshot(repo_root: Path) -> dict[str, str] | None:
@@ -282,34 +335,44 @@ def _validate_status(payload: dict[str, Any], repo_root: Path, errors: list[str]
             errors.append(f"later phase changed before its gate: {key}")
 
 
-def _validate_git(payload: dict[str, Any], repo_root: Path, validated_paths: set[str], errors: list[str]) -> None:
+def _validated_commit(payload: dict[str, Any], repo_root: Path, errors: list[str]) -> str | None:
     commit = payload.get("validated_commit")
     if not isinstance(commit, str) or not re.fullmatch(r"[0-9a-f]{40}", commit):
-        return
+        errors.append("validated_commit must be a full lowercase SHA-1")
+        return None
     if run_git("rev-parse", "--verify", f"{commit}^{{commit}}", cwd=repo_root).returncode != 0:
         errors.append(f"validated_commit does not resolve: {commit}")
-        return
+        return None
     if run_git("cat-file", "-e", f"{commit}^{{commit}}", cwd=repo_root).returncode != 0:
         errors.append(f"validated_commit is not a commit object: {commit}")
+        return None
     if run_git("merge-base", "--is-ancestor", commit, "HEAD", cwd=repo_root).returncode != 0:
         errors.append(f"validated_commit is not an ancestor of HEAD: {commit}")
-    dirty = run_git("diff", "--name-only", "HEAD", cwd=repo_root)
+        return None
+    return commit
+
+
+def _validate_worktree_guards(repo_root: Path, errors: list[str]) -> None:
+    dirty = run_git("diff", "--name-only", "HEAD", "--", str(REPORT_PATH), "STATUS.md", cwd=repo_root)
     if dirty.returncode != 0:
-        errors.append("cannot inspect working tree for validated inputs")
+        errors.append("cannot inspect working tree for report and status guards")
         return
     dirty_paths = {line.replace("\\", "/") for line in dirty.stdout.splitlines() if line}
-    for path in sorted(dirty_paths & validated_paths):
-        errors.append(f"validated input has uncommitted changes: {path}")
+    if REPORT_PATH.as_posix() in dirty_paths:
+        errors.append("M0 report has uncommitted changes")
+    if "STATUS.md" in dirty_paths:
+        errors.append("STATUS.md has uncommitted changes")
 
 
 def validate_payload(payload: dict[str, Any], *, repo_root: Path = ROOT) -> list[str]:
     errors = _schema_errors(payload, repo_root)
     _validate_checks(payload, errors)
     _validate_boundaries(payload, errors)
-    _validate_task_evidence(payload, repo_root, errors)
-    validated_paths = _validate_inputs(payload, repo_root, errors)
+    validated_commit = _validated_commit(payload, repo_root, errors)
+    _validate_task_evidence(payload, repo_root, validated_commit, errors)
+    _validate_inputs(payload, repo_root, validated_commit, errors)
     _validate_status(payload, repo_root, errors)
-    _validate_git(payload, repo_root, validated_paths, errors)
+    _validate_worktree_guards(repo_root, errors)
     return errors
 
 
