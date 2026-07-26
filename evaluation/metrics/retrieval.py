@@ -21,6 +21,13 @@ class JudgedPaper:
             raise ValueError("JudgedPaper requires a non-empty paper_id")
 
 
+_GRADES: dict[Relevance, int] = {
+    Relevance.HIGH: 2,
+    Relevance.PARTIAL: 1,
+    Relevance.IRRELEVANT: 0,
+}
+
+
 def _require_k(k: int) -> None:
     if isinstance(k, bool) or not isinstance(k, int) or k <= 0:
         raise ValueError("k must be greater than 0")
@@ -44,15 +51,10 @@ def precision_at_k(
 
 
 def _dcg(relevances: Sequence[Relevance | str], k: int) -> float:
-    grades = {
-        Relevance.HIGH: 2,
-        Relevance.PARTIAL: 1,
-        Relevance.IRRELEVANT: 0,
-    }
-    return sum(
-        (2**grades[_as_relevance(value)] - 1) / log2(rank + 1)
-        for rank, value in enumerate(relevances[:k], start=1)
-    )
+    total = 0.0
+    for rank, value in enumerate(relevances[:k], start=1):
+        total += (2**_GRADES[_as_relevance(value)] - 1) / log2(rank + 1)
+    return total
 
 
 def ndcg_at_k(
@@ -68,7 +70,7 @@ def ndcg_at_k(
     if ideal_relevances is None:
         ideal_relevances = sorted(
             (_as_relevance(value) for value in relevances[:k]),
-            key={Relevance.HIGH: 2, Relevance.PARTIAL: 1, Relevance.IRRELEVANT: 0}.get,
+            key=lambda relevance: _GRADES[relevance],
             reverse=True,
         )
     idcg = _dcg(ideal_relevances, k)
