@@ -5,7 +5,7 @@ import json
 import re
 import subprocess
 import sys
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any
 
 import jsonschema  # type: ignore[import-untyped]
@@ -107,7 +107,13 @@ def _schema_errors(payload: dict[str, Any], repo_root: Path) -> list[str]:
 
 def _safe_relative_path(value: str, repo_root: Path) -> Path | None:
     candidate = Path(value)
-    if candidate.is_absolute() or ".." in candidate.parts:
+    windows_candidate = PureWindowsPath(value)
+    if (
+        candidate.is_absolute()
+        or windows_candidate.is_absolute()
+        or ".." in candidate.parts
+        or ".." in windows_candidate.parts
+    ):
         return None
     resolved = (repo_root / candidate).resolve()
     try:
