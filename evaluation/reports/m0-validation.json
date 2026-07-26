@@ -1,8 +1,8 @@
 {
   "schema_version": "0.1",
   "phase": "M0",
-  "validated_commit": "6762e2f195071af0ffde26b9fd03e00171709253",
-  "generated_at_utc": "2026-07-26T11:01:42Z",
+  "validated_commit": "a6904df91cf60b76c10c13ef8af325e165cc7e21",
+  "generated_at_utc": "2026-07-26T12:44:30Z",
   "python_version": "3.12.10",
   "task_evidence": [
     {
@@ -29,16 +29,16 @@
     {"task_id": "M0-T04", "status": "passed", "source_reports": [], "source_report_sha256": []}
   ],
   "checks": [
-    {"name": "domain_contract_tests", "evidence_type": "automated", "status": "passed", "command": "py -3.12 -m pytest tests/contract/test_domain_models.py -q", "exit_code": 0, "observed_at_utc": "2026-07-26T11:01:42Z"},
-    {"name": "state_machine_tests", "evidence_type": "automated", "status": "passed", "command": "py -3.12 -m pytest tests/unit/test_state_machine.py -q", "exit_code": 0, "observed_at_utc": "2026-07-26T11:01:42Z"},
-    {"name": "evaluation_dataset_contract_tests", "evidence_type": "automated", "status": "passed", "command": "py -3.12 -m pytest tests/contract/test_evaluation_dataset.py -q", "exit_code": 0, "observed_at_utc": "2026-07-26T11:01:42Z"},
-    {"name": "retrieval_metrics_tests", "evidence_type": "automated", "status": "passed", "command": "py -3.12 -m pytest tests/unit/test_retrieval_metrics.py -q", "exit_code": 0, "observed_at_utc": "2026-07-26T11:01:42Z"},
-    {"name": "evidence_report_contract_tests", "evidence_type": "automated", "status": "passed", "command": "py -3.12 -m pytest tests/contract/test_evidence_report.py -q", "exit_code": 0, "observed_at_utc": "2026-07-26T11:01:42Z"},
-    {"name": "full_regression", "evidence_type": "automated", "status": "passed", "command": "py -3.12 -m pytest -q", "exit_code": 0, "observed_at_utc": "2026-07-26T11:01:42Z"},
-    {"name": "ruff", "evidence_type": "automated", "status": "passed", "command": "py -3.12 -m ruff check app evaluation scripts tests", "exit_code": 0, "observed_at_utc": "2026-07-26T11:01:42Z"},
-    {"name": "mypy", "evidence_type": "automated", "status": "passed", "command": "py -3.12 -m mypy app evaluation scripts", "exit_code": 0, "observed_at_utc": "2026-07-26T11:01:42Z"},
-    {"name": "project_docs_validation", "evidence_type": "automated", "status": "passed", "command": "py -3.12 scripts/validate_project_docs.py", "exit_code": 0, "observed_at_utc": "2026-07-26T11:01:42Z"},
-    {"name": "pip_check", "evidence_type": "automated", "status": "passed", "command": "py -3.12 -m pip check", "exit_code": 0, "observed_at_utc": "2026-07-26T11:01:42Z"}
+    {"name": "domain_contract_tests", "evidence_type": "automated", "status": "passed", "command": "py -3.12 -m pytest tests/contract/test_domain_models.py -q", "exit_code": 0, "observed_at_utc": "2026-07-26T12:41:19Z"},
+    {"name": "state_machine_tests", "evidence_type": "automated", "status": "passed", "command": "py -3.12 -m pytest tests/unit/test_state_machine.py -q", "exit_code": 0, "observed_at_utc": "2026-07-26T12:41:19Z"},
+    {"name": "evaluation_dataset_contract_tests", "evidence_type": "automated", "status": "passed", "command": "py -3.12 -m pytest tests/contract/test_evaluation_dataset.py -q", "exit_code": 0, "observed_at_utc": "2026-07-26T12:41:20Z"},
+    {"name": "retrieval_metrics_tests", "evidence_type": "automated", "status": "passed", "command": "py -3.12 -m pytest tests/unit/test_retrieval_metrics.py -q", "exit_code": 0, "observed_at_utc": "2026-07-26T12:41:21Z"},
+    {"name": "evidence_report_contract_tests", "evidence_type": "automated", "status": "passed", "command": "py -3.12 -m pytest tests/contract/test_evidence_report.py -q", "exit_code": 0, "observed_at_utc": "2026-07-26T12:42:32Z"},
+    {"name": "full_regression", "evidence_type": "automated", "status": "passed", "command": "py -3.12 -m pytest -q", "exit_code": 0, "observed_at_utc": "2026-07-26T12:43:48Z"},
+    {"name": "ruff", "evidence_type": "automated", "status": "passed", "command": "py -3.12 -m ruff check app evaluation scripts tests", "exit_code": 0, "observed_at_utc": "2026-07-26T12:43:49Z"},
+    {"name": "mypy", "evidence_type": "automated", "status": "passed", "command": "py -3.12 -m mypy app evaluation scripts", "exit_code": 0, "observed_at_utc": "2026-07-26T12:43:50Z"},
+    {"name": "project_docs_validation", "evidence_type": "automated", "status": "passed", "command": "py -3.12 scripts/validate_project_docs.py", "exit_code": 0, "observed_at_utc": "2026-07-26T12:43:50Z"},
+    {"name": "pip_check", "evidence_type": "automated", "status": "passed", "command": "py -3.12 -m pip check", "exit_code": 0, "observed_at_utc": "2026-07-26T12:43:53Z"}
   ],
   "validated_inputs": [
     {"path": "PRODUCT_SPEC.md", "sha256": "8d31b8f75885effdf284df55b7ff10f4d98c9f9aedbcb1c192cbc633bab57e52"},
@@ -63,9 +63,9 @@
     {"path": "tests/unit/test_state_machine.py", "sha256": "23712041917d83abd0644103aba63ccf522821712b05378d4367cbdad2ca4182"},
     {"path": "tests/contract/test_evaluation_dataset.py", "sha256": "7d0fd11780d93bd4435bbcb6280f7aa6f7b90172e3f192eea0bdb5e68bafc717"},
     {"path": "tests/unit/test_retrieval_metrics.py", "sha256": "c2838146dcf9454a8c81c5f2322f8947618ae20be4ea5ce334b01460fa9a8851"},
-    {"path": "tests/contract/test_evidence_report.py", "sha256": "f3029286ed7b9419f64a39eb8c06e1def713858fed2ffb24138ac9b5dbdf9307"},
+    {"path": "tests/contract/test_evidence_report.py", "sha256": "78e418ddc34091d37e81cab7d4bd8fdb51785c9a587a03449aa88d94cd564936"},
     {"path": "evaluation/report.schema.json", "sha256": "e9bcc5cf9074f9ed8b6c99271716576b51998596188d32d1e356b10ad4e49504"},
-    {"path": "scripts/validate_phase.py", "sha256": "17957b36707ef81a0b228dceafbaddbef7fecd4ab58d8946a47b89feef8802bc"},
+    {"path": "scripts/validate_phase.py", "sha256": "ad8d27e182bbb90a3b41502559092e3d8dce2bb849999373ca793ac1d04d324d"},
     {"path": ".github/workflows/docs-validation.yml", "sha256": "931ac410bf32396396355350c1a7a7dd3dfc0da5dcfc01977635d2054b294e93"},
     {"path": "evaluation/reports/m0-t01r-acceptance-fix.json", "sha256": "13fc3d28734381ebbde8543c4bdd81767901bb617d5d298c76e80ab95032840d"},
     {"path": "evaluation/reports/m0-t02-state-machine.json", "sha256": "d1ad50a9bcef5d63d34c4543d22e73bdbef478c04f1195cf1a93b138ec3330c6"},
