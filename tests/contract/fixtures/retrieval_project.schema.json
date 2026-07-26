@@ -1,0 +1,112 @@
+{
+  "$defs": {
+    "MethodConstraint": {
+      "enum": ["REQUIRED", "PREFERRED", "OPEN"],
+      "title": "MethodConstraint",
+      "type": "string"
+    },
+    "ProjectStage": {
+      "enum": [
+        "INIT",
+        "CLARIFYING",
+        "ROUND1_SEARCHING",
+        "WAITING_FOR_FEEDBACK",
+        "ROUND2_SEARCHING",
+        "WAITING_FOR_DIRECTION_CONFIRMATION",
+        "FINALIZED"
+      ],
+      "title": "ProjectStage",
+      "type": "string"
+    },
+    "ResearchIntent": {
+      "additionalProperties": false,
+      "properties": {
+        "accepted_paper_roles": {
+          "items": {"type": "string"},
+          "minItems": 1,
+          "title": "Accepted Paper Roles",
+          "type": "array",
+          "uniqueItems": true
+        },
+        "exclusions": {
+          "items": {"type": "string"},
+          "title": "Exclusions",
+          "type": "array"
+        },
+        "frozen_at": {
+          "format": "date-time",
+          "title": "Frozen At",
+          "type": "string"
+        },
+        "method_constraint": {"$ref": "#/$defs/MethodConstraint"},
+        "method_terms": {
+          "items": {"type": "string"},
+          "minItems": 1,
+          "title": "Method Terms",
+          "type": "array"
+        },
+        "object_terms": {
+          "items": {"type": "string"},
+          "minItems": 1,
+          "title": "Object Terms",
+          "type": "array"
+        },
+        "revision": {"minimum": 1, "title": "Revision", "type": "integer"},
+        "scope_terms": {
+          "items": {"type": "string"},
+          "minItems": 1,
+          "title": "Scope Terms",
+          "type": "array"
+        },
+        "task_terms": {
+          "items": {"type": "string"},
+          "minItems": 1,
+          "title": "Task Terms",
+          "type": "array"
+        }
+      },
+      "required": [
+        "object_terms",
+        "task_terms",
+        "method_terms",
+        "scope_terms",
+        "method_constraint",
+        "accepted_paper_roles",
+        "revision",
+        "frozen_at"
+      ],
+      "title": "ResearchIntent",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "created_at": {"format": "date-time", "title": "Created At", "type": "string"},
+    "current_intent": {
+      "anyOf": [{"$ref": "#/$defs/ResearchIntent"}, {"type": "null"}],
+      "default": null
+    },
+    "final_selection_ids": {
+      "anyOf": [{"items": {"type": "string"}, "type": "array"}, {"type": "null"}],
+      "default": null,
+      "title": "Final Selection Ids"
+    },
+    "original_input": {"minLength": 1, "title": "Original Input", "type": "string"},
+    "project_id": {
+      "pattern": "^RRC-\\d{4}-\\d{4}$",
+      "title": "Project Id",
+      "type": "string"
+    },
+    "round1_selection_ids": {
+      "anyOf": [{"items": {"type": "string"}, "type": "array"}, {"type": "null"}],
+      "default": null,
+      "title": "Round1 Selection Ids"
+    },
+    "round_number": {"maximum": 2, "minimum": 0, "title": "Round Number", "type": "integer"},
+    "stage": {"$ref": "#/$defs/ProjectStage"},
+    "updated_at": {"format": "date-time", "title": "Updated At", "type": "string"}
+  },
+  "required": ["project_id", "stage", "round_number", "original_input"],
+  "title": "RetrievalProject",
+  "type": "object"
+}

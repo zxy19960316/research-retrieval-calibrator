@@ -4,7 +4,6 @@ import re
 import sys
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 EXPECTED_TASKS = {
     "M0": 4,
@@ -38,6 +37,17 @@ REQUIRED_FILES = [
     "docs/phases/README.md",
     "docs/superpowers/plans/2026-07-26-research-retrieval-calibrator-m0.md",
 ]
+PHASE_ORDER = tuple(EXPECTED_TASKS)
+ACTIVE_STATUSES = {"READY", "IN_PROGRESS"}
+VALID_STATUSES = ACTIVE_STATUSES | {"NO_GO", "COMPLETE"} | {
+    f"BLOCKED_BY_{phase}" for phase in PHASE_ORDER
+}
+CURRENT_PHASE_PATTERN = re.compile(r"^- \u5f53\u524d\u9636\u6bb5\uff1a`(M\d+)`$", re.MULTILINE)
+CURRENT_STATUS_PATTERN = re.compile(r"^- \u5f53\u524d\u72b6\u6001\uff1a`([A-Z0-9_]+)`$", re.MULTILINE)
+STATUS_ROW_PATTERN = re.compile(
+    r"^\|\s*(M\d+)\s+[^|]*\|\s*([A-Z0-9_]+)\s*\|\s*(\d+)/(\d+)\s*\|",
+    re.MULTILINE,
+)
 
 
 def validate_required_files(errors: list[str]) -> None:
@@ -53,13 +63,13 @@ def validate_phase_tasks(errors: list[str]) -> None:
             errors.append(f"missing phase file: {path.relative_to(ROOT)}")
             continue
         text = path.read_text(encoding="utf-8")
-        task_ids = re.findall(rf"^### ({phase}-T\d{{2}})：", text, flags=re.MULTILINE)
+        task_ids = re.findall(rf"^### ({phase}-T\d{{2}})\uff1a", text, flags=re.MULTILINE)
         expected_ids = [f"{phase}-T{index:02d}" for index in range(1, expected_count + 1)]
         if task_ids != expected_ids:
             errors.append(
                 f"{phase} task IDs mismatch: expected {expected_ids}, observed {task_ids}"
             )
-        if "## Codex 执行指令" not in text:
+        if "## Codex \u6267\u884c\u6307\u4ee4" not in text:
             errors.append(f"{phase} has no Codex execution instruction")
 
 
@@ -77,13 +87,73 @@ def validate_local_links(errors: list[str]) -> None:
                 )
 
 
+def validate_status_text(status: str, errors: list[str]) -> None:
+    current_phases = CURRENT_PHASE_PATTERN.findall(status)
+    current_statuses = CURRENT_STATUS_PATTERN.findall(status)
+    if len(current_phases) != 1 or current_phases[0] not in EXPECTED_TASKS:
+        errors.append("STATUS.md must declare exactly one known current phase")
+        return
+    if len(current_statuses) != 1 or current_statuses[0] not in VALID_STATUSES:
+        errors.append("STATUS.md must declare exactly one valid current status")
+        return
+
+    rows = STATUS_ROW_PATTERN.findall(status)
+    by_phase: dict[str, tuple[str, int, int]] = {}
+    for phase, phase_status, completed, total in rows:
+        if phase in EXPECTED_TASKS:
+            if phase in by_phase:
+                errors.append(f"STATUS.md has duplicate row for {phase}")
+                continue
+            by_phase[phase] = (phase_status, int(completed), int(total))
+
+    if set(by_phase) != set(PHASE_ORDER):
+        errors.append(f"STATUS.md phase rows mismatch: observed {sorted(by_phase)}")
+        return
+
+    active_phases: list[str] = []
+    for index, phase in enumerate(PHASE_ORDER):
+        phase_status, completed, total = by_phase[phase]
+        expected_total = EXPECTED_TASKS[phase]
+        if phase_status not in VALID_STATUSES:
+            errors.append(f"{phase} has invalid status: {phase_status}")
+        if total != expected_total or not 0 <= completed <= total:
+            errors.append(
+                f"{phase} task count must be within 0/{expected_total} to {expected_total}/{expected_total}; "
+                f"observed {completed}/{total}"
+            )
+        if phase_status == "COMPLETE" and completed != total:
+            errors.append(f"{phase} is COMPLETE but declares only {completed}/{total} tasks")
+        if phase_status in ACTIVE_STATUSES:
+            active_phases.append(phase)
+        if index:
+            predecessor = PHASE_ORDER[index - 1]
+            predecessor_status = by_phase[predecessor][0]
+            expected_blocker = f"BLOCKED_BY_{predecessor}"
+            if predecessor_status == "COMPLETE":
+                if phase_status == expected_blocker:
+                    errors.append(f"{phase} remains blocked although {predecessor} is COMPLETE")
+            elif phase_status != expected_blocker:
+                errors.append(
+                    f"{phase} must be {expected_blocker} until {predecessor} is COMPLETE; "
+                    f"observed {phase_status}"
+                )
+
+    current_phase = current_phases[0]
+    current_status = current_statuses[0]
+    if by_phase[current_phase][0] != current_status:
+        errors.append(
+            f"current status mismatch for {current_phase}: "
+            f"header is {current_status}, table is {by_phase[current_phase][0]}"
+        )
+    if active_phases != [current_phase]:
+        errors.append(
+            f"STATUS.md must have exactly one active phase matching its header; "
+            f"observed {active_phases}"
+        )
+
+
 def validate_status(errors: list[str]) -> None:
-    status = (ROOT / "STATUS.md").read_text(encoding="utf-8")
-    if "- 当前阶段：`M0`" not in status or "- 当前状态：`READY`" not in status:
-        errors.append("baseline STATUS.md must start at M0 READY")
-    for phase, expected_count in EXPECTED_TASKS.items():
-        if f"| {phase} " not in status or f"0/{expected_count}" not in status:
-            errors.append(f"STATUS.md does not declare {phase} 0/{expected_count}")
+    validate_status_text((ROOT / "STATUS.md").read_text(encoding="utf-8"), errors)
 
 
 def main() -> int:

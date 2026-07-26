@@ -69,11 +69,17 @@ SupportLevel:
 - `revision`: 从 1 开始递增
 - `frozen_at`: UTC 时间
 
-### QueryPlan / Query
+### Query（M0-T01 最小接口）
 
 - 轮次、分支、宽度、语言、查询文本、预算权重
 - 每个查询有稳定 `query_id`
-- 第二轮查询必须关联至少一个 `QueryRevision`
+- 第二轮查询必须关联至少一个最小 `QueryRevision` 来源记录
+
+`M0-T01` 只定义 `Query` 与最小变更来源记录，用于防止第二轮查询脱离溯源。它不代表已实现后续阶段的完整计划、排名或校准对象。
+
+### QueryPlan（M1）
+
+完整 `QueryPlan` 在 `M1` 首轮真实召回阶段实现：它负责组织四条查询路线、查询预算与首轮执行绑定。`M0-T01` 不实现 `QueryPlan`。
 
 ### PaperRecord
 
@@ -88,7 +94,7 @@ SupportLevel:
 - `PARTIAL` 必须至少有一个维度
 - `HIGH` 和 `IRRELEVANT` 不接受维度化正样本语义
 
-### QueryRevision
+### QueryRevision（M3 完整实现）
 
 - `from_round=1`、`to_round=2`
 - 提升/降低术语
@@ -96,11 +102,15 @@ SupportLevel:
 - 分支预算变化
 - 每项变化的来源论文或系统规则
 
-### RankedPaper
+完整 `QueryRevision` 在 `M3` 反馈与第二轮校准阶段实现。`M0-T01` 只提供 `source_paper_id`、`rule` 和 `reason` 的最小溯源接口，不实现术语权重、约束改写或分支预算的完整变更模型。
+
+### RankedPaper（M2）
 
 - 论文 ID、轮次、分项分数、总分、模型/配置版本
 - 证据槽位、支持级别、基于标题摘要的理由
 - 选择或未选择原因
+
+`RankedPaper` 在 `M2` 首轮排序与选择阶段实现。`M0-T01` 不实现评分、重排、证据槽位填充或选择逻辑。
 
 ## 3. 最小持久化表
 

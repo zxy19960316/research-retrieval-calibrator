@@ -1,15 +1,15 @@
+import json
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
 
 from app.models.enums import (
-    EvidenceSlot,
     FeedbackAspect,
     ProjectStage,
     QueryBranch,
     Relevance,
-    SupportLevel,
 )
 from app.models.feedback import FeedbackRecord
 from app.models.paper import PaperRecord
@@ -17,17 +17,54 @@ from app.models.project import ResearchIntent, RetrievalProject
 from app.models.query import Query, QueryRevision
 
 
-def test_closed_enums_reject_unknown_values() -> None:
-    with pytest.raises(ValueError):
-        ProjectStage("SEARCHING")
-    with pytest.raises(ValueError):
-        QueryBranch("UNKNOWN_BRANCH")
-    with pytest.raises(ValueError):
-        FeedbackAspect("WHOLE_PAPER")
-    with pytest.raises(ValueError):
-        EvidenceSlot("UNSUPPORTED_SLOT")
-    with pytest.raises(ValueError):
-        SupportLevel("WEAK")
+@pytest.mark.parametrize(
+    ("model", "payload", "field"),
+    [
+        (
+            RetrievalProject,
+            {
+                "project_id": "RRC-2026-0001",
+                "stage": "SEARCHING",
+                "round_number": 0,
+                "original_input": "Find shielding design methods.",
+            },
+            "stage",
+        ),
+        (
+            FeedbackRecord,
+            {
+                "project_id": "RRC-2026-0001",
+                "paper_id": "arxiv:2401.00001",
+                "relevance": "UNKNOWN_RELEVANCE",
+                "raw_text": "feedback",
+            },
+            "relevance",
+        ),
+        (
+            Query,
+            {
+                "query_id": "Q1-M-01",
+                "round_number": 1,
+                "branch": "UNKNOWN_BRANCH",
+                "breadth": "MEDIUM",
+                "language": "en",
+                "query_text": "graph surrogate",
+                "weight": 0.25,
+            },
+            "branch",
+        ),
+    ],
+)
+def test_pydantic_models_reject_unknown_enum_values(
+    model: type[RetrievalProject] | type[FeedbackRecord] | type[Query],
+    payload: dict[str, object],
+    field: str,
+) -> None:
+    with pytest.raises(ValidationError) as error:
+        model.model_validate(payload)
+
+    assert error.value.errors()[0]["loc"] == (field,)
+    assert error.value.errors()[0]["type"] == "enum"
 
 
 def test_partial_feedback_requires_aspect() -> None:
@@ -54,7 +91,7 @@ def test_non_partial_feedback_rejects_aspects(relevance: Relevance) -> None:
 
 
 def test_visible_paper_requires_source_identity_and_url() -> None:
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValidationError) as error:
         PaperRecord(
             paper_id="arxiv:2401.00001",
             source="arxiv",
@@ -62,8 +99,13 @@ def test_visible_paper_requires_source_identity_and_url() -> None:
             title="A real title",
             url="",
             language="en",
+            retrieval_paths=["DIRECT_INTERSECTION"],
             user_visible=True,
         )
+
+    assert error.value.errors()[0]["msg"] == (
+        "Value error, User-visible papers require source_id and HTTP(S) URL"
+    )
 
 
 def test_paper_requires_at_least_one_retrieval_path() -> None:
@@ -164,7 +206,11 @@ def test_valid_models_export_stable_json_schema() -> None:
     )
 
     assert project.project_id == "RRC-2026-0001"
-    assert RetrievalProject.model_json_schema() == RetrievalProject.model_json_schema()
+    snapshot_path = Path(__file__).parent / "fixtures" / "retrieval_project.schema.json"
+    expected_schema = json.loads(snapshot_path.read_text(encoding="utf-8"))
+    normalized_actual = json.loads(json.dumps(RetrievalProject.model_json_schema(), sort_keys=True))
+    normalized_expected = json.loads(json.dumps(expected_schema, sort_keys=True))
+    assert normalized_actual == normalized_expected
     assert set(RetrievalProject.model_json_schema()["properties"]) == {
         "project_id",
         "stage",
