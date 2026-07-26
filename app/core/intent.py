@@ -3,14 +3,20 @@
 import re
 import unicodedata
 from collections.abc import Mapping, Sequence
-from datetime import datetime
+from datetime import UTC, datetime
+from typing import Literal, cast
 
+from app.adapters.llm import LLMProvider, StructuredRequest, validate_llm_candidate
 from app.models.planning import (
     ClarificationQuestion,
     IntentDraft,
     IntentField,
     IntentGap,
+    IntentPreparationResult,
     PlanningError,
+    RetrievalTerm,
+    TermEvidence,
+    TermSource,
 )
 from app.models.project import ResearchIntent
 
@@ -30,12 +36,48 @@ _QUESTION_TEMPLATES = {
     IntentField.ACCEPTED_PAPER_ROLES: ("可接受哪些论文角色？", "Which paper roles are acceptable?"),
     IntentField.EXCLUSIONS: ("有哪些需要排除的方向？", "Which directions should be excluded?"),
 }
+_RETRIEVAL_TRANSLATIONS = {
+    "\u8f90\u5c04\u5c4f\u853d": "radiation shielding",
+    "\u6838\u53cd\u5e94\u5806": "nuclear reactor",
+    "\u6838\u5de5\u7a0b": "nuclear engineering",
+    "\u8fc1\u79fb\u5b66\u4e60": "transfer learning",
+    "\u6df1\u5ea6\u5b66\u4e60": "deep learning",
+    "\u673a\u5668\u5b66\u4e60": "machine learning",
+    "\u8bbe\u8ba1": "design",
+    "\u8bc4\u4f30": "evaluation",
+    "\u65b9\u6cd5": "method",
+}
+_CJK_PATTERN = re.compile(r"[\u3400-\u9fff]")
 
 
 def normalise_term(value: str) -> str:
     """Canonical comparison form required by the M1-T01 exclusion contract."""
 
     return re.sub(r"\s+", " ", unicodedata.normalize("NFKC", value).strip()).casefold()
+
+
+def build_retrieval_term(
+    original_text: str,
+    *,
+    source: TermSource,
+    target_field: IntentField,
+) -> RetrievalTerm:
+    """Map a required term to English or fail closed without content loss."""
+
+    retrieval_text = original_text
+    for chinese, english in sorted(_RETRIEVAL_TRANSLATIONS.items(), key=lambda item: -len(item[0])):
+        retrieval_text = retrieval_text.replace(chinese, english)
+    if _CJK_PATTERN.search(retrieval_text):
+        raise PlanningError("UNMAPPED_RETRIEVAL_TERM")
+    retrieval_text = " ".join(retrieval_text.split()).casefold()
+    if not retrieval_text:
+        raise PlanningError("UNMAPPED_RETRIEVAL_TERM")
+    return RetrievalTerm(
+        original_text=original_text,
+        retrieval_text_en=retrieval_text,
+        source=source,
+        target_field=target_field,
+    )
 
 
 def _field_is_explicit(draft: IntentDraft, field: IntentField) -> bool:
@@ -131,4 +173,53 @@ def freeze_research_intent(draft: IntentDraft, frozen_at: datetime) -> ResearchI
         accepted_paper_roles=draft.accepted_paper_roles,
         revision=draft.revision,
         frozen_at=frozen_at,
+    )
+
+
+def prepare_intent(
+    request: StructuredRequest,
+    provider: LLMProvider,
+) -> IntentPreparationResult:
+    """Call a fake provider once, validate strictly, then clarify or freeze its draft."""
+
+    candidate = validate_llm_candidate(provider.generate_structured(request))
+    terms_by_field = {
+        field: list(candidate.candidate_terms.get(field, [])) for field in IntentField
+    }
+    retrieval_terms = [
+        build_retrieval_term(term, source=TermSource.LLM_FAKE, target_field=field)
+        for field, terms in terms_by_field.items()
+        for term in terms
+    ]
+    field_evidence = {
+        field: [TermEvidence(term=term, source=TermSource.LLM_FAKE) for term in terms]
+        for field, terms in terms_by_field.items()
+        if terms
+    }
+    source_language = cast(Literal["zh", "en", "mixed"], candidate.source_language)
+    draft = IntentDraft(
+        original_input=request.original_input,
+        object_terms=terms_by_field[IntentField.OBJECT],
+        task_terms=terms_by_field[IntentField.TASK],
+        method_terms=terms_by_field[IntentField.METHOD],
+        scope_terms=terms_by_field[IntentField.SCOPE],
+        exclusions=terms_by_field[IntentField.EXCLUSIONS],
+        method_constraint=candidate.candidate_method_constraint,
+        accepted_paper_roles=set(terms_by_field[IntentField.ACCEPTED_PAPER_ROLES]),
+        source_language=source_language,
+        revision=1,
+        field_evidence=field_evidence,
+    )
+    gaps = build_intent_gaps(draft, candidate.field_confidences)
+    questions = build_clarification_questions(draft, gaps)
+    if questions:
+        return IntentPreparationResult(
+            draft=draft,
+            retrieval_terms=retrieval_terms,
+            clarification_questions=questions,
+        )
+    return IntentPreparationResult(
+        draft=draft,
+        retrieval_terms=retrieval_terms,
+        research_intent=freeze_research_intent(draft, datetime.now(UTC)),
     )

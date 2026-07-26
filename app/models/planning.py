@@ -8,6 +8,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.models.enums import MethodConstraint, QueryBranch, QueryBreadth
+from app.models.project import ResearchIntent
 from app.models.query import Query
 
 
@@ -68,6 +69,45 @@ class TermEvidence(BaseModel):
         return normalised
 
 
+class RetrievalTerm(BaseModel):
+    """A source-traceable term with its explicit English retrieval mapping."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    original_text: str = Field(min_length=1)
+    retrieval_text_en: str = Field(min_length=1)
+    source: TermSource
+    target_field: IntentField
+
+    @field_validator("original_text", "retrieval_text_en")
+    @classmethod
+    def validate_retrieval_text(cls, value: str) -> str:
+        normalised = _trim_term(value)
+        if not normalised:
+            raise ValueError("Retrieval terms must be non-blank after trimming")
+        if '"' in normalised or "%" in normalised:
+            raise ValueError("Retrieval terms cannot contain query syntax or URL encoding")
+        return normalised
+
+
+class QueryExpansion(BaseModel):
+    """A provenance-bearing English term usable only in its declared field."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    target_field: IntentField
+    term_en: str = Field(min_length=1)
+    source: TermSource
+
+    @field_validator("term_en")
+    @classmethod
+    def validate_term_en(cls, value: str) -> str:
+        normalised = _trim_term(value)
+        if not normalised or not normalised.isascii() or '"' in normalised or "%" in normalised:
+            raise ValueError("Query expansion must be plain ASCII retrieval text")
+        return normalised.casefold()
+
+
 class IntentDraft(BaseModel):
     """Pre-freeze input; this is deliberately not a ResearchIntent subtype."""
 
@@ -117,9 +157,14 @@ class IntentDraft(BaseModel):
             IntentField.EXCLUSIONS: self.exclusions,
         }
         for field, evidence_items in self.field_evidence.items():
-            declared = {_trim_term(term).casefold() for term in terms[field]}
-            if any(_trim_term(item.term).casefold() not in declared for item in evidence_items):
-                raise ValueError("Field evidence must reference a declared term")
+            declared = [_trim_term(term).casefold() for term in terms[field]]
+            evidence = [_trim_term(item.term).casefold() for item in evidence_items]
+            if len(declared) != len(set(declared)):
+                raise ValueError("Declared terms must not contain normalized duplicates")
+            if len(evidence) != len(set(evidence)) or set(evidence) != set(declared):
+                raise ValueError(
+                    "Field evidence must exactly cover declared terms without duplicates"
+                )
         for field, field_terms in terms.items():
             if field_terms and not self.field_evidence.get(field):
                 raise ValueError(f"Non-empty {field.value} terms require field evidence")
@@ -148,6 +193,25 @@ class ClarificationQuestion(BaseModel):
     priority_score: float = Field(ge=0, le=1)
 
 
+class IntentPreparationResult(BaseModel):
+    """The result of one strict fake-provider intent-preparation call."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    draft: IntentDraft
+    retrieval_terms: list[RetrievalTerm]
+    clarification_questions: list[ClarificationQuestion] = Field(default_factory=list)
+    research_intent: ResearchIntent | None = None
+
+    @model_validator(mode="after")
+    def validate_result_state(self) -> "IntentPreparationResult":
+        if self.research_intent is None and not self.clarification_questions:
+            raise ValueError("An unfreezable draft must return clarification questions")
+        if self.research_intent is not None and self.clarification_questions:
+            raise ValueError("A frozen intent cannot retain clarification questions")
+        return self
+
+
 class TermConflict(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -169,7 +233,7 @@ class QueryPlan(BaseModel):
     queries: list[Query]
     generated_at_utc: datetime
     exclusions: list[str] = Field(default_factory=list)
-    positive_expansions: list[str] = Field(default_factory=list)
+    positive_expansions: list[QueryExpansion] = Field(default_factory=list)
     excluded_term_conflicts: list[TermConflict] = Field(default_factory=list)
 
     @field_validator("generated_at_utc")

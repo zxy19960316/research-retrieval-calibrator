@@ -4,6 +4,7 @@ from typing import Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
+from app.models.enums import MethodConstraint
 from app.models.planning import IntentField, PlanningError, _clean_term_collection
 
 
@@ -24,6 +25,7 @@ class LLMCandidate(BaseModel):
     candidate_terms: dict[IntentField, list[str]] = Field(default_factory=dict)
     candidate_synonyms: dict[IntentField, list[str]] = Field(default_factory=dict)
     field_confidences: dict[IntentField, float] = Field(default_factory=dict)
+    candidate_method_constraint: MethodConstraint | None = None
     source_language: str = "mixed"
 
     @field_validator("candidate_terms", "candidate_synonyms", mode="before")

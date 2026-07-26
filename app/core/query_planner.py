@@ -1,19 +1,24 @@
-"""Deterministic M1-T01 four-branch, three-breadth arXiv query planning."""
+"""Deterministic M1-T01 four-branch, three-breadth canonical arXiv planning."""
 
 import hashlib
 import json
-import re
 from collections.abc import Sequence
 from datetime import UTC, datetime
 
-from app.core.intent import normalise_term
+from app.core.intent import build_retrieval_term, normalise_term
 from app.models.enums import QueryBranch, QueryBreadth
-from app.models.planning import PlanningError, QueryPlan, TermConflict, TermSource
+from app.models.planning import (
+    IntentField,
+    PlanningError,
+    QueryExpansion,
+    QueryPlan,
+    TermConflict,
+    TermSource,
+)
 from app.models.project import ResearchIntent
 from app.models.query import Query
 
-PLANNING_CONFIG_VERSION = "m1-t01.v1"
-_DETERMINISTIC_GENERATED_AT = datetime(2026, 1, 1, tzinfo=UTC)
+PLANNING_CONFIG_VERSION = "m1-t01.v2"
 _BRANCH_WEIGHTS = {
     QueryBranch.DIRECT_INTERSECTION: 0.35,
     QueryBranch.PROBLEM_DOMAIN: 0.25,
@@ -21,84 +26,70 @@ _BRANCH_WEIGHTS = {
     QueryBranch.BRIDGE_DOMAIN: 0.20,
 }
 _BRIDGE_TERMS = ("application", "adaptation", "transfer", "framework", "methodology", "benchmark")
-_TRANSLATIONS = {
-    "辐射屏蔽": "radiation shielding",
-    "核反应堆": "nuclear reactor",
-    "核工程": "nuclear engineering",
-    "迁移学习": "transfer learning",
-    "深度学习": "deep learning",
-    "机器学习": "machine learning",
-    "设计": "design",
-    "评估": "evaluation",
-    "方法": "method",
-}
 _SYNONYMS = {
     "transfer learning": ("domain adaptation",),
     "radiation shielding": ("radiation protection",),
     "design": ("optimization",),
 }
+_FIELD_BY_GROUP = {
+    "object": IntentField.OBJECT,
+    "task": IntentField.TASK,
+    "method": IntentField.METHOD,
+    "scope": IntentField.SCOPE,
+}
 
 
-def _english_term(value: str) -> str:
-    translated = value
-    for chinese, english in sorted(_TRANSLATIONS.items(), key=lambda item: -len(item[0])):
-        translated = translated.replace(chinese, english)
-    translated = re.sub(r"[^\x00-\x7f]+", " ", translated)
-    return " ".join(translated.split()).casefold()
-
-
-def _english_terms(values: Sequence[str]) -> list[str]:
-    return [term for value in values if (term := _english_term(value))]
-
-
-def _quoted(term: str) -> str:
-    return f'"{term}"'
+def _term_clause(term: str, field: str = "all") -> str:
+    return f'{field}:"{term}"'
 
 
 def _or_group(terms: Sequence[str]) -> str:
     unique = list(dict.fromkeys(terms))
     if not unique:
-        return '"research"'
-    if len(unique) == 1:
-        return _quoted(unique[0])
-    return "(" + " OR ".join(_quoted(term) for term in unique) + ")"
+        raise PlanningError("INVALID_INTENT_STRUCTURE")
+    clauses = [_term_clause(term) for term in unique]
+    return clauses[0] if len(clauses) == 1 else "(" + " OR ".join(clauses) + ")"
 
 
 def _narrow_terms(terms: Sequence[str]) -> str:
-    return _quoted(terms[0]) if terms else '"research"'
+    if not terms:
+        raise PlanningError("INVALID_INTENT_STRUCTURE")
+    return _term_clause(terms[0])
 
 
 def _synonym_terms(terms: Sequence[str]) -> list[str]:
     return [synonym for term in terms for synonym in _SYNONYMS.get(normalise_term(term), ())]
 
 
-def _template(branch: QueryBranch, breadth: QueryBreadth, groups: dict[str, list[str]]) -> str:
-    object_terms = groups["object"]
-    task_terms = groups["task"]
-    method_terms = groups["method"]
-    scope_terms = groups["scope"]
+def _components(branch: QueryBranch, groups: dict[str, list[str]]) -> list[list[str]]:
     if branch is QueryBranch.DIRECT_INTERSECTION:
-        components = [object_terms, task_terms, method_terms]
-    elif branch is QueryBranch.PROBLEM_DOMAIN:
-        components = [object_terms, task_terms, scope_terms]
-    elif branch is QueryBranch.METHOD_DOMAIN:
-        components = [method_terms, task_terms]
-    else:
-        components = [object_terms, task_terms, method_terms, list(_BRIDGE_TERMS)]
+        return [groups["object"], groups["task"], groups["method"]]
+    if branch is QueryBranch.PROBLEM_DOMAIN:
+        return [groups["object"], groups["task"], groups["scope"]]
+    if branch is QueryBranch.METHOD_DOMAIN:
+        return [groups["method"], groups["task"]]
+    return [groups["object"], groups["task"], groups["method"], list(_BRIDGE_TERMS)]
 
+
+def _template(branch: QueryBranch, breadth: QueryBreadth, groups: dict[str, list[str]]) -> str:
+    components = _components(branch, groups)
     if breadth is QueryBreadth.NARROW:
         return " AND ".join(_narrow_terms(component) for component in components)
     if breadth is QueryBreadth.MEDIUM:
-        return " AND ".join(_or_group(component + _synonym_terms(component)) for component in components)
+        return " AND ".join(
+            _or_group(component + _synonym_terms(component)) for component in components
+        )
     wide_components = list(components)
     if branch is QueryBranch.DIRECT_INTERSECTION:
-        wide_components[-1] = method_terms + _synonym_terms(method_terms)
+        wide_components[-1] = components[-1] + _synonym_terms(components[-1])
     if branch is QueryBranch.BRIDGE_DOMAIN:
         wide_components[-1] = list(_BRIDGE_TERMS[:3])
     return " AND ".join(_or_group(component) for component in wide_components)
 
 
-def _stable_id(project_id: str, revision: int, branch: QueryBranch, breadth: QueryBreadth, text: str) -> str:
+def _stable_id(
+    project_id: str, revision: int, branch: QueryBranch, breadth: QueryBreadth, text: str
+) -> str:
     payload = json.dumps(
         [project_id, revision, branch.value, breadth.value, text, PLANNING_CONFIG_VERSION],
         ensure_ascii=True,
@@ -108,46 +99,73 @@ def _stable_id(project_id: str, revision: int, branch: QueryBranch, breadth: Que
 
 
 def _filter_expansions(
-    exclusions: Sequence[str], positive_expansions: Sequence[str]
-) -> tuple[list[str], list[TermConflict]]:
+    exclusions: Sequence[str], positive_expansions: Sequence[QueryExpansion]
+) -> tuple[list[QueryExpansion], list[TermConflict]]:
     excluded = {normalise_term(term) for term in exclusions}
-    kept: list[str] = []
+    kept: list[QueryExpansion] = []
     conflicts: list[TermConflict] = []
-    for term in positive_expansions:
-        if normalise_term(term) in excluded:
+    for expansion in positive_expansions:
+        if normalise_term(expansion.term_en) in excluded:
             conflicts.append(
                 TermConflict(
-                    term=normalise_term(term),
-                    positive_source=TermSource.DETERMINISTIC_RULE,
+                    term=normalise_term(expansion.term_en),
+                    positive_source=expansion.source,
                     exclusion_source=TermSource.ORIGINAL_INPUT,
                 )
             )
         else:
-            kept.append(term)
+            kept.append(expansion)
     return kept, conflicts
+
+
+def _mapped_groups(intent: ResearchIntent) -> dict[str, list[str]]:
+    values = {
+        "object": intent.object_terms,
+        "task": intent.task_terms,
+        "method": intent.method_terms,
+        "scope": intent.scope_terms,
+    }
+    return {
+        group: [
+            build_retrieval_term(
+                value, source=TermSource.ORIGINAL_INPUT, target_field=_FIELD_BY_GROUP[group]
+            ).retrieval_text_en
+            for value in terms
+        ]
+        for group, terms in values.items()
+    }
+
+
+def _groups_with_expansions(
+    groups: dict[str, list[str]], expansions: Sequence[QueryExpansion]
+) -> dict[str, list[str]]:
+    expanded = {name: list(terms) for name, terms in groups.items()}
+    for expansion in expansions:
+        for group, field in _FIELD_BY_GROUP.items():
+            if expansion.target_field is field:
+                expanded[group].append(expansion.term_en)
+    return expanded
 
 
 def build_query_plan(
     project_id: str,
     intent: ResearchIntent,
     *,
-    positive_expansions: Sequence[str] | None = None,
+    positive_expansions: Sequence[QueryExpansion] | None = None,
+    generated_at_utc: datetime | None = None,
 ) -> QueryPlan:
-    """Build a byte-stable first-round plan from a frozen M0 ResearchIntent only."""
+    """Build 12 canonical, unencoded arXiv queries from a frozen intent."""
 
     if not isinstance(intent, ResearchIntent):
         raise PlanningError("INVALID_INTENT_STRUCTURE")
     expansions, conflicts = _filter_expansions(intent.exclusions, positive_expansions or ())
-    groups = {
-        "object": _english_terms(intent.object_terms),
-        "task": _english_terms(intent.task_terms),
-        "method": _english_terms(intent.method_terms),
-        "scope": _english_terms(intent.scope_terms),
-    }
+    groups = _mapped_groups(intent)
+    expanded_groups = _groups_with_expansions(groups, expansions)
     queries: list[Query] = []
     for branch in QueryBranch:
         for breadth in QueryBreadth:
-            text = _template(branch, breadth, groups)
+            selected_groups = groups if breadth is QueryBreadth.NARROW else expanded_groups
+            text = _template(branch, breadth, selected_groups)
             queries.append(
                 Query(
                     query_id=_stable_id(project_id, intent.revision, branch, breadth, text),
@@ -172,7 +190,7 @@ def build_query_plan(
         planning_config_version=PLANNING_CONFIG_VERSION,
         branch_weights=_BRANCH_WEIGHTS,
         queries=queries,
-        generated_at_utc=_DETERMINISTIC_GENERATED_AT,
+        generated_at_utc=generated_at_utc or datetime.now(UTC),
         exclusions=list(intent.exclusions),
         positive_expansions=expansions,
         excluded_term_conflicts=conflicts,

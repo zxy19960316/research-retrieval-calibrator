@@ -302,6 +302,7 @@ def _status_snapshot(repo_root: Path) -> dict[str, str] | None:
     return {
         "current_phase": phases[0],
         "current_status": statuses[0],
+        "m0_status": rows["M0"][0],
         "m0_tasks": rows["M0"][1],
         "m1_status": rows["M1"][0],
         "m1_tasks": rows["M1"][1],
@@ -323,26 +324,37 @@ def _validate_status(payload: dict[str, Any], repo_root: Path, errors: list[str]
         "current_phase": "M1", "current_status": "READY", "m0_tasks": "4/4",
         "m1_status": "READY", "m1_tasks": "0/4",
     }
-    m1_t01_after = {
-        "current_phase": "M1", "current_status": "IN_PROGRESS", "m0_tasks": "4/4",
-        "m1_status": "IN_PROGRESS", "m1_tasks": "1/4",
-    }
     if transition.get("from") != before or transition.get("to") != after:
         errors.append("report status_transition does not declare the M0-to-M1 gate")
     status = _status_snapshot(repo_root)
     if status is None:
         errors.append("STATUS.md cannot be parsed for M0 gate")
         return
-    live = {key: status[key] for key in before}
-    if live not in (before, after, m1_t01_after):
-        errors.append("STATUS.md is not a legal M0 gate or M1-T01 post-gate state")
-    expected_later = {
-        "m2_status": "BLOCKED_BY_M1", "m3_status": "BLOCKED_BY_M2", "m4_status": "BLOCKED_BY_M3",
-        "m5_status": "BLOCKED_BY_M4", "m6_status": "BLOCKED_BY_M5",
+    if status["m0_status"] not in {"IN_PROGRESS", "COMPLETE"}:
+        errors.append("STATUS.md has an invalid M0 historical state")
+        return
+    if status["m0_status"] == "COMPLETE" and status["m0_tasks"] != "4/4":
+        errors.append("STATUS.md regresses historical M0 completion")
+    phase_statuses = {
+        "M0": status["m0_status"],
+        "M1": status["m1_status"],
+        "M2": status["m2_status"],
+        "M3": status["m3_status"],
+        "M4": status["m4_status"],
+        "M5": status["m5_status"],
+        "M6": status["m6_status"],
     }
-    for key, expected in expected_later.items():
-        if status[key] != expected:
-            errors.append(f"later phase changed before its gate: {key}")
+    phase_order = tuple(phase_statuses)
+    for index, phase in enumerate(phase_order[1:], start=1):
+        predecessor = phase_order[index - 1]
+        predecessor_status = phase_statuses[predecessor]
+        observed = phase_statuses[phase]
+        blocked = f"BLOCKED_BY_{predecessor}"
+        if predecessor_status == "COMPLETE":
+            if observed == blocked:
+                errors.append(f"{phase} remains blocked although {predecessor} is COMPLETE")
+        elif observed != blocked:
+            errors.append(f"{phase} must be {blocked} until {predecessor} is COMPLETE")
 
 
 def _validated_commit(payload: dict[str, Any], repo_root: Path, errors: list[str]) -> str | None:

@@ -463,6 +463,21 @@ def test_historical_report_rejects_uncommitted_report_or_status_changes(tmp_path
     )
 
 
+@pytest.mark.parametrize("completed", (1, 2, 3))
+def test_historical_m0_validator_accepts_legal_later_m1_progress(
+    tmp_path: Path, completed: int
+) -> None:
+    validator = _load_validator()
+    _seed_historical_report_repository(tmp_path)
+
+    status = _status(final=True).replace("`READY`", "`IN_PROGRESS`")
+    status = status.replace("| M1 phase | READY | 0/4 |", f"| M1 phase | IN_PROGRESS | {completed}/4 |")
+    _write(tmp_path, "STATUS.md", status)
+    _commit(tmp_path, f"advance M1 to {completed}/4")
+
+    assert validator.validate_report_file("M0", repo_root=tmp_path) == []
+
+
 def test_historical_report_rejects_hash_mismatch_against_validated_commit_blob(
     tmp_path: Path,
 ) -> None:

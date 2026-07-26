@@ -108,3 +108,27 @@ def test_query_plan_rejects_non_first_round_and_wrong_source() -> None:
 def test_invalid_llm_fake_is_rejected_without_repair(payload: dict[str, object]) -> None:
     with pytest.raises(PlanningError, match="INVALID_INTENT_STRUCTURE"):
         validate_llm_candidate(payload)
+
+
+def test_intent_draft_requires_exact_nonduplicated_evidence_per_term() -> None:
+    payload = _draft_payload()
+    payload["object_terms"] = ["radiation shielding", "radiation protection"]
+    payload["field_evidence"] = {
+        **payload["field_evidence"],
+        IntentField.OBJECT: [
+            TermEvidence(term="radiation shielding", source=TermSource.ORIGINAL_INPUT)
+        ],
+    }
+    with pytest.raises(ValidationError):
+        IntentDraft.model_validate(payload)
+
+    payload = _draft_payload()
+    payload["field_evidence"] = {
+        **payload["field_evidence"],
+        IntentField.OBJECT: [
+            TermEvidence(term="radiation shielding", source=TermSource.ORIGINAL_INPUT),
+            TermEvidence(term="radiation shielding", source=TermSource.LLM_FAKE),
+        ],
+    }
+    with pytest.raises(ValidationError):
+        IntentDraft.model_validate(payload)

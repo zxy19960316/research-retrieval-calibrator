@@ -5,7 +5,13 @@ import pytest
 from app.core.intent import freeze_research_intent
 from app.core.query_planner import build_query_plan
 from app.models.enums import MethodConstraint, QueryBranch, QueryBreadth
-from app.models.planning import IntentDraft, TermEvidence, TermSource
+from app.models.planning import (
+    IntentDraft,
+    PlanningError,
+    QueryExpansion,
+    TermEvidence,
+    TermSource,
+)
 
 
 def _frozen_intent(*, exclusions: list[str] | None = None, chinese: bool = False):
@@ -59,7 +65,8 @@ def test_same_intent_has_deterministic_twelve_query_plan() -> None:
     first = build_query_plan("RRC-2026-0001", intent)
     second = build_query_plan("RRC-2026-0001", intent)
 
-    assert first == second
+    assert first.plan_id == second.plan_id
+    assert first.queries == second.queries
     assert len(first.queries) == 12
     assert {query.branch for query in first.queries} == set(QueryBranch)
     for branch in QueryBranch:
@@ -92,8 +99,72 @@ def test_chinese_intent_produces_english_arxiv_queries() -> None:
 
 def test_exclusion_uses_exact_normalized_match_not_substring() -> None:
     intent = _frozen_intent(exclusions=[" linear "])
-    plan = build_query_plan("RRC-2026-0001", intent, positive_expansions=["linear", "nonlinear"])
+    plan = build_query_plan(
+        "RRC-2026-0001",
+        intent,
+        positive_expansions=[
+            QueryExpansion(
+                target_field="method",
+                term_en="linear",
+                source=TermSource.LLM_FAKE,
+            ),
+            QueryExpansion(
+                target_field="method",
+                term_en="nonlinear",
+                source=TermSource.LLM_FAKE,
+            ),
+        ],
+    )
 
-    assert "linear" not in plan.positive_expansions
-    assert "nonlinear" in plan.positive_expansions
+    assert [item.term_en for item in plan.positive_expansions] == ["nonlinear"]
     assert plan.excluded_term_conflicts[0].term == "linear"
+    assert all('all:"linear"' not in query.query_text for query in plan.queries)
+    assert any('all:"nonlinear"' in query.query_text for query in plan.queries)
+
+
+def test_unmapped_required_chinese_term_refuses_query_plan() -> None:
+    intent = _frozen_intent().model_copy(update={"object_terms": ["\u672a\u77e5\u672f\u8bed"]})
+
+    with pytest.raises(PlanningError, match="UNMAPPED_RETRIEVAL_TERM"):
+        build_query_plan("RRC-2026-0001", intent)
+
+
+def test_canonical_arxiv_queries_have_allowed_prefixes_operators_and_quoting() -> None:
+    plan = build_query_plan("RRC-2026-0001", _frozen_intent())
+
+    assert len(plan.queries) == 12
+    for query in plan.queries:
+        assert 'all:"' in query.query_text
+        assert "%" not in query.query_text and "+" not in query.query_text
+        assert '"research"' not in query.query_text
+        assert all(operator in {"AND", "OR", "ANDNOT"} for operator in query.query_text.replace("(", " ").replace(")", " ").split() if operator in {"AND", "OR", "ANDNOT"})
+
+
+def test_allowed_expansion_enters_target_medium_and_wide_queries_only() -> None:
+    plan = build_query_plan(
+        "RRC-2026-0001",
+        _frozen_intent(),
+        positive_expansions=[
+            QueryExpansion(
+                target_field="object",
+                term_en="radiation barrier",
+                source=TermSource.LLM_FAKE,
+            )
+        ],
+    )
+
+    matching = [query for query in plan.queries if 'all:"radiation barrier"' in query.query_text]
+    assert matching
+    assert {query.breadth for query in matching} == {QueryBreadth.MEDIUM, QueryBreadth.WIDE}
+
+
+def test_clock_injection_is_reproducible_without_fixed_default_time() -> None:
+    intent = _frozen_intent()
+    fixed = datetime(2026, 7, 26, 12, 0, tzinfo=UTC)
+    first = build_query_plan("RRC-2026-0001", intent, generated_at_utc=fixed)
+    second = build_query_plan("RRC-2026-0001", intent, generated_at_utc=fixed)
+    default = build_query_plan("RRC-2026-0001", intent)
+
+    assert first.generated_at_utc == second.generated_at_utc == fixed
+    assert first.plan_id == second.plan_id == default.plan_id
+    assert default.generated_at_utc.year >= 2026
