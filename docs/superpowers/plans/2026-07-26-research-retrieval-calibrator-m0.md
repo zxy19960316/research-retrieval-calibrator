@@ -428,8 +428,10 @@ Expected: tests exit 0 and commit succeeds.
 
 **Interfaces:**
 
-- Produces: `precision_at_k`, `ndcg_at_k`, `evidence_coverage`, `metadata_hallucination_rate`
-- Produces: a schema-validated 5+5 unjudged question template
+- Produces: `precision_at_k`（Strict/Inclusive，固定分母 `k`）、`ndcg_at_k`（支持显式 ideal sequence）、`evidence_coverage`、`negative_suppression`、`new_useful_papers`、`metadata_hallucination_rate`。
+- Produces: `JudgedPaper`，仅组合非空论文 ID 与现有 `Relevance`，不依赖 M2 `RankedPaper`。
+- Produces: 一个 schema 校验通过的 5+5 `unjudged` 十题模板。
+- Metric semantics: the six frozen formulas and all `k > 0` failure behavior are authoritative in `docs/evaluation.md`; Task 3 must not substitute a returned-list-length denominator, implicit-only IDCG, absolute negative suppression, or inferred source confirmation.
 
 - [ ] **Step 1: Write hand-calculated failing metric tests**
 

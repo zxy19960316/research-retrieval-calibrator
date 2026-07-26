@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Research Retrieval Calibrator question template",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "questions"],
+  "properties": {
+    "schema_version": {"const": "0.1"},
+    "questions": {
+      "type": "array",
+      "minItems": 10,
+      "maxItems": 10,
+      "items": {"$ref": "#/$defs/question"}
+    }
+  },
+  "$defs": {
+    "non_empty_string": {"type": "string", "pattern": ".*\\S.*"},
+    "question": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "question_id",
+        "domain",
+        "question_zh",
+        "question_en",
+        "scope",
+        "exclusions",
+        "judging_guide",
+        "label_status",
+        "judge",
+        "judgment_version",
+        "source_pool_snapshot"
+      ],
+      "properties": {
+        "question_id": {"type": "string", "pattern": "^RRC-Q(?:0[1-9]|10)$"},
+        "domain": {"enum": ["nuclear_engineering", "cross_domain_stem"]},
+        "question_zh": {"$ref": "#/$defs/non_empty_string"},
+        "question_en": {"$ref": "#/$defs/non_empty_string"},
+        "scope": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/non_empty_string"}
+        },
+        "exclusions": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/non_empty_string"}
+        },
+        "judging_guide": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["high", "partial", "irrelevant"],
+          "properties": {
+            "high": {"$ref": "#/$defs/non_empty_string"},
+            "partial": {"$ref": "#/$defs/non_empty_string"},
+            "irrelevant": {"$ref": "#/$defs/non_empty_string"}
+          }
+        },
+        "label_status": {"enum": ["unjudged", "frozen"]},
+        "judge": {"type": ["string", "null"], "pattern": ".*\\S.*"},
+        "judgment_version": {"type": ["string", "null"], "pattern": ".*\\S.*"},
+        "source_pool_snapshot": {"type": ["string", "null"], "pattern": ".*\\S.*"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"label_status": {"const": "frozen"}}},
+          "then": {
+            "properties": {
+              "judge": {"$ref": "#/$defs/non_empty_string"},
+              "judgment_version": {"$ref": "#/$defs/non_empty_string"},
+              "source_pool_snapshot": {"$ref": "#/$defs/non_empty_string"}
+            }
+          }
+        }
+      ]
+    }
+  }
+}

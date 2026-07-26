@@ -18,15 +18,52 @@ M4 冻结 10 个真实问题：
 
 所有组使用相同来源快照或记录清楚时间差，不能把数据源变化误当算法改善。
 
-## 3. 指标
+## 3. 冻结指标语义
 
-- `Strict Precision@10`：只有 `HIGH` 计 1。
-- `Inclusive Precision@10`：`HIGH` 和 `PARTIAL` 计 1。
-- `NDCG@10`：`HIGH=2`、`PARTIAL=1`、`IRRELEVANT=0`。
-- `Evidence Coverage`：5 个固定槽位中至少被一篇有效论文覆盖的比例。
-- `Negative Suppression`：负反馈方向在第二轮前 10 中的暴露下降。
-- `New Useful Papers`：第二轮前 10 中未在首轮前 20 且被判断为 HIGH/PARTIAL 的数量。
-- `Metadata Hallucination Rate`：无真实来源确认的用户可见记录数 / 用户可见记录总数。
+M0-T03 冻结以下六项指标的数学语义；实现不得在函数内部四舍五入。
+
+### Strict Precision@k
+
+- 只有 `HIGH` 计为相关。
+- 只读取前 `k` 条，分母固定为 `k`；返回不足 `k` 条时，缺失位置按不相关处理。
+- `k` 必须大于 0。
+
+### Inclusive Precision@k
+
+- `HIGH` 和 `PARTIAL` 计为相关。
+- 只读取前 `k` 条，分母固定为 `k`；返回不足 `k` 条时，缺失位置按不相关处理。
+- `k` 必须大于 0。
+
+### NDCG@k
+
+- 相关性等级为 `HIGH=2`、`PARTIAL=1`、`IRRELEVANT=0`。
+- `gain = 2^grade - 1`；第 1 名开始的 `discount = log2(rank + 1)`。
+- 缺失位置贡献 0，IDCG 为 0 时返回 0，`k` 必须大于 0。
+- 接口允许显式提供理想相关性序列；未提供时才可将当前返回的前 `k` 条按等级排序作为默认理想序列。
+
+### Evidence Coverage
+
+- 分母固定为全部 5 个 `EvidenceSlot`。
+- 重复槽位只计算一次；未知槽位必须拒绝。
+- 返回已覆盖槽位数 / 5。
+
+### Negative Suppression
+
+- 定义为“第一轮前 `k` 的负向暴露率 - 第二轮前 `k` 的负向暴露率”。
+- 两个暴露率的分母均固定为 `k`，返回不足 `k` 条时缺失位置不构成负向暴露。
+- `k` 必须大于 0；结果允许为负数，负数表示第二轮恶化，禁止取绝对值掩盖恶化。
+
+### New Useful Papers
+
+- 计算第二轮前 `k` 中同时满足“未出现在第一轮前 20 的论文 ID”和“相关性为 `HIGH` 或 `PARTIAL`”的唯一论文数。
+- 论文 ID 必须非空；重复 ID 输入必须拒绝，不能静默累计。
+- `k` 必须大于 0。
+
+### Metadata Hallucination Rate
+
+- 定义为“未确认真实来源的用户可见记录数 / 用户可见记录总数”。
+- 没有用户可见记录时返回 0。
+- 只接收明确的来源确认布尔值；标题看起来真实或 URL 非空都不等同于来源已确认。
 
 ## 4. M3 单问题门禁
 
