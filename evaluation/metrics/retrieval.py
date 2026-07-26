@@ -68,8 +68,9 @@ def ndcg_at_k(
     _require_k(k)
     dcg = _dcg(relevances, k)
     if ideal_relevances is None:
+        default_ideal: list[Relevance] = [_as_relevance(value) for value in relevances[:k]]
         ideal_relevances = sorted(
-            (_as_relevance(value) for value in relevances[:k]),
+            default_ideal,
             key=lambda relevance: _GRADES[relevance],
             reverse=True,
         )
