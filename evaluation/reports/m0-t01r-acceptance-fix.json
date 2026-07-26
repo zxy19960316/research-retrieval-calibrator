@@ -1,9 +1,13 @@
 {
   "task_id": "M0-T01R",
   "phase": "M0",
-  "validated_commit": "3e4a5f47b7e0cd2bdd95aa05c5fe0d635a511acf",
-  "baseline_commit": "dafcb844ed5b9ec8d510533c481a93f59a91fe22",
-  "generated_at_utc": "2026-07-26T07:35:12Z",
+  "validated_commit": "453dcce4ee7b53963ee3dd150f1e912dc87f50dc",
+  "baseline_commit": "f005f33e9ba74afa8ba5168191f877698dc11afa",
+  "generated_at_utc": "2026-07-26T08:56:37Z",
+  "ci_evidence_boundary": {
+    "validated_commit_scope": "This report records local checks for the implementation commit above.",
+    "final_pr_head_scope": "The authoritative result for the final pushed PR head is the GitHub Checks for its push and pull_request events; do not rewrite this report solely to chase a later evidence-only commit hash."
+  },
   "environment": {
     "python": "3.12.10",
     "dependencies": {
@@ -17,20 +21,21 @@
   },
   "checks": [
     {
-      "name": "pre_fix_docs_validation",
+      "name": "pre_fix_acceptance_tests",
       "evidence_type": "automated",
       "status": "failed_as_expected",
-      "command": "py -3.12 scripts/validate_project_docs.py",
+      "command": "py -3.12 -m pytest tests/contract/test_project_docs_validation.py tests/contract/test_domain_models.py -q",
       "exit_code": 1,
-      "summary": "The baseline rejected STATUS.md because M0 was IN_PROGRESS with 1/4 tasks instead of READY with 0/4 tasks."
+      "test_summary": "7 failed, 18 passed",
+      "summary": "Before the minimal implementation, M4 NO_GO handling, status-count constraints, and the merged public-contract schema snapshot were not accepted."
     },
     {
-      "name": "focused_m0_contract_tests",
+      "name": "focused_m0_t01r_contract_tests",
       "evidence_type": "automated",
       "status": "passed",
-      "command": "py -3.12 -m pytest tests/contract -q",
+      "command": "py -3.12 -m pytest tests/contract/test_project_docs_validation.py tests/contract/test_domain_models.py -q",
       "exit_code": 0,
-      "test_summary": "17 passed"
+      "test_summary": "26 passed"
     },
     {
       "name": "full_regression",
@@ -38,7 +43,7 @@
       "status": "passed",
       "command": "py -3.12 -m pytest -q",
       "exit_code": 0,
-      "test_summary": "17 passed"
+      "test_summary": "26 passed"
     },
     {
       "name": "ruff",
@@ -78,9 +83,9 @@
   ],
   "validated_inputs": [
     {
-      "path": "tests/contract/fixtures/retrieval_project.schema.json",
-      "sha256": "688988742c710ae1972812d84d220c5e27e8fe7b47b60c7f691196bac7161c1b",
-      "purpose": "version-controlled normalized RetrievalProject JSON Schema snapshot"
+      "path": "tests/contract/fixtures/m0_t01_public_contracts.schema.json",
+      "sha256": "7781e91625a6178a8f9e8a01de4adb89d800a4ad53e6c488f5de140f4174f631",
+      "purpose": "version-controlled, key-sorted merged JSON Schema snapshot for all public M0-T01 contracts"
     },
     {
       "path": "STATUS.md",
@@ -111,6 +116,6 @@
     }
   ],
   "residual_risks": [
-    "The schema snapshot intentionally locks the current Pydantic 2.13.4 output; intentional contract changes require an explicit snapshot review."
+    "The merged schema snapshot intentionally locks the current Pydantic 2.13.4 output for all six public M0-T01 contracts; intentional contract changes require an explicit snapshot review."
   ]
 }
