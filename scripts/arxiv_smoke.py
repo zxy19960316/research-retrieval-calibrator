@@ -46,6 +46,7 @@ def main() -> int:
     try:
         papers = adapter.search(query, max_results=arguments.max_results)
     except ArxivAdapterError as error:
+        observation = adapter.last_observation
         print(
             json.dumps(
                 {
@@ -54,11 +55,17 @@ def main() -> int:
                     "observed_at_utc": observed_at,
                     "query": arguments.query,
                     "error_code": error.code,
+                    "attempt_count": observation.attempt_count,
+                    "http_status": observation.http_status,
+                    "retry_after_seconds": observation.retry_after_seconds,
+                    "elapsed_seconds": observation.elapsed_seconds,
                 },
                 sort_keys=True,
             )
         )
         return 1
+    observation = adapter.last_observation
+    error_code = None if papers else "NO_CONFIRMED_ARXIV_RESULT"
     print(
         json.dumps(
             {
@@ -68,6 +75,11 @@ def main() -> int:
                 "query": arguments.query,
                 "result_count": len(papers),
                 "source_id_sample": [paper.source_id for paper in papers[:3]],
+                "error_code": error_code,
+                "attempt_count": observation.attempt_count,
+                "http_status": observation.http_status,
+                "retry_after_seconds": observation.retry_after_seconds,
+                "elapsed_seconds": observation.elapsed_seconds,
             },
             sort_keys=True,
         )

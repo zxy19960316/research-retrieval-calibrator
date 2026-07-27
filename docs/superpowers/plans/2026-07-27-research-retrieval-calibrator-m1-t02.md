@@ -100,6 +100,15 @@ class ArxivAdapterConfig(BaseModel):
 - [ ] Commit implementation/tests/fixtures/plan as `feat: add M1 arXiv retrieval adapter`; write evidence that references that full commit and hashes its changed blobs. Commit only evidence and `STATUS.md` as `chore: record M1-T02 adapter evidence`.
 - [ ] Push the existing M1-T02 branch and open/update one Draft PR only after all local checks are green. Roll back using `git revert <evidence>` then `git revert <implementation>`.
 
+### M1-T02R transport, Atom-error and cache-provenance closure
+
+- [x] Detect arXiv Atom error feeds before creating a `PaperRecord`; report `ARXIV_API_ERROR` with an optional source reason, and reject malformed source identities with `INVALID_ARXIV_ENTRY`.
+- [x] Keep HTTP response status/body/headers at the urllib transport boundary, but translate DNS, proxy, TLS and timeout failures to a retryable `ArxivTransportFailure`. The adapter alone maps exhausted attempts to `ARXIV_TRANSPORT_ERROR`.
+- [x] Schedule every transport attempt through one stateful boundary. The wait is the maximum of the remaining three-second minimum interval, exponential backoff and a valid `Retry-After`; cache hits do not sleep.
+- [x] Cache source metadata independently of query provenance, return deep copies, and bind every returned record's `retrieval_paths` to the current `query_id`.
+- [x] Add recorded error Atom, modern/legacy ID, default-urllib transport retry, bounded retry, per-attempt interval, `Retry-After` and cache-isolation tests. The independent smoke reports URL-free `attempt_count`, HTTP status, error code, retry-after and elapsed time.
+- [x] Preserve scope: this closure does not implement M1-T03 normalization/deduplication, M1-T04 orchestration, ranking, models, CNKI, or platform work. Real smoke evidence reports adapter observation separately from connectivity diagnostics; a causal link is not established.
+
 ## Self-Review
 
 - Coverage: HTTP boundary, Atom parsing, pagination, User-Agent, timeout, rate limit, retry/backoff, cache, recorded fixture, automated/recorded/real evidence separation and independent smoke each have a named task and test path.

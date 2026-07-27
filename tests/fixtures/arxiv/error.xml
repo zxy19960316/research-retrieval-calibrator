@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <entry>
+    <id>http://arxiv.org/api/errors#incorrect_query</id>
+    <title>Error</title>
+    <summary>Invalid query syntax supplied to the arXiv API.</summary>
+    <author><name>arXiv api core</name></author>
+  </entry>
+</feed>

@@ -6,9 +6,11 @@ import re
 import time
 import xml.etree.ElementTree as element_tree
 from collections.abc import Callable, Mapping
+from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 from typing import NamedTuple, Protocol
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 from urllib.request import Request, urlopen
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -18,21 +20,36 @@ from app.models.query import Query
 
 _ATOM_NAMESPACE = "{http://www.w3.org/2005/Atom}"
 _TRANSIENT_STATUSES = {429, 500, 502, 503, 504}
+_MODERN_ARXIV_ID = re.compile(r"\d{4}\.\d{4,5}(?:v\d+)?$")
+_LEGACY_ARXIV_ID = re.compile(r"[a-z-]+(?:\.[a-z-]+)?/\d{7}(?:v\d+)?$")
 _ARXIV_ID_VERSION = re.compile(r"v\d+$")
 
 
 class ArxivAdapterError(ValueError):
     """Stable failure surface for an unavailable or invalid source response."""
 
-    def __init__(self, code: str) -> None:
+    def __init__(self, code: str, reason: str | None = None) -> None:
         self.code = code
+        self.reason = reason
         super().__init__(code)
+
+
+class ArxivTransportFailure(OSError):
+    """A retryable failure to complete an HTTP transaction."""
 
 
 class ArxivResponse(NamedTuple):
     status_code: int
     body: bytes
     headers: Mapping[str, str]
+
+
+class ArxivRequestObservation(NamedTuple):
+    attempt_count: int
+    http_status: int | None
+    retry_after_seconds: float | None
+    final_error_code: str | None
+    elapsed_seconds: float
 
 
 class ArxivTransport(Protocol):
@@ -42,6 +59,8 @@ class ArxivTransport(Protocol):
 
 
 class UrllibArxivTransport:
+    """Translate urllib's network exceptions without deciding adapter policy."""
+
     def get(
         self, url: str, *, headers: Mapping[str, str], timeout_seconds: float
     ) -> ArxivResponse:
@@ -51,8 +70,8 @@ class UrllibArxivTransport:
                 return ArxivResponse(response.status, response.read(), dict(response.headers.items()))
         except HTTPError as error:
             return ArxivResponse(error.code, error.read(), dict(error.headers.items()))
-        except URLError as error:
-            raise ArxivAdapterError("ARXIV_TRANSPORT_ERROR") from error
+        except (URLError, OSError) as error:
+            raise ArxivTransportFailure(str(error)) from error
 
 
 class ArxivAdapterConfig(BaseModel):
@@ -68,7 +87,7 @@ class ArxivAdapterConfig(BaseModel):
 
 
 class ArxivAdapter:
-    """Fetch bounded first-round arXiv records without inventing any metadata."""
+    """Fetch bounded first-round arXiv records without inventing metadata."""
 
     def __init__(
         self,
@@ -83,79 +102,134 @@ class ArxivAdapter:
         self._monotonic = monotonic
         self._sleeper = sleeper
         self._cache: dict[tuple[str, int], list[PaperRecord]] = {}
-        self._last_request_at: float | None = None
+        self._next_allowed_at: float | None = None
+        self._search_started_at = 0.0
+        self._last_observation = ArxivRequestObservation(0, None, None, None, 0.0)
+
+    @property
+    def last_observation(self) -> ArxivRequestObservation:
+        """Return safe, URL-free facts from the most recent search call."""
+        return self._last_observation
 
     def search(self, query: Query, *, max_results: int) -> list[PaperRecord]:
         if max_results < 1:
             raise ArxivAdapterError("INVALID_ARXIV_MAX_RESULTS")
+        self._search_started_at = self._monotonic()
+        self._last_observation = ArxivRequestObservation(0, None, None, None, 0.0)
         key = (query.query_text, max_results)
         cached = self._cache.get(key)
         if cached is not None:
-            return [paper.model_copy(deep=True) for paper in cached]
+            return self._for_query(cached, query.query_id)
 
-        papers: list[PaperRecord] = []
-        seen_ids: set[str] = set()
-        start = 0
-        while len(papers) < max_results:
-            page_size = min(self._config.page_size, max_results - len(papers))
-            page = self._parse_atom(
-                self._request(query.query_text, start=start, max_results=page_size).body,
-                query_id=query.query_id,
-            )
-            if not page:
-                break
-            new_records = [paper for paper in page if paper.source_id not in seen_ids]
-            if not new_records:
-                break
-            for paper in new_records:
-                seen_ids.add(paper.source_id)
-                papers.append(paper)
-                if len(papers) == max_results:
+        try:
+            papers: list[PaperRecord] = []
+            seen_ids: set[str] = set()
+            start = 0
+            while len(papers) < max_results:
+                page_size = min(self._config.page_size, max_results - len(papers))
+                page = self._parse_atom(
+                    self._request(query.query_text, start=start, max_results=page_size).body,
+                    query_id=query.query_id,
+                )
+                if not page:
                     break
-            if len(page) < page_size:
-                break
-            start += page_size
+                new_records = [paper for paper in page if paper.source_id not in seen_ids]
+                if not new_records:
+                    break
+                for paper in new_records:
+                    seen_ids.add(paper.source_id)
+                    papers.append(paper)
+                    if len(papers) == max_results:
+                        break
+                if len(page) < page_size:
+                    break
+                start += page_size
+        except ArxivAdapterError as error:
+            self._set_final_error(error.code)
+            raise
         self._cache[key] = [paper.model_copy(deep=True) for paper in papers]
-        return papers
+        self._set_elapsed()
+        return self._for_query(papers, query.query_id)
 
     def _request(self, search_query: str, *, start: int, max_results: int) -> ArxivResponse:
         url = f"{self._config.endpoint}?{urlencode({'search_query': search_query, 'start': start, 'max_results': max_results})}"
+        retry_not_before: float | None = None
         for attempt in range(self._config.max_attempts):
-            if attempt == 0:
-                self._wait_for_rate_limit()
+            self._wait_for_attempt(retry_not_before)
             try:
                 response = self._transport.get(
                     url,
                     headers={"User-Agent": self._config.user_agent},
                     timeout_seconds=self._config.timeout_seconds,
                 )
-            except ArxivAdapterError:
-                raise
-            except (OSError, TimeoutError) as error:
+            except ArxivTransportFailure as error:
+                self._record_attempt(http_status=None)
                 if attempt == self._config.max_attempts - 1:
                     raise ArxivAdapterError("ARXIV_TRANSPORT_ERROR") from error
-                self._backoff(attempt)
+                retry_not_before = self._monotonic() + self._backoff_seconds(attempt)
                 continue
-            self._last_request_at = self._monotonic()
+
+            self._record_attempt(http_status=response.status_code)
             if response.status_code == 200:
                 return response
             if response.status_code not in _TRANSIENT_STATUSES or attempt == self._config.max_attempts - 1:
                 raise ArxivAdapterError(f"ARXIV_HTTP_{response.status_code}")
-            self._backoff(attempt)
+            retry_after = self._retry_after_seconds(response.headers)
+            self._last_observation = self._last_observation._replace(
+                retry_after_seconds=retry_after
+            )
+            retry_not_before = self._monotonic() + (
+                retry_after if retry_after is not None else self._backoff_seconds(attempt)
+            )
         raise ArxivAdapterError("ARXIV_TRANSPORT_ERROR")
 
-    def _wait_for_rate_limit(self) -> None:
-        if self._last_request_at is not None:
-            delay = self._config.min_request_interval_seconds - (
-                self._monotonic() - self._last_request_at
-            )
-            if delay > 0:
-                self._sleeper(delay)
-
-    def _backoff(self, attempt: int) -> None:
-        delay = self._config.initial_backoff_seconds * (2**attempt)
+    def _wait_for_attempt(self, retry_not_before: float | None) -> None:
+        targets = [target for target in (self._next_allowed_at, retry_not_before) if target is not None]
+        if not targets:
+            return
+        delay = max(targets) - self._monotonic()
         if delay > 0:
             self._sleeper(delay)
+
+    def _record_attempt(self, *, http_status: int | None) -> None:
+        now = self._monotonic()
+        self._next_allowed_at = now + self._config.min_request_interval_seconds
+        self._last_observation = self._last_observation._replace(
+            attempt_count=self._last_observation.attempt_count + 1,
+            http_status=http_status,
+        )
+
+    def _set_final_error(self, code: str) -> None:
+        self._last_observation = self._last_observation._replace(final_error_code=code)
+        self._set_elapsed()
+
+    def _set_elapsed(self) -> None:
+        self._last_observation = self._last_observation._replace(
+            elapsed_seconds=max(0.0, self._monotonic() - self._search_started_at)
+        )
+
+    def _backoff_seconds(self, attempt: int) -> float:
+        return float(self._config.initial_backoff_seconds * (2**attempt))
+
+    @staticmethod
+    def _retry_after_seconds(headers: Mapping[str, str]) -> float | None:
+        value = next((value for key, value in headers.items() if key.lower() == "retry-after"), None)
+        if value is None:
+            return None
+        try:
+            return max(0.0, float(value))
+        except ValueError:
+            try:
+                parsed = parsedate_to_datetime(value)
+            except (TypeError, ValueError):
+                return None
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=UTC)
+            return max(0.0, float((parsed - datetime.now(UTC)).total_seconds()))
+
+    @staticmethod
+    def _for_query(papers: list[PaperRecord], query_id: str) -> list[PaperRecord]:
+        return [paper.model_copy(update={"retrieval_paths": [query_id]}, deep=True) for paper in papers]
 
     @staticmethod
     def _parse_atom(body: bytes, *, query_id: str) -> list[PaperRecord]:
@@ -168,10 +242,10 @@ class ArxivAdapter:
             source_url = ArxivAdapter._element_text(entry, "id")
             title = ArxivAdapter._element_text(entry, "title")
             abstract = ArxivAdapter._element_text(entry, "summary")
-            if not source_url or not title or not abstract or not source_url.startswith(("http://", "https://")):
-                raise ArxivAdapterError("INVALID_ARXIV_ENTRY")
-            source_id = _ARXIV_ID_VERSION.sub("", source_url.rstrip("/").rsplit("/", 1)[-1])
-            if not source_id:
+            if ArxivAdapter._is_error_atom(source_url, title):
+                raise ArxivAdapterError("ARXIV_API_ERROR", abstract or None)
+            source_id = ArxivAdapter._source_id(source_url)
+            if not source_id or not title or not abstract:
                 raise ArxivAdapterError("INVALID_ARXIV_ENTRY")
             authors = [
                 name
@@ -180,13 +254,42 @@ class ArxivAdapter:
             ]
             papers.append(
                 PaperRecord(
-                    paper_id=f"arxiv:{source_id}", source="arxiv", source_id=source_id,
-                    title=title, abstract=abstract, authors=authors,
+                    paper_id=f"arxiv:{source_id}",
+                    source="arxiv",
+                    source_id=source_id,
+                    title=title,
+                    abstract=abstract,
+                    authors=authors,
                     year=ArxivAdapter._year(ArxivAdapter._element_text(entry, "published")),
-                    url=source_url, language="en", retrieval_paths=[query_id],
+                    url=source_url,
+                    language="en",
+                    retrieval_paths=[query_id],
                 )
             )
         return papers
+
+    @staticmethod
+    def _is_error_atom(source_url: str, title: str) -> bool:
+        parsed = urlparse(source_url)
+        return (
+            parsed.hostname == "arxiv.org" and parsed.path.startswith("/api/errors")
+        ) or title.casefold() == "error"
+
+    @staticmethod
+    def _source_id(source_url: str) -> str | None:
+        parsed = urlparse(source_url)
+        if (
+            parsed.scheme not in {"http", "https"}
+            or parsed.hostname != "arxiv.org"
+            or parsed.query
+            or parsed.fragment
+            or not parsed.path.startswith("/abs/")
+        ):
+            return None
+        raw_id = parsed.path.removeprefix("/abs/")
+        if not (_MODERN_ARXIV_ID.fullmatch(raw_id) or _LEGACY_ARXIV_ID.fullmatch(raw_id)):
+            return None
+        return _ARXIV_ID_VERSION.sub("", raw_id)
 
     @staticmethod
     def _element_text(element: element_tree.Element, name: str) -> str:
