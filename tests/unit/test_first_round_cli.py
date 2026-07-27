@@ -43,6 +43,27 @@ def test_recorded_cli_writes_json_and_markdown_without_invented_metadata(tmp_pat
     assert "DOI:" not in markdown or all(item["doi"] for item in payload["candidates"])
 
 
+def test_recorded_cli_creates_a_missing_nested_output_directory(tmp_path: Path) -> None:
+    output_dir = tmp_path / "missing" / "nested" / "output"
+
+    assert main(["--question", QUESTION, "--output-dir", str(output_dir), "--mode", "recorded"]) == 0
+
+    assert (output_dir / "first-round.json").is_file()
+    assert (output_dir / "first-round.md").is_file()
+
+
+def test_existing_output_file_is_an_invalid_cli_argument(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    output_file = tmp_path / "not-a-directory"
+    output_file.write_text("not a directory", encoding="utf-8")
+
+    assert main(["--question", QUESTION, "--output-dir", str(output_file)]) == 2
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["error_code"] == "INVALID_CLI_ARGUMENT"
+
+
 def test_output_write_failure_emits_structured_json(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

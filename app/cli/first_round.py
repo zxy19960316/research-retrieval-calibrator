@@ -133,10 +133,13 @@ def _parse_arguments(argv: Sequence[str] | None) -> argparse.Namespace:
     arguments = parser.parse_args(argv)
     if not arguments.question.strip() or not arguments.user_agent.strip():
         raise _CliArgumentError("question and user-agent must be non-blank")
-    if not arguments.output_dir.parent.is_dir():
-        raise _CliArgumentError("output directory parent must already exist")
     if arguments.output_dir.exists() and not arguments.output_dir.is_dir():
         raise _CliArgumentError("output-dir must be a directory")
+    existing_parent = arguments.output_dir.parent
+    while not existing_parent.exists():
+        existing_parent = existing_parent.parent
+    if not existing_parent.is_dir():
+        raise _CliArgumentError("output directory parent must be a directory")
     return arguments
 
 
