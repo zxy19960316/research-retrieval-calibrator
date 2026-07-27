@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <entry>
+    <id>http://arxiv.org/abs/2401.00001v2</id>
+    <title> Radiation Shielding with Transfer Learning </title>
+    <summary> A recorded abstract for adapter testing. </summary>
+    <published>2024-01-01T00:00:00Z</published>
+    <author><name>Ada Author</name></author>
+    <author><name>Ben Author</name></author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2401.00002v1</id>
+    <title> Nuclear Engineering Design </title>
+    <summary> Another recorded abstract. </summary>
+    <published>2023-12-31T00:00:00Z</published>
+    <author><name>Cora Author</name></author>
+  </entry>
+</feed>

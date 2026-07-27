@@ -1,0 +1,129 @@
+{
+  "task_id": "M1-T02",
+  "repair_id": "M1-T02R3",
+  "phase": "M1",
+  "status": "adapter_contract_complete_pending_m1_t04_live_gate",
+  "validated_implementation_commit": "94a48bc891c92b1a40a848d2d174b14b7a692d12",
+  "generated_at_utc": "2026-07-27T05:09:15Z",
+  "python_version": "3.12.10",
+  "red_light": [
+    {
+      "command": "py -3.12 -m pytest tests/unit/test_arxiv_adapter.py -q",
+      "exit_code": 1,
+      "summary": "33 failed in 0.47s before implementation. The new suite exposed absent total-result and total-attempt bounds, uncapped and nondeterministic Retry-After handling, acceptance of a non-Atom root, unwrapped entry validation, and a smoke CLI without JSON argument failures. Existing tests also failed because the new contract fields were intentionally introduced before the implementation."
+    },
+    {
+      "command": "py -3.12 -m pytest tests/unit/test_arxiv_adapter.py -q",
+      "exit_code": 1,
+      "summary": "7 failed and 40 passed in 0.37s before M1-T02R3. Canonical math.GT, cs.SE, and nlin.CD identifiers were rejected, while lowercase subject classes and v0 were incorrectly accepted."
+    }
+  ],
+  "green_light": [
+    {
+      "name": "adapter_unit_tests",
+      "command": "py -3.12 -m pytest tests/unit/test_arxiv_adapter.py -q",
+      "exit_code": 0,
+      "summary": "47 passed in 0.21s; all tests are offline."
+    },
+    {
+      "name": "full_regression",
+      "command": "py -3.12 -m pytest -q",
+      "exit_code": 0,
+      "summary": "213 passed in 95.75s"
+    },
+    {
+      "name": "ruff",
+      "command": "py -3.12 -m ruff check app evaluation scripts tests",
+      "exit_code": 0,
+      "summary": "All checks passed"
+    },
+    {
+      "name": "mypy",
+      "command": "py -3.12 -m mypy app evaluation scripts",
+      "exit_code": 0,
+      "summary": "Success: no issues found in 22 source files"
+    },
+    {
+      "name": "project_docs_validation",
+      "command": "py -3.12 scripts/validate_project_docs.py",
+      "exit_code": 0,
+      "summary": "PASS: project docs are complete; 31 phase tasks are indexed; local links resolve."
+    },
+    {
+      "name": "m0_historical_validation",
+      "command": "py -3.12 scripts/validate_phase.py M0",
+      "exit_code": 0,
+      "summary": "PASS: M0 evidence report, inputs, git ancestry, and status gate are valid."
+    },
+    {
+      "name": "pip_check",
+      "command": "py -3.12 -m pip check",
+      "exit_code": 0,
+      "summary": "No broken requirements found"
+    },
+    {
+      "name": "smoke_argument_validation",
+      "command": "py -3.12 scripts/arxiv_smoke.py --max-results 0; py -3.12 scripts/arxiv_smoke.py --max-results 101; py -3.12 scripts/arxiv_smoke.py --user-agent '   '; py -3.12 scripts/arxiv_smoke.py --query '   '",
+      "exit_code": 2,
+      "summary": "Each invalid invocation emitted JSON with evidence_type=real_external, status=failed, and error_code=INVALID_SMOKE_ARGUMENT. Exit 2 is the intended argument-failure result; no transport was created."
+    }
+  ],
+  "acceptance_coverage": {
+    "bounded_total_results": "passed: exact limit accepted and excessive max_results rejects INVALID_ARXIV_MAX_RESULTS before transport",
+    "bounded_total_attempts": "passed: retries and pages share one total budget; exhaustion raises ARXIV_REQUEST_BUDGET_EXHAUSTED without a further request or partial cache",
+    "bounded_retry_after": "passed: numeric and HTTP-date values are capped, malformed values fall back to exponential backoff, and negative values still obey the minimum interval",
+    "atom_root_validation": "passed: only the Atom feed root is accepted; wrong-root.xml yields INVALID_ARXIV_ATOM",
+    "stable_entry_validation_error": "passed: source identity, blank fields, and PaperRecord validation failures expose INVALID_ARXIV_ENTRY",
+    "smoke_argument_validation": "passed: invalid CLI inputs return structured INVALID_SMOKE_ARGUMENT JSON without a traceback",
+    "legacy_identifier_subject_classes": "passed: canonical math.GT, cs.SE, and nlin.CD subject classes are accepted without casefolding",
+    "legacy_identifier_version_handling": "passed: v1+ is removed from source IDs while v0 is rejected for modern and legacy forms",
+    "mixed_modern_legacy_atom_page": "passed: modern and legacy entries parse in feed order and retain the current query retrieval path",
+    "invalid_identifier_rejection": "passed: malformed archive/subject/serial forms retain INVALID_ARXIV_ENTRY"
+  },
+  "input_sha256": {
+    "app/adapters/__init__.py": "9feed06d9bff1666552336e3f3f68223a042f9dd1e2c4ac6fa96ae5b9032e0fb",
+    "app/adapters/arxiv.py": "e87ea50be5e9f4eeb4d583945a83ef06af4effe0882021725a6c43371401db13",
+    "app/models/enums.py": "25a0f237729076dc31e01e65242b7bf40a12c971d92d38c38eeacb2581b2720e",
+    "app/models/paper.py": "a1f088883a7158d6991f5112ae65c1ef14fa4455649acdc8fd417402e31669d4",
+    "app/models/query.py": "9c8bf9ff2b14dc0aeebbdda37d5e6ff64a622ea29cccbec219720bfb61997eee",
+    "docs/superpowers/plans/2026-07-27-research-retrieval-calibrator-m1-t02.md": "222c1152b570f4fc86bc516cab8b12f73891457e2b6ab3fd13c86c05669208b4",
+    "scripts/arxiv_smoke.py": "044d02d7181e55f1e89174ced4066b5de037ace0e3c02080c03d813015bcc7cc",
+    "tests/unit/test_arxiv_adapter.py": "1359d719038ae528a1e039830d1c116a19f2e9c0eedbd09b40e1fd2268ddf575",
+    "tests/fixtures/arxiv/normal.xml": "b66b5a86e983ad2ddd1cb9a814be48523dc565620f440bf805f52aeea337e227",
+    "tests/fixtures/arxiv/empty.xml": "8894e851c71b6842655b4540fb7837ce69fc123f8291ad0dd97e69aa6adef8d6",
+    "tests/fixtures/arxiv/malformed.xml": "03caebe43e1d4db1c893efc3d8a543cb31951f4484b2bc83726abe1880f2af33",
+    "tests/fixtures/arxiv/error.xml": "e877049d2efbc6a4b5c73fe9f9310c7bd5bfddfe4412aa5c073287d4b08ebf4c",
+    "tests/fixtures/arxiv/wrong-root.xml": "630154f3017aa9a94b67a3c1a8eb18fce416acea831fb4a1d929317ed7e40c57"
+  },
+  "external_evidence": [
+    {
+      "name": "recorded_atom_fixtures",
+      "evidence_type": "recorded_external",
+      "status": "passed",
+      "reason": "Recorded normal, empty, malformed, error, and wrong-root XML responses cover deterministic parser and protocol behavior without a socket."
+    },
+    {
+      "name": "arxiv_real_network_smoke",
+      "evidence_type": "real_external",
+      "status": "failed",
+      "observed_at_utc": "2026-07-27T03:53:27.144186Z",
+      "query": "all:radiation shielding",
+      "adapter_observation": {
+        "attempt_count": 3,
+        "http_status": null,
+        "error_code": "ARXIV_TRANSPORT_ERROR",
+        "retry_after_seconds": null,
+        "elapsed_seconds": 51.954
+      },
+      "reason": "The preserved one bounded smoke exhausted its configured transport attempts. It did not return a confirmed source record or an HTTP response."
+    },
+    {
+      "name": "connectivity_diagnostic",
+      "evidence_type": "not_run",
+      "status": "not_run",
+      "reason": "No additional network diagnostic was run after the one permitted smoke request, and M1-T02R2 did not rerun real-network smoke."
+    }
+  ],
+  "causal_link": "not_established",
+  "scope_note": "M1-T02R3 accepts canonical legacy arXiv identifiers without changing transport, budgets, scheduling, cache provenance, smoke argument handling, or external evidence. The previously attempted real_external smoke failed honestly and was not rerun. M1-T04 live-success acceptance gate remains unsatisfied. M1 remains IN_PROGRESS 2/4; M1-T03 is the next action but is not started by this change. M2 remains BLOCKED_BY_M1."
+}
