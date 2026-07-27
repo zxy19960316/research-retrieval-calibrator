@@ -15,7 +15,7 @@
 | 阶段 | 状态 | 已通过任务 | 阶段证据 |
 |---|---|---:|---|
 | M0 产品与评测契约 | COMPLETE | 4/4 | M0-T01 domain contracts, M0-T02 state-machine guard, M0-T03 evaluation contracts, and M0-T04 evidence gate validated |
-| M1 首轮真实召回 | IN_PROGRESS | 1/4 | M1-T01 意图 IR、澄清问题与四路线查询规划已验证 |
+| M1 首轮真实召回 | IN_PROGRESS | 2/4 | M1-T01 意图 IR、澄清问题与四路线查询规划，以及 M1-T02 arXiv adapter contract 已验证 |
 | M2 首轮排序与选择 | BLOCKED_BY_M1 | 0/5 | 尚未生成 |
 | M3 反馈与第二轮校准 | BLOCKED_BY_M2 | 0/5 | 尚未生成 |
 | M4 十题离线评测 | BLOCKED_BY_M3 | 0/4 | 尚未生成 |
@@ -32,12 +32,12 @@
 
 ## 下一动作
 
-M0-T01、M0-T02、M0-T03、M0-T03R 与 M0-T04 已完成：领域契约、状态机、十题评测模板与指标、负向抑制修正，以及机器可读的证据报告和阶段自校验均已通过。M1-T01 已完成：意图 IR、澄清问题、严格 LLM fake 边界和四路线三宽度查询规划均已验证。下一动作：`M1-T02`；继续遵守 M1 的真实来源与证据边界。
+M0-T01、M0-T02、M0-T03、M0-T03R 与 M0-T04 已完成：领域契约、状态机、十题评测模板与指标、负向抑制修正，以及机器可读的证据报告和阶段自校验均已通过。M1-T01 与 M1-T02 已完成：意图 IR、澄清问题、严格 LLM fake 边界、四路线三宽度查询规划，以及 bounded arXiv adapter contract 均已验证。下一动作：`M1-T03`；但在 PR #7 最终审查和合并前不开始实现，并继续遵守 M1 的真实来源与证据边界。
 
 ## M1-T02 arXiv adapter evidence
 
-M1-T02R hardens the deterministic arXiv adapter with an explicit urllib transport boundary, Atom error-feed detection, strict modern/legacy source identity validation, start/max_results pagination, configured User-Agent and timeout, every-attempt request scheduling, Retry-After handling, and query-independent cached metadata with defensively rebuilt retrieval provenance. The 18 offline adapter tests and 184-test full regression passed. The one independent real arXiv smoke on 2026-07-27 exhausted three transport attempts and returned `ARXIV_TRANSPORT_ERROR` without an HTTP status; no additional connectivity diagnostic was run, so no causal link is claimed. This failed `real_external` evidence is not replaced by fixture evidence. M1 remains `IN_PROGRESS 1/4`; M1-T02 must continue until a successful independent real-network smoke is recorded, and M1-T03/M1-T04 are not started.
+M1-T02R2 closes the deterministic adapter contract with bounded total results and attempts, capped numeric/HTTP-date Retry-After values, strict Atom feed-root validation, stable entry validation errors, and structured smoke argument failures. The 33 offline adapter tests and 199-test full regression passed. M1-T02 adapter contract complete. The previously attempted `real_external` smoke failed honestly with `attempt_count = 3`, `http_status = null`, and `ARXIV_TRANSPORT_ERROR`; its timestamp and observation were preserved, no extra diagnostic or smoke was run, and causal link remains `not_established`. M1-T04 live-success acceptance gate remains unsatisfied. M1 is `IN_PROGRESS 2/4`; M1-T03 is the next action but is not started here, and M2 remains `BLOCKED_BY_M1`.
 
 ## M1-T01R3 repair evidence
 
-PR #6 now contains the M1-T01R3 breadth and exclusion closure evidence: each of the four branches has serializable NARROW/MEDIUM/WIDE required-group expressions, with WIDE strictly using fewer mandatory groups than MEDIUM while retaining the branch anchor. Former `framework`, `application`, `methodology`, and `benchmark` WIDE-only mandatory terms are removed; their individual exclusions preserve a complete twelve-query plan. Exclusions retain original audit text and canonical English comparison values, duplicate canonical exclusions are rejected, and exhausted bridge vocabulary reports `INVALID_QUERY_PLAN` with a stable reason. M1 remains `IN_PROGRESS 1/4`; M1-T02 is explicitly not started and outside this repair scope.
+PR #6 contains the M1-T01R3 breadth and exclusion closure evidence: each of the four branches has serializable NARROW/MEDIUM/WIDE required-group expressions, with WIDE strictly using fewer mandatory groups than MEDIUM while retaining the branch anchor. Former `framework`, `application`, `methodology`, and `benchmark` WIDE-only mandatory terms are removed; their individual exclusions preserve a complete twelve-query plan. Exclusions retain original audit text and canonical English comparison values, duplicate canonical exclusions are rejected, and exhausted bridge vocabulary reports `INVALID_QUERY_PLAN` with a stable reason. M1 is now `IN_PROGRESS 2/4`; M1-T02 is complete, while M1-T03 remains outside this change scope.

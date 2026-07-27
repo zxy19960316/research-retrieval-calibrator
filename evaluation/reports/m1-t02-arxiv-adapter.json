@@ -1,16 +1,16 @@
 {
   "task_id": "M1-T02",
-  "repair_id": "M1-T02R",
+  "repair_id": "M1-T02R2",
   "phase": "M1",
-  "status": "in_progress_external_validation",
-  "validated_implementation_commit": "2e00101351ba5787fe959d13fa170a6d9d7b0bd1",
-  "generated_at_utc": "2026-07-27T03:54:23Z",
+  "status": "adapter_contract_complete_pending_m1_t04_live_gate",
+  "validated_implementation_commit": "d03528115630406f8ce68f5c72d08f074e6108e8",
+  "generated_at_utc": "2026-07-27T04:32:56Z",
   "python_version": "3.12.10",
   "red_light": [
     {
       "command": "py -3.12 -m pytest tests/unit/test_arxiv_adapter.py -q",
       "exit_code": 1,
-      "summary": "5 passed, 12 failed before the M1-T02R implementation: error Atom was accepted as a paper; source identity accepted invalid URLs and truncated legacy IDs; urllib transport did not retry; every-attempt scheduling and Retry-After were absent; cache provenance was retained from the first query."
+      "summary": "33 failed in 0.47s before implementation. The new suite exposed absent total-result and total-attempt bounds, uncapped and nondeterministic Retry-After handling, acceptance of a non-Atom root, unwrapped entry validation, and a smoke CLI without JSON argument failures. Existing tests also failed because the new contract fields were intentionally introduced before the implementation."
     }
   ],
   "green_light": [
@@ -18,13 +18,13 @@
       "name": "adapter_unit_tests",
       "command": "py -3.12 -m pytest tests/unit/test_arxiv_adapter.py -q",
       "exit_code": 0,
-      "summary": "18 passed in 0.16s; all tests are offline. Covers error Atom rejection, source identities, real urllib exception translation/retry, bounded failures, every-attempt interval, Retry-After, pagination, cache provenance and defensive copying."
+      "summary": "33 passed in 0.16s; all tests are offline."
     },
     {
       "name": "full_regression",
       "command": "py -3.12 -m pytest -q",
       "exit_code": 0,
-      "summary": "184 passed in 103.07s"
+      "summary": "199 passed in 84.71s"
     },
     {
       "name": "ruff",
@@ -55,28 +55,43 @@
       "command": "py -3.12 -m pip check",
       "exit_code": 0,
       "summary": "No broken requirements found"
-    }
-  ],
-  "non_accepted_execution": [
+    },
     {
-      "command": "py -3.12 -m pytest tests/unit/test_arxiv_adapter.py -q; py -3.12 -m pytest -q; py -3.12 -m ruff check app evaluation scripts tests; py -3.12 -m mypy app evaluation scripts; py -3.12 scripts/validate_project_docs.py; py -3.12 scripts/validate_phase.py M0; py -3.12 -m pip check",
-      "exit_code": 124,
-      "summary": "The combined verification command exceeded the 124-second tool limit without a final test summary; it was not accepted as a pass. Each command was then rerun separately, including the accepted full regression above."
+      "name": "smoke_argument_validation",
+      "command": "py -3.12 scripts/arxiv_smoke.py --max-results 0; py -3.12 scripts/arxiv_smoke.py --max-results 101; py -3.12 scripts/arxiv_smoke.py --user-agent '   '; py -3.12 scripts/arxiv_smoke.py --query '   '",
+      "exit_code": 2,
+      "summary": "Each invalid invocation emitted JSON with evidence_type=real_external, status=failed, and error_code=INVALID_SMOKE_ARGUMENT. Exit 2 is the intended argument-failure result; no transport was created."
     }
   ],
+  "acceptance_coverage": {
+    "bounded_total_results": "passed: exact limit accepted and excessive max_results rejects INVALID_ARXIV_MAX_RESULTS before transport",
+    "bounded_total_attempts": "passed: retries and pages share one total budget; exhaustion raises ARXIV_REQUEST_BUDGET_EXHAUSTED without a further request or partial cache",
+    "bounded_retry_after": "passed: numeric and HTTP-date values are capped, malformed values fall back to exponential backoff, and negative values still obey the minimum interval",
+    "atom_root_validation": "passed: only the Atom feed root is accepted; wrong-root.xml yields INVALID_ARXIV_ATOM",
+    "stable_entry_validation_error": "passed: source identity, blank fields, and PaperRecord validation failures expose INVALID_ARXIV_ENTRY",
+    "smoke_argument_validation": "passed: invalid CLI inputs return structured INVALID_SMOKE_ARGUMENT JSON without a traceback"
+  },
   "input_sha256": {
-    "app/adapters/arxiv.py": "4911363ea7e8fd51173ba35ed6f64e4af9bfb3c568f6bfe07e9b18240a651b35",
-    "docs/superpowers/plans/2026-07-27-research-retrieval-calibrator-m1-t02.md": "520de67cc63f30c82b914d32d3dbce7f5585705c38c7f33d05252e21a321df73",
-    "scripts/arxiv_smoke.py": "38510e6ea0f990feeea5677c93299634e6892c28b681cd14c26a6c047d306128",
+    "app/adapters/__init__.py": "9feed06d9bff1666552336e3f3f68223a042f9dd1e2c4ac6fa96ae5b9032e0fb",
+    "app/adapters/arxiv.py": "4ea5117852a0a415b2094575889a7a89109a0b44d52d99eee590dbb54d29688e",
+    "app/models/enums.py": "25a0f237729076dc31e01e65242b7bf40a12c971d92d38c38eeacb2581b2720e",
+    "app/models/paper.py": "a1f088883a7158d6991f5112ae65c1ef14fa4455649acdc8fd417402e31669d4",
+    "app/models/query.py": "9c8bf9ff2b14dc0aeebbdda37d5e6ff64a622ea29cccbec219720bfb61997eee",
+    "docs/superpowers/plans/2026-07-27-research-retrieval-calibrator-m1-t02.md": "cf05251935e454c9c6ec5e4febfea0aacc322d6de069af8051340297c99bf1de",
+    "scripts/arxiv_smoke.py": "044d02d7181e55f1e89174ced4066b5de037ace0e3c02080c03d813015bcc7cc",
+    "tests/unit/test_arxiv_adapter.py": "eba4fb0a3ee3e28424ad178b903c252131a2675f24bededcb7fe2576be740cb5",
+    "tests/fixtures/arxiv/normal.xml": "b66b5a86e983ad2ddd1cb9a814be48523dc565620f440bf805f52aeea337e227",
+    "tests/fixtures/arxiv/empty.xml": "8894e851c71b6842655b4540fb7837ce69fc123f8291ad0dd97e69aa6adef8d6",
+    "tests/fixtures/arxiv/malformed.xml": "03caebe43e1d4db1c893efc3d8a543cb31951f4484b2bc83726abe1880f2af33",
     "tests/fixtures/arxiv/error.xml": "e877049d2efbc6a4b5c73fe9f9310c7bd5bfddfe4412aa5c073287d4b08ebf4c",
-    "tests/unit/test_arxiv_adapter.py": "01a35399d40b53ff670b3ee982e7605e47dfe0ab6088a5f273e9a4d3e60c47de"
+    "tests/fixtures/arxiv/wrong-root.xml": "630154f3017aa9a94b67a3c1a8eb18fce416acea831fb4a1d929317ed7e40c57"
   },
   "external_evidence": [
     {
       "name": "recorded_atom_fixtures",
       "evidence_type": "recorded_external",
       "status": "passed",
-      "reason": "Recorded normal, empty, malformed and arXiv error Atom responses cover deterministic parser and protocol behavior without a socket."
+      "reason": "Recorded normal, empty, malformed, error, and wrong-root XML responses cover deterministic parser and protocol behavior without a socket."
     },
     {
       "name": "arxiv_real_network_smoke",
@@ -91,15 +106,15 @@
         "retry_after_seconds": null,
         "elapsed_seconds": 51.954
       },
-      "reason": "The one bounded smoke exhausted its configured transport attempts. It did not return a confirmed source record or an HTTP response."
+      "reason": "The preserved one bounded smoke exhausted its configured transport attempts. It did not return a confirmed source record or an HTTP response."
     },
     {
       "name": "connectivity_diagnostic",
       "evidence_type": "not_run",
       "status": "not_run",
-      "reason": "No additional network diagnostic was run after the one permitted smoke request, so the external-call boundary was preserved."
+      "reason": "No additional network diagnostic was run after the one permitted smoke request, and M1-T02R2 did not rerun real-network smoke."
     }
   ],
   "causal_link": "not_established",
-  "scope_note": "M1-T02R hardens only the arXiv transport and Atom adapter boundary. The live-success acceptance condition remains unsatisfied after the recorded transport failure, so M1 remains IN_PROGRESS 1/4 and M1-T03/M1-T04 are not started. M1-T03 normalization/deduplication, M1-T04 CLI orchestration, M2 ranking, real-model work, CNKI automation and platform deployment are not implemented."
+  "scope_note": "M1-T02 adapter contract complete. The previously attempted real_external smoke failed honestly. M1-T04 live-success acceptance gate remains unsatisfied. M1 remains IN_PROGRESS 2/4; M1-T03 is the next action but is not started by this change. M2 remains BLOCKED_BY_M1."
 }
