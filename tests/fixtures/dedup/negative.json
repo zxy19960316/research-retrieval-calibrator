@@ -1,0 +1,38 @@
+{
+  "records": [
+    {"paper_id": "same-title-ada", "source": "crossref", "source_id": "n1", "title": "Shared Title", "abstract": "Recorded", "authors": ["Ada Author"], "year": 2024, "doi": null, "url": "https://example.test/n1", "language": "en", "retrieval_paths": ["Q1"]},
+    {"paper_id": "same-title-ben", "source": "crossref", "source_id": "n2", "title": "Shared Title", "abstract": "Recorded", "authors": ["Ben Author"], "year": 2024, "doi": null, "url": "https://example.test/n2", "language": "en", "retrieval_paths": ["Q2"]},
+    {"paper_id": "review-a", "source": "crossref", "source_id": "n3", "title": "A Review", "abstract": "Recorded", "authors": ["Cara Author"], "year": 2021, "doi": null, "url": "https://example.test/n3", "language": "en", "retrieval_paths": ["Q3"]},
+    {"paper_id": "review-b", "source": "crossref", "source_id": "n4", "title": "A Review", "abstract": "Recorded", "authors": ["Dora Author"], "year": 2021, "doi": null, "url": "https://example.test/n4", "language": "en", "retrieval_paths": ["Q4"]},
+    {"paper_id": "author-different-a", "source": "crossref", "source_id": "n5", "title": "Graph Indexing", "abstract": "Recorded", "authors": ["Evan Author"], "year": 2022, "doi": null, "url": "https://example.test/n5", "language": "en", "retrieval_paths": ["Q5"]},
+    {"paper_id": "author-different-b", "source": "crossref", "source_id": "n6", "title": "Quantum Cooling", "abstract": "Recorded", "authors": ["Evan Author"], "year": 2022, "doi": null, "url": "https://example.test/n6", "language": "en", "retrieval_paths": ["Q6"]},
+    {"paper_id": "distant-year-a", "source": "crossref", "source_id": "n7", "title": "Stable Retrieval Study", "abstract": "Recorded", "authors": ["Faye Author"], "year": 2018, "doi": null, "url": "https://example.test/n7", "language": "en", "retrieval_paths": ["Q7"]},
+    {"paper_id": "distant-year-b", "source": "crossref", "source_id": "n8", "title": "Stable Retrieval Study", "abstract": "Recorded", "authors": ["Faye Author"], "year": 2024, "doi": null, "url": "https://example.test/n8", "language": "en", "retrieval_paths": ["Q8"]},
+    {"paper_id": "different-doi-a", "source": "crossref", "source_id": "n9", "title": "DOI Difference", "abstract": "Recorded", "authors": ["Gail Author"], "year": 2024, "doi": "10.1000/a", "url": "https://example.test/n9", "language": "en", "retrieval_paths": ["Q9"]},
+    {"paper_id": "different-doi-b", "source": "crossref", "source_id": "n10", "title": "DOI Difference", "abstract": "Recorded", "authors": ["Gail Author"], "year": 2024, "doi": "10.1000/b", "url": "https://example.test/n10", "language": "en", "retrieval_paths": ["Q10"]},
+    {"paper_id": "different-arxiv-a", "source": "arxiv", "source_id": "2401.00011", "title": "Arxiv Difference", "abstract": "Recorded", "authors": ["Hank Author"], "year": 2024, "doi": null, "url": "https://arxiv.org/abs/2401.00011", "language": "en", "retrieval_paths": ["Q11"]},
+    {"paper_id": "different-arxiv-b", "source": "arxiv", "source_id": "2401.00012", "title": "Arxiv Difference", "abstract": "Recorded", "authors": ["Hank Author"], "year": 2024, "doi": null, "url": "https://arxiv.org/abs/2401.00012", "language": "en", "retrieval_paths": ["Q12"]},
+    {"paper_id": "initial-a", "source": "crossref", "source_id": "n13", "title": "Initial Study", "abstract": "Recorded", "authors": ["A. Author"], "year": 2024, "doi": null, "url": "https://example.test/n13", "language": "en", "retrieval_paths": ["Q13"]},
+    {"paper_id": "initial-b", "source": "crossref", "source_id": "n14", "title": "Initial Study", "abstract": "Recorded", "authors": ["Ada Author"], "year": 2024, "doi": null, "url": "https://example.test/n14", "language": "en", "retrieval_paths": ["Q14"]},
+    {"paper_id": "series-a", "source": "crossref", "source_id": "n15", "title": "Graph Models Part I", "abstract": "Recorded", "authors": ["Ira Author"], "year": 2024, "doi": null, "url": "https://example.test/n15", "language": "en", "retrieval_paths": ["Q15"]},
+    {"paper_id": "series-b", "source": "crossref", "source_id": "n16", "title": "Graph Models Part II", "abstract": "Recorded", "authors": ["Ira Author"], "year": 2024, "doi": null, "url": "https://example.test/n16", "language": "en", "retrieval_paths": ["Q16"]},
+    {"paper_id": "erratum-a", "source": "crossref", "source_id": "n17", "title": "Robust Retrieval", "abstract": "Recorded", "authors": ["Jane Author"], "year": 2024, "doi": null, "url": "https://example.test/n17", "language": "en", "retrieval_paths": ["Q17"]},
+    {"paper_id": "erratum-b", "source": "crossref", "source_id": "n18", "title": "Erratum: Robust Retrieval", "abstract": "Recorded", "authors": ["Jane Author"], "year": 2024, "doi": null, "url": "https://example.test/n18", "language": "en", "retrieval_paths": ["Q18"]},
+    {"paper_id": "theme-a", "source": "crossref", "source_id": "n19", "title": "Retrieval for Medical Images", "abstract": "Recorded", "authors": ["Kara Author"], "year": 2024, "doi": null, "url": "https://example.test/n19", "language": "en", "retrieval_paths": ["Q19"]},
+    {"paper_id": "theme-b", "source": "crossref", "source_id": "n20", "title": "Retrieval for Satellite Images", "abstract": "Recorded", "authors": ["Liam Author"], "year": 2024, "doi": null, "url": "https://example.test/n20", "language": "en", "retrieval_paths": ["Q20"]}
+  ],
+  "protected_pairs": [["same-title-ada", "same-title-ben"], ["review-a", "review-b"], ["author-different-a", "author-different-b"], ["distant-year-a", "distant-year-b"], ["different-doi-a", "different-doi-b"], ["different-arxiv-a", "different-arxiv-b"], ["initial-a", "initial-b"], ["series-a", "series-b"], ["erratum-a", "erratum-b"], ["theme-a", "theme-b"]],
+  "duplicate_paper_id_conflict_cases": [
+    {"field": "source_id", "replacement": "2401.00002"},
+    {"field": "doi", "replacement": "10.1000/conflicting-doi"},
+    {"field": "title", "replacement": "A conflicting title"},
+    {"field": "url", "replacement": "https://arxiv.org/abs/2401.00001?conflict=1"}
+  ],
+  "identity_conflict_case": {
+    "left": {"paper_id": "identity-a", "source": "arxiv", "source_id": "2401.00001", "title": "Identity conflict", "abstract": "Recorded", "authors": ["Ada Author"], "year": 2024, "doi": "10.1000/shared", "url": "https://arxiv.org/abs/2401.00001", "language": "en", "retrieval_paths": ["Q-identity-a"]},
+    "right": {"paper_id": "identity-b", "source": "arxiv", "source_id": "2401.00002", "title": "Identity conflict", "abstract": "Recorded", "authors": ["Ada Author"], "year": 2024, "doi": "10.1000/shared", "url": "https://arxiv.org/abs/2401.00002", "language": "en", "retrieval_paths": ["Q-identity-b"]}
+  },
+  "bridge_cases": ["high_title_similarity_three_record_chain", "shared_author_three_record_chain"],
+  "part_series_case": ["series-a", "series-b"],
+  "expected": {"false_auto_merge_count": 0}
+}

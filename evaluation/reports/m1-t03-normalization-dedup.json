@@ -1,0 +1,174 @@
+{
+  "task_id": "M1-T03",
+  "repair_id": "M1-T03R2",
+  "phase": "M1",
+  "status": "deterministic_complete_link_closure_complete_pending_pr_merge_and_m1_t04_live_gate",
+  "main_baseline": "3bb5da48912b43a2cc76ec8dd82ec553c66d549d",
+  "validated_implementation_commit": "fa2c9151e34ad4bb06716eebdebe933b5e71a2f8",
+  "generated_at_utc": "2026-07-27T11:10:06Z",
+  "environment": {
+    "python": "3.12.10",
+    "pydantic": "2.13.4",
+    "pytest": "8.4.2",
+    "ruff": "0.16.0",
+    "mypy": "1.20.2"
+  },
+  "red_light": [
+    {
+      "command": "py -3.12 -m pytest tests/unit/test_paper_dedup.py::test_exact_title_author_clique_merges_all_three_records_deterministically tests/unit/test_paper_dedup.py::test_high_similarity_clique_merges_all_three_records_deterministically tests/unit/test_paper_dedup.py::test_normalization_equivalent_observations_choose_a_stable_raw_representative tests/contract/test_m1_t03_contracts.py::test_result_contract_rejects_duplicate_cluster_members_and_pair_decisions -q",
+      "exit_code": 1,
+      "summary": "4 failed in 0.25s: both valid three-record cliques materialized as 2+1, normalization-equivalent duplicate observations selected different raw representatives after reversal, and duplicate cluster member IDs were not rejected."
+    }
+  ],
+  "green_light": [
+    {
+      "name": "focused_m1_t03_tests",
+      "command": "py -3.12 -m pytest tests/unit/test_paper_normalization.py tests/unit/test_paper_dedup.py tests/contract/test_m1_t03_contracts.py -q",
+      "exit_code": 0,
+      "summary": "38 passed in 0.22s; all inputs are offline fixtures or recorded Atom responses."
+    },
+    {
+      "name": "full_regression",
+      "command": "py -3.12 -m pytest -q",
+      "exit_code": 0,
+      "summary": "251 passed in 100.58s."
+    },
+    {
+      "name": "ruff",
+      "command": "py -3.12 -m ruff check app evaluation scripts tests",
+      "exit_code": 0,
+      "summary": "All checks passed."
+    },
+    {
+      "name": "mypy",
+      "command": "py -3.12 -m mypy app evaluation scripts",
+      "exit_code": 0,
+      "summary": "Success: no issues found in 25 source files."
+    },
+    {
+      "name": "project_docs_validation",
+      "command": "py -3.12 scripts/validate_project_docs.py",
+      "exit_code": 0,
+      "summary": "PASS: project docs are complete; 31 phase tasks are indexed; local links resolve."
+    },
+    {
+      "name": "m0_historical_validation",
+      "command": "py -3.12 scripts/validate_phase.py M0",
+      "exit_code": 0,
+      "summary": "PASS: M0 evidence report, inputs, git ancestry, and status gate are valid."
+    },
+    {
+      "name": "pip_check",
+      "command": "py -3.12 -m pip check",
+      "exit_code": 0,
+      "summary": "No broken requirements found."
+    }
+  ],
+  "dedup_configuration": {
+    "pair_classification": "all unique pairs are classified before any union; base decisions are immutable",
+    "tier_order": [
+      "EXACT_DOI",
+      "EXACT_ARXIV_ID",
+      "EXACT_NORMALIZED_TITLE_WITH_AUTHOR",
+      "HIGH_TITLE_SIMILARITY_WITH_AUTHOR"
+    ],
+    "title_token_jaccard_threshold": 0.92,
+    "title_sequence_ratio_threshold": 0.96,
+    "author_jaccard_threshold": 0.5,
+    "allowed_year_difference": 1,
+    "retrieval_path_order": "lexicographic",
+    "observation_representative": "minimum JSON model_dump excluding retrieval_paths, with sorted keys and compact separators"
+  },
+  "acceptance_coverage": {
+    "three_record_exact_title_clique": "passed: three exact normalized title-and-author records have three base auto-merge decisions and materialize as one three-member cluster under forward, reverse, and repeated input.",
+    "three_record_similarity_clique": "passed: three distinct high-similarity titles have three base auto-merge decisions, one three-member cluster, and no TRANSITIVE_BRIDGE_RISK.",
+    "transitive_bridge_rejection": "passed: existing title and author bridge cases retain 2+1 clusters; each blocked candidate is manual_review/TRANSITIVE_BRIDGE_RISK.",
+    "normalized_equivalent_observation_order_invariance": "passed: same-paper_id normalization-equivalent title, author, and abstract variants produce identical forward and reverse results while preserving both retrieval paths and both inputs.",
+    "deterministic_observation_representative": "passed: the canonical raw metadata is the minimum stable representation key, independent of input order; retrieval paths are merged separately.",
+    "duplicate_paper_id_conflict": "passed: conflicting source ID, DOI, title, or URL observations fail closed with DUPLICATE_PAPER_ID_CONFLICT.",
+    "unique_cluster_id": "passed: cluster IDs remain globally unique; member paper IDs and final decision pair IDs are validated as unique and stable.",
+    "frozen_negative_boundary": "passed: false_auto_merge_count = 0.",
+    "input_non_mutation": "passed: tests snapshot source PaperRecord payloads before deduplication.",
+    "retrieval_path_preservation": "passed: paths are complete, lexicographically sorted, and unique."
+  },
+  "fixture_statistics": {
+    "positive": {
+      "input_record_count": 14,
+      "coalesced_observation_count": 13,
+      "duplicate_paper_id_group_count": 1,
+      "duplicate_paper_id_conflict_count": 0,
+      "auto_merge_pair_count": 9,
+      "manual_review_pair_count": 0,
+      "keep_separate_pair_count": 69,
+      "output_cluster_count": 6,
+      "unique_cluster_id_count": 6,
+      "complete_link_positive_clique_count": 2,
+      "transitive_bridge_block_count": 0,
+      "retrieval_paths_preserved": true
+    },
+    "negative": {
+      "input_record_count": 20,
+      "coalesced_observation_count": 20,
+      "duplicate_paper_id_group_count": 0,
+      "duplicate_paper_id_conflict_count": 4,
+      "auto_merge_pair_count": 0,
+      "manual_review_pair_count": 10,
+      "keep_separate_pair_count": 180,
+      "output_cluster_count": 20,
+      "unique_cluster_id_count": 20,
+      "complete_link_positive_clique_count": 0,
+      "transitive_bridge_block_count": 0,
+      "false_auto_merge_count": 0,
+      "retrieval_paths_preserved": true
+    },
+    "manual_review": {
+      "input_record_count": 8,
+      "coalesced_observation_count": 8,
+      "duplicate_paper_id_group_count": 0,
+      "duplicate_paper_id_conflict_count": 0,
+      "auto_merge_pair_count": 0,
+      "manual_review_pair_count": 4,
+      "keep_separate_pair_count": 24,
+      "output_cluster_count": 8,
+      "unique_cluster_id_count": 8,
+      "complete_link_positive_clique_count": 0,
+      "transitive_bridge_block_count": 0,
+      "retrieval_paths_preserved": true
+    },
+    "focused_acceptance_tests": {
+      "complete_link_positive_clique_count": 2,
+      "transitive_bridge_block_count": 2,
+      "false_auto_merge_count": 0
+    }
+  },
+  "input_sha256": {
+    "app/models/dedup.py": "ad6e8210fa3856e1027c9d6775769f80cba0797c39ec7c7ecc43beae4bc6a5ea",
+    "app/core/paper_normalization.py": "542524da5fd9fd3cdc84645d0ac604c702a5e55d353b4740b3c6057de1a6a85f",
+    "app/core/paper_dedup.py": "035abc51e7633ae8355380e2e58a0363c03a9276c0d53e92c1b4998c8fd8df0f",
+    "tests/unit/test_paper_normalization.py": "d0fd663c84b4dcf0262559ebca1d1397ee54dcf57f96fd3ddd5b464ae399adeb",
+    "tests/unit/test_paper_dedup.py": "083984cae057359ae322b948ad478af679466f7517cb2be7fd9f8002a0d73b9b",
+    "tests/contract/test_m1_t03_contracts.py": "c8eabb9df3004c8b1ad7c646953a4a85c248b96a4dced9e56212619f2fdcb48a",
+    "tests/fixtures/dedup/positive.json": "23d25f82fdc42565ac9217e20d5bf5a701546f6a4ae3a9407941e5e6b68b767b",
+    "tests/fixtures/dedup/negative.json": "d469df641c22d32a01f63ad62dafdd4eb96750bf9ce44b3b0422e75a30b9096c",
+    "tests/fixtures/dedup/manual_review.json": "28b68ba39112e942340ea14edad41104cce27c6543e19a4ed987103aa21a7dad",
+    "docs/superpowers/plans/2026-07-27-research-retrieval-calibrator-m1-t03.md": "999ffd90494e8c78e410cd29a06db8d1bf097eb8035ad600ae31ad10b616de95"
+  },
+  "external_boundaries": [
+    {
+      "name": "real_external",
+      "status": "not_run",
+      "reason": "M1-T03R2 is deterministic offline normalization and deduplication; this task does not authorize an arXiv smoke request."
+    },
+    {
+      "name": "embedding_or_model",
+      "status": "not_run",
+      "reason": "No embedding, reranker, LLM judgment, or model download is in scope."
+    },
+    {
+      "name": "third_party_metadata_requests",
+      "status": "not_run",
+      "reason": "No Crossref, Semantic Scholar, translation, CNKI, or other network service was called."
+    }
+  ],
+  "scope_note": "M1-T03R2 changes only offline deterministic deduplication. M1 remains IN_PROGRESS 3/4 on this PR branch; M1-T04 is not started, its real arXiv live-success gate remains unsatisfied, and main remains M1 2/4 until PR #8 is merged."
+}
