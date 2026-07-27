@@ -258,7 +258,7 @@ def _report(root: Path) -> dict[str, Any]:
 @pytest.fixture
 def valid_report(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Any, Path, dict[str, Any]]:
     validator = _load_validator()
-    _seed_repository(tmp_path)
+    _seed_repository(tmp_path, final_status=True)
 
     def fake_git(*arguments: str, cwd: Path) -> subprocess.CompletedProcess[str]:
         if arguments[:2] == ("diff", "--name-only"):
@@ -290,11 +290,8 @@ def test_report_schema_is_valid_draft_2020_12() -> None:
     jsonschema.Draft202012Validator.check_schema(schema)
 
 
-def test_valid_pre_transition_and_final_transition_reports_pass(valid_report: tuple[Any, Path, dict[str, Any]]) -> None:
+def test_valid_final_transition_report_passes(valid_report: tuple[Any, Path, dict[str, Any]]) -> None:
     validator, root, payload = valid_report
-    assert _errors(validator, root, payload) == []
-
-    _write(root, "STATUS.md", _status(final=True))
     assert _errors(validator, root, payload) == []
 
 
@@ -401,6 +398,28 @@ def test_validator_recomputes_validated_input_hashes(valid_report: tuple[Any, Pa
     assert any("validated input hash mismatch" in error for error in _errors(validator, root, payload))
 
 
+def test_historical_m0_validator_allows_legal_m1_t01_in_progress_status(
+    valid_report: tuple[Any, Path, dict[str, Any]],
+) -> None:
+    validator, root, payload = valid_report
+    m1_status = _status(final=True)
+    m1_status = m1_status.replace("- 当前状态：`READY`", "- 当前状态：`IN_PROGRESS`")
+    m1_status = m1_status.replace("| M1 phase | READY | 0/4 |", "| M1 phase | IN_PROGRESS | 1/4 |")
+    _write(root, "STATUS.md", m1_status)
+
+    assert _errors(validator, root, payload) == []
+
+
+def test_historical_m0_validator_rejects_live_m0_completion_regression(
+    valid_report: tuple[Any, Path, dict[str, Any]],
+) -> None:
+    validator, root, payload = valid_report
+    regressed = _status(final=True).replace("| M0 phase | COMPLETE | 4/4 |", "| M0 phase | IN_PROGRESS | 3/4 |")
+    _write(root, "STATUS.md", regressed)
+
+    assert "STATUS.md regresses historical M0 completion" in _errors(validator, root, payload)
+
+
 def test_historical_report_uses_validated_commit_blobs_after_later_shared_input_change(
     tmp_path: Path,
 ) -> None:
@@ -449,6 +468,21 @@ def test_historical_report_rejects_uncommitted_report_or_status_changes(tmp_path
     assert "STATUS.md has uncommitted changes" in validator.validate_report_file(
         "M0", repo_root=tmp_path
     )
+
+
+@pytest.mark.parametrize("completed", (1, 2, 3))
+def test_historical_m0_validator_accepts_legal_later_m1_progress(
+    tmp_path: Path, completed: int
+) -> None:
+    validator = _load_validator()
+    _seed_historical_report_repository(tmp_path)
+
+    status = _status(final=True).replace("`READY`", "`IN_PROGRESS`")
+    status = status.replace("| M1 phase | READY | 0/4 |", f"| M1 phase | IN_PROGRESS | {completed}/4 |")
+    _write(tmp_path, "STATUS.md", status)
+    _commit(tmp_path, f"advance M1 to {completed}/4")
+
+    assert validator.validate_report_file("M0", repo_root=tmp_path) == []
 
 
 def test_historical_report_rejects_hash_mismatch_against_validated_commit_blob(

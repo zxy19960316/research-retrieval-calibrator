@@ -170,3 +170,43 @@ def test_status_validation_enforces_status_task_counts(
     )
 
     assert expected_error in errors
+
+
+@pytest.mark.parametrize("completed", (0, 1, 2, 3))
+def test_status_validation_allows_every_legal_m1_precompletion_state(completed: int) -> None:
+    errors: list[str] = []
+    state = "READY" if completed == 0 else "IN_PROGRESS"
+    rows = [
+        ("M0", "COMPLETE", 4, 4),
+        ("M1", state, completed, 4),
+        ("M2", "BLOCKED_BY_M1", 0, 5),
+        ("M3", "BLOCKED_BY_M2", 0, 5),
+        ("M4", "BLOCKED_BY_M3", 0, 4),
+        ("M5", "BLOCKED_BY_M4", 0, 4),
+        ("M6", "BLOCKED_BY_M5", 0, 5),
+    ]
+
+    validator.validate_status_text(
+        _status(rows, current_phase="M1", current_status=state), errors
+    )
+
+    assert errors == []
+
+
+def test_status_validation_allows_m1_completion_then_m2_ready() -> None:
+    errors: list[str] = []
+    rows = [
+        ("M0", "COMPLETE", 4, 4),
+        ("M1", "COMPLETE", 4, 4),
+        ("M2", "READY", 0, 5),
+        ("M3", "BLOCKED_BY_M2", 0, 5),
+        ("M4", "BLOCKED_BY_M3", 0, 4),
+        ("M5", "BLOCKED_BY_M4", 0, 4),
+        ("M6", "BLOCKED_BY_M5", 0, 5),
+    ]
+
+    validator.validate_status_text(
+        _status(rows, current_phase="M2", current_status="READY"), errors
+    )
+
+    assert errors == []
