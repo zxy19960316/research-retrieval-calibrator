@@ -32,7 +32,7 @@
 
 ## 下一动作
 
-M0-T01、M0-T02、M0-T03、M0-T03R 与 M0-T04 已完成：领域契约、状态机、十题评测模板与指标、负向抑制修正，以及机器可读的证据报告和阶段自校验均已通过。M1-T01 至 M1-T04 已完成：M1-T04 的 12-query real arXiv smoke 返回 12 个 HTTP 200，产生 51 条原始记录和 33 条去重候选，source-ID/URL coverage 均为 100%，metadata hallucination rate 为 0；同配置缓存回放产生 0 次传输、12 次缓存命中且候选一致。下一动作：`M2-T01`；本次变更不开始 M2 实现。
+M0-T01、M0-T02、M0-T03、M0-T03R 与 M0-T04 已完成：领域契约、状态机、十题评测模板与指标、负向抑制修正，以及机器可读的证据报告和阶段自校验均已通过。M1-T01 至 M1-T04 已完成：M1-T04R1 的 fresh-cache real arXiv smoke 返回 12 个 HTTP 200，产生 51 条原始记录和 33 条去重候选，source-ID/URL coverage 均为 100%，metadata projection mismatch count 为 0、Metadata Hallucination Rate 为 0；真实模式最小请求间隔为 3.0 秒，观测到的最小请求起始间隔为 4.016 秒，累计 11 次等待共 32.984 秒；同配置 real-cache 回放产生 0 次传输、12 次缓存命中且候选一致。前两次 real 尝试各有一次传输失败，未被作为完成证据。下一动作：`M2-T01`；本次变更不开始 M2 实现。
 
 ## M1-T03 normalization and deduplication evidence
 

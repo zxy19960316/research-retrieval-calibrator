@@ -1,12 +1,18 @@
 {
-  "report_version": "m1-t04-validation.v2",
+  "report_version": "m1-t04-validation.v3",
   "phase": "M1",
-  "task_id": "M1-T04",
-  "recorded_at_utc": "2026-07-27T12:37:30.157Z",
+  "task_id": "M1-T04R1",
+  "recorded_at_utc": "2026-07-27T13:51:22.0727698Z",
   "baseline_commit": "f0f167766589e3321821b0caf7793b00c8ff7291",
   "implementation_commit_g": "c5fe64e73ab951b3e7437f44c3d4b001d6428ced",
   "implementation_correction_commit_i": "bd9653bea638664f549dbb3e62e7d25ce5d745e5",
-  "prior_evidence_commit_h": "b41b8b2e7787da3870a1a8d39db82f9dedbe779f",
+  "validated_implementation_commit": "d007763454781c0a26be70c132834bdd6219c3e4",
+  "implementation_ancestry": [
+    "c5fe64e73ab951b3e7437f44c3d4b001d6428ced",
+    "bd9653bea638664f549dbb3e62e7d25ce5d745e5",
+    "4d52572e69183e9614bf6e1ff3970b649571515c",
+    "d007763454781c0a26be70c132834bdd6219c3e4"
+  ],
   "environment": {
     "python": "3.12.10",
     "pydantic": "2.13.4",
@@ -15,278 +21,68 @@
     "mypy": "1.20.2"
   },
   "validated_inputs": [
-    {
-      "path": "evaluation/reports/m1-t04-red-tests.json",
-      "sha256": "a95dffc688a4e1e488e3d4ebf30755a6fb344916b657553260c5bdbcacdf3d97"
-    },
-    {
-      "path": "tests/fixtures/arxiv/first_round_graph.xml",
-      "sha256": "480a1f1f4a86016ba7571b38229491811deb441fa88d83375d0c38db2b6580c1"
-    },
-    {
-      "path": "tests/fixtures/arxiv/first_round_empty.xml",
-      "sha256": "02bf2fc2be69d1bd6a92bc0f69eba3fed2665a0501bda9e1970a9e9cae3e5d88"
-    },
-    {
-      "path": "app/models/first_round.py",
-      "sha256": "cb72eff4b3a052d878673b87ec28e740b1184164fe2b46f1d3a774bd706eb652"
-    },
-    {
-      "path": "app/core/first_round.py",
-      "sha256": "0dfd2f75295fd59861131efa2d03214fa2da23f715f032ca41c510b286a668a4"
-    },
-    {
-      "path": "app/cli/first_round.py",
-      "sha256": "df05bd7d490efb0d708d955880a0e414d36b040717cc2e68a1b4e92412808e58"
-    },
-    {
-      "path": "scripts/first_round_retrieval.py",
-      "sha256": "85c6ef55cce8ea155a5d24d36c0758baf1f94134a6f6f39728e7afd8e18de728"
-    },
-    {
-      "path": "tests/contract/test_m1_t04_contracts.py",
-      "sha256": "3ba8547e4725d7000f26c89d9d3302f8b59d90e8020a055b04f2b2cdf160b3d2"
-    },
-    {
-      "path": "tests/integration/test_first_round_pipeline.py",
-      "sha256": "9a9510a87c703dcc3d78e235fd3ce081f6eb810526f1c17c791bb65ae4a7785f"
-    },
-    {
-      "path": "tests/unit/test_first_round_cli.py",
-      "sha256": "bb15479276d416671606478bc0563ecb99d312b4d2d99c583e40eccdc8e1d259"
-    }
+    {"path": ".github/workflows/docs-validation.yml", "sha256": "dde66b61c5e04ad90c904cee7901ddf1ec259e990216dd9edc99a2cabec1a419"},
+    {"path": "app/adapters/arxiv.py", "sha256": "e293a1f9241edfa76c6d0edb19c4ae61d4935121ae79bf39efbdac9e3dfbdbaa"},
+    {"path": "app/cli/first_round.py", "sha256": "72e8768e89d367d7500bc7fcea2a033846b3a8c062eb8b38c29cbd04a1bdde7c"},
+    {"path": "app/core/first_round.py", "sha256": "4d7f03928c7c569bda0c5ab146226987e844ec9f7e8522f6ade79997c9eafad1"},
+    {"path": "app/models/first_round.py", "sha256": "27a5fb9472d9d271cb1180bb2463d233651f6e09c20386a39e3cbf56e29f673b"},
+    {"path": "docs/superpowers/plans/2026-07-27-research-retrieval-calibrator-m1-t04.md", "sha256": "8006b91abb4f5a6f3ecce7d689c0df848d20e4eabe09f4e4656585e831ad16cb"},
+    {"path": "scripts/validate_m1_evidence.py", "sha256": "d8804c9019ea9e9b50afa656c2840cacb29f4d3d694c9a48eddc931d85566121"},
+    {"path": "tests/contract/test_m1_evidence_validation.py", "sha256": "cfb71bcbd59187123a9450a5e8fb1bee026ffb9f52d9f643c45ada0060057301"},
+    {"path": "tests/contract/test_m1_t04_contracts.py", "sha256": "e77f128e04143e9e4c51695446770d560ea641545ec813e632531d5f942f218e"},
+    {"path": "tests/integration/test_first_round_pipeline.py", "sha256": "1878020b5075b3fcc4c2ce03e0ef6815737d6a25085c0b70af22723eab4752aa"},
+    {"path": "tests/unit/test_arxiv_adapter.py", "sha256": "5df8f2274165955dddf066939dd6d8f074adcd23a78c4ff08241c9174802c7c5"},
+    {"path": "tests/unit/test_first_round_cli.py", "sha256": "281e5038c6d11028a7db4d90cc4bb336e17f51466b08fb5644c30516aa7a4b0e"}
   ],
-  "automated": {
-    "red_tests": {
-      "classification": "automated",
-      "artifact": "evaluation/reports/m1-t04-red-tests.json",
-      "exit_codes": [1, 1, 1],
-      "summary": "Three pre-implementation collection failures were preserved before their corresponding contracts, orchestration module, and CLI module existed."
-    },
-    "pre_real_gates": [
-      {
-        "command": "py -3.12 -m pytest tests/unit/test_first_round_cli.py tests/integration/test_first_round_pipeline.py tests/contract/test_m1_t04_contracts.py -q",
-        "exit_code": 0,
-        "result": "22 passed",
-        "classification": "automated"
-      },
-      {
-        "command": "py -3.12 -m pytest -q",
-        "exit_code": 124,
-        "result": "Initial tool-bounded invocation timed out after 124 seconds without a test conclusion; it is not counted as a pass or failure of the suite.",
-        "classification": "automated_diagnostic"
-      },
-      {
-        "command": "py -3.12 -m pytest -vv -x --durations=20",
-        "exit_code": 0,
-        "result": "273 passed in 118.27 seconds",
-        "classification": "automated"
-      },
-      {
-        "command": "py -3.12 -m ruff check app evaluation scripts tests",
-        "exit_code": 0,
-        "result": "All checks passed",
-        "classification": "automated"
-      },
-      {
-        "command": "py -3.12 -m mypy app evaluation scripts",
-        "exit_code": 0,
-        "result": "Success: no issues found in 30 source files",
-        "classification": "automated"
-      },
-      {
-        "command": "py -3.12 scripts/validate_project_docs.py",
-        "exit_code": 0,
-        "result": "PASS: project docs are complete; 31 phase tasks are indexed; local links resolve",
-        "classification": "automated"
-      },
-      {
-        "command": "py -3.12 scripts/validate_phase.py M0",
-        "exit_code": 0,
-        "result": "PASS: M0 evidence report, inputs, git ancestry, and status gate are valid",
-        "classification": "automated"
-      },
-      {
-        "command": "py -3.12 -m pip check",
-        "exit_code": 0,
-        "result": "No broken requirements found",
-        "classification": "automated"
-      }
-    ],
-    "fresh_after_correction_i": [
-      {
-        "command": "py -3.12 -m pytest tests/unit/test_first_round_cli.py tests/integration/test_first_round_pipeline.py tests/contract/test_m1_t04_contracts.py -q",
-        "exit_code": 0,
-        "result": "24 passed",
-        "classification": "automated"
-      },
-      {
-        "command": "py -3.12 -m pytest -q",
-        "exit_code": 0,
-        "result": "275 passed in 106.55 seconds",
-        "classification": "automated"
-      },
-      {
-        "command": "py -3.12 -m ruff check app evaluation scripts tests",
-        "exit_code": 0,
-        "result": "All checks passed",
-        "classification": "automated"
-      },
-      {
-        "command": "py -3.12 -m mypy app evaluation scripts",
-        "exit_code": 0,
-        "result": "Success: no issues found in 30 source files",
-        "classification": "automated"
-      },
-      {
-        "command": "py -3.12 scripts/validate_project_docs.py",
-        "exit_code": 0,
-        "result": "PASS: project docs are complete; 31 phase tasks are indexed; local links resolve",
-        "classification": "automated"
-      },
-      {
-        "command": "py -3.12 scripts/validate_phase.py M0",
-        "exit_code": 0,
-        "result": "PASS: M0 evidence report, inputs, git ancestry, and status gate are valid",
-        "classification": "automated"
-      },
-      {
-        "command": "py -3.12 -m pip check",
-        "exit_code": 0,
-        "result": "No broken requirements found",
-        "classification": "automated"
-      }
-    ]
-  },
+  "automated_checks": [
+    {"name": "focused_tests", "command": "py -3.12 -m pytest tests/unit/test_first_round_cli.py tests/integration/test_first_round_pipeline.py tests/contract/test_m1_t04_contracts.py tests/contract/test_m1_evidence_validation.py -q", "exit_code": 0, "result": "35 passed"},
+    {"name": "full_regression", "command": "py -3.12 -m pytest -q", "exit_code": 0, "result": "288 passed in 77.04s"},
+    {"name": "ruff", "command": "py -3.12 -m ruff check app evaluation scripts tests", "exit_code": 0, "result": "All checks passed"},
+    {"name": "mypy", "command": "py -3.12 -m mypy app evaluation scripts", "exit_code": 0, "result": "Success: no issues found in 31 source files"},
+    {"name": "project_docs_validation", "command": "py -3.12 scripts/validate_project_docs.py", "exit_code": 0, "result": "PASS"},
+    {"name": "m0_evidence_validation", "command": "py -3.12 scripts/validate_phase.py M0", "exit_code": 0, "result": "PASS"},
+    {"name": "pip_check", "command": "py -3.12 -m pip check", "exit_code": 0, "result": "No broken requirements found"}
+  ],
+  "cache_namespaces": {"recorded": "first-round:recorded", "real": "first-round:real"},
   "recorded_external": {
     "classification": "recorded_external",
-    "source": "tests/fixtures/arxiv/first_round_graph.xml and tests/fixtures/arxiv/first_round_empty.xml only; no network transport",
-    "question": "How can graph-based retrieval support scientific literature discovery?",
-    "query_plan_count": 12,
-    "recorded_core_success": {
-      "raw_candidate_count": 3,
-      "deduplicated_candidate_count": 2,
-      "manual_review_count": 0,
-      "source_id_coverage": 1.0,
-      "url_coverage": 1.0,
-      "metadata_hallucination_rate": 0.0,
-      "transport_requests": 12,
-      "cache_hits": 0,
-      "candidate_budget_reached": false
-    },
-    "recorded_cache_replay": {
-      "first_run_transport_requests": "> 0",
-      "second_run_transport_requests": 0,
-      "second_run_cache_hits": 12,
-      "candidate_arrays_byte_equivalent": true
-    },
-    "honest_failure_coverage": [
-      "ARXIV_UNAVAILABLE when every recorded query fails",
-      "INSUFFICIENT_CANDIDATES for empty recorded responses",
-      "DEDUPLICATION_FAILED for conflicting source records",
-      "ARXIV_ATTEMPT_BUDGET_EXHAUSTED before an over-budget adapter call"
-    ],
-    "budgets": {
-      "max_results_per_query": 5,
-      "max_total_candidates": 60,
-      "max_total_attempts": 20,
-      "timeout_seconds": 20.0
-    }
+    "cache_namespace": "first-round:recorded",
+    "source": "checked-in Atom fixtures only; no network transport",
+    "cross_mode_cache_isolation": "passed: a recorded cache entry was not used for the first real request; a later real replay used only the real namespace",
+    "endpoint_cache_isolation": "passed: identical query, mode, and max-results with a changed endpoint made a transport request"
   },
-  "historical_local_preflight": {
-    "classification": "historical_local_failure",
-    "requested_command": "py -3.12 scripts/first_round_retrieval.py --question \"How can graph-based retrieval support scientific literature discovery?\" --output-dir evaluation/runs/m1-live --mode real --user-agent \"research-retrieval-calibrator/0.1 (M1-T04 validation)\"",
-    "exit_code": 1,
-    "stdout": "{\"error_code\": \"INVALID_CLI_ARGUMENT\", \"failure\": {\"error_code\": \"INVALID_CLI_ARGUMENT\", \"reason\": \"output directory parent must already exist\", \"scope\": \"run\"}, \"status\": \"failed\"}",
-    "network_requests": 0,
-    "query_ids_observed": 0,
-    "attempt_count": 0,
-    "http_statuses": [],
-    "raw_candidate_count": null,
-    "deduplicated_candidate_count": null,
-    "source_id_coverage": null,
-    "url_coverage": null,
-    "metadata_hallucination_rate": null,
-    "cache_state": "not_created",
-    "candidate_budget_state": "not_reached; orchestration was not constructed",
-    "elapsed_seconds": null,
-    "causal_reason": "Before correction I, the required output directory parent evaluation/runs did not exist. Argument validation failed before the real transport was constructed, so no arXiv request or live run occurred."
-  },
+  "real_external_attempts_before_success": [
+    {"status": "partial_success", "network_requests": 12, "http_200_count": 11, "transport_failure_count": 1, "cache_hits": 0, "reason": "not accepted as closure evidence"},
+    {"status": "partial_success", "network_requests": 12, "http_200_count": 11, "transport_failure_count": 1, "cache_hits": 0, "reason": "not accepted as closure evidence"}
+  ],
   "real_external": {
     "classification": "real_external",
-    "command": "py -3.12 scripts/first_round_retrieval.py --question \"How can graph-based retrieval support scientific literature discovery?\" --output-dir evaluation/runs/m1-live --mode real --user-agent \"research-retrieval-calibrator/0.1 (M1-T04 validation)\"",
-    "exit_code": 0,
-    "started_at_utc": "2026-07-27T12:36:32.200042Z",
-    "finished_at_utc": "2026-07-27T12:36:50.023019Z",
+    "command": "py -3.12 scripts/first_round_retrieval.py --question \"How can graph-based retrieval support scientific literature discovery?\" --output-dir evaluation/runs/m1-live-r1-final --cache-dir evaluation/runs/m1-t04r1-cache-final --mode real --user-agent \"research-retrieval-calibrator/0.1 (M1-T04R1 validation)\"",
+    "started_at_utc": "2026-07-27T13:50:17.6856277Z",
+    "finished_at_utc": "2026-07-27T13:51:04.0235250Z",
     "status": "success",
     "network_requests": 12,
-    "query_ids": [
-      "Q1-5817f8956b30c396",
-      "Q1-8de87d0bacb5005b",
-      "Q1-8b68f4bbf8561196",
-      "Q1-9bb3a309c0570081",
-      "Q1-be01416bad9ecb19",
-      "Q1-ae88ee9e9a5ff91f",
-      "Q1-a16109f2426f3024",
-      "Q1-040540c9679d7f10",
-      "Q1-6dc96c56f6f1e49a",
-      "Q1-3fb237a1ce9ed2b3",
-      "Q1-23cfe0602c5c3bda",
-      "Q1-0297414dafd0e41d"
-    ],
-    "attempt_counts": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+    "cache_hits": 0,
     "http_statuses": [200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200],
     "raw_candidate_count": 51,
     "deduplicated_candidate_count": 33,
-    "manual_review_count": 0,
     "source_id_coverage": 1.0,
     "url_coverage": 1.0,
+    "metadata_projection_mismatch_count": 0,
     "metadata_hallucination_rate": 0.0,
-    "cache_hits": 0,
-    "candidate_budget_reached": false,
-    "elapsed_seconds": 17.828000000008615,
-    "output_hashes": {
-      "first-round.json": "945eb0e78c067fae52343ef5a53bde627e5870a0fb4bcf1beec02acc9dfee306",
-      "first-round.md": "9983fbfd6fa04678f45b5b4dcfa1069a7b88b599a29fa868864e578196f4bece"
-    }
+    "real_source_id_samples": ["1401.6891", "1611.00097", "1804.03257", "2005.04961", "2007.12731", "2210.15912", "2306.03535", "2306.10044", "2310.16146", "2402.12352"],
+    "real_url_samples": ["http://arxiv.org/abs/1401.6891v1", "http://arxiv.org/abs/1611.00097v3", "http://arxiv.org/abs/1804.03257v2", "http://arxiv.org/abs/2005.04961v1", "http://arxiv.org/abs/2007.12731v1", "http://arxiv.org/abs/2210.15912v1", "http://arxiv.org/abs/2306.03535v2", "http://arxiv.org/abs/2306.10044v1", "http://arxiv.org/abs/2310.16146v1", "http://arxiv.org/abs/2402.12352v1"],
+    "candidate_array_sha256": "e51eb84d4e772bba324a199478caa5f0983edef0b0dbf4c58fce5f9da5803209",
+    "output_hashes": {"first-round.json": "069cd8c94d294c68bb051898d4c262f324b7e1f20eff10eabcf22d9bc435d178", "first-round.md": "9983fbfd6fa04678f45b5b4dcfa1069a7b88b599a29fa868864e578196f4bece"},
+    "rate_limit": {"configured_min_request_interval_seconds": 3.0, "request_start_offsets_seconds": [0.0, 4.203, 8.281, 12.5, 16.516, 20.578, 24.625, 28.656, 32.844, 36.875, 40.906, 44.953], "minimum_observed_request_start_delta_seconds": 4.016, "rate_limit_wait_count": 11, "rate_limit_wait_seconds": 32.984}
   },
   "real_cache_replay": {
     "classification": "real_cache_replay",
-    "command": "py -3.12 scripts/first_round_retrieval.py --question \"How can graph-based retrieval support scientific literature discovery?\" --output-dir evaluation/runs/m1-live-replay --mode real --user-agent \"research-retrieval-calibrator/0.1 (M1-T04 validation)\"",
-    "exit_code": 0,
-    "started_at_utc": "2026-07-27T12:37:02.690084Z",
-    "finished_at_utc": "2026-07-27T12:37:03.046209Z",
     "status": "success",
     "transport_requests": 0,
     "cache_hits": 12,
-    "query_result_count": 12,
     "candidate_arrays_equal": true,
-    "raw_candidate_count": 51,
-    "deduplicated_candidate_count": 33,
-    "elapsed_seconds": 0.3600000000005821,
-    "output_hashes": {
-      "first-round.json": "e417ddb6783057a81aed970f1375cf52523c84e98c562a90963493e062c012c7",
-      "first-round.md": "9983fbfd6fa04678f45b5b4dcfa1069a7b88b599a29fa868864e578196f4bece"
-    }
+    "output_hashes": {"first-round.json": "ad8349acfa99184503a6d3a534b3a1e62b1027726ca23687edd42e1c808ad3b8", "first-round.md": "9983fbfd6fa04678f45b5b4dcfa1069a7b88b599a29fa868864e578196f4bece"}
   },
-  "completion_gates": {
-    "all_automated_gates_passed": true,
-    "recorded_source_id_coverage": 1.0,
-    "recorded_url_coverage": 1.0,
-    "recorded_metadata_hallucination_rate": 0.0,
-    "real_live_success": true,
-    "real_cache_replay_success": true,
-    "m1_completion_allowed": true
-  },
-  "status_after_evidence": {
-    "m1": "COMPLETE 4/4",
-    "m2": "READY",
-    "reason": "All M1-T04 automated, recorded, real-live, and real-cache-replay gates passed."
-  },
-  "rollback_order": [
-    "git revert <J>",
-    "git revert bd9653bea638664f549dbb3e62e7d25ce5d745e5",
-    "git revert b41b8b2e7787da3870a1a8d39db82f9dedbe779f",
-    "git revert c5fe64e73ab951b3e7437f44c3d4b001d6428ced"
-  ]
+  "status_after_evidence": {"m1": "COMPLETE 4/4", "m2": "READY", "next_action": "M2-T01; not started by this change"}
 }
