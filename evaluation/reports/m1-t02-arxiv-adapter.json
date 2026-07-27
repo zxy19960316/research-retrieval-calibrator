@@ -1,16 +1,21 @@
 {
   "task_id": "M1-T02",
-  "repair_id": "M1-T02R2",
+  "repair_id": "M1-T02R3",
   "phase": "M1",
   "status": "adapter_contract_complete_pending_m1_t04_live_gate",
-  "validated_implementation_commit": "d03528115630406f8ce68f5c72d08f074e6108e8",
-  "generated_at_utc": "2026-07-27T04:32:56Z",
+  "validated_implementation_commit": "94a48bc891c92b1a40a848d2d174b14b7a692d12",
+  "generated_at_utc": "2026-07-27T05:09:15Z",
   "python_version": "3.12.10",
   "red_light": [
     {
       "command": "py -3.12 -m pytest tests/unit/test_arxiv_adapter.py -q",
       "exit_code": 1,
       "summary": "33 failed in 0.47s before implementation. The new suite exposed absent total-result and total-attempt bounds, uncapped and nondeterministic Retry-After handling, acceptance of a non-Atom root, unwrapped entry validation, and a smoke CLI without JSON argument failures. Existing tests also failed because the new contract fields were intentionally introduced before the implementation."
+    },
+    {
+      "command": "py -3.12 -m pytest tests/unit/test_arxiv_adapter.py -q",
+      "exit_code": 1,
+      "summary": "7 failed and 40 passed in 0.37s before M1-T02R3. Canonical math.GT, cs.SE, and nlin.CD identifiers were rejected, while lowercase subject classes and v0 were incorrectly accepted."
     }
   ],
   "green_light": [
@@ -18,13 +23,13 @@
       "name": "adapter_unit_tests",
       "command": "py -3.12 -m pytest tests/unit/test_arxiv_adapter.py -q",
       "exit_code": 0,
-      "summary": "33 passed in 0.16s; all tests are offline."
+      "summary": "47 passed in 0.21s; all tests are offline."
     },
     {
       "name": "full_regression",
       "command": "py -3.12 -m pytest -q",
       "exit_code": 0,
-      "summary": "199 passed in 84.71s"
+      "summary": "213 passed in 95.75s"
     },
     {
       "name": "ruff",
@@ -69,17 +74,21 @@
     "bounded_retry_after": "passed: numeric and HTTP-date values are capped, malformed values fall back to exponential backoff, and negative values still obey the minimum interval",
     "atom_root_validation": "passed: only the Atom feed root is accepted; wrong-root.xml yields INVALID_ARXIV_ATOM",
     "stable_entry_validation_error": "passed: source identity, blank fields, and PaperRecord validation failures expose INVALID_ARXIV_ENTRY",
-    "smoke_argument_validation": "passed: invalid CLI inputs return structured INVALID_SMOKE_ARGUMENT JSON without a traceback"
+    "smoke_argument_validation": "passed: invalid CLI inputs return structured INVALID_SMOKE_ARGUMENT JSON without a traceback",
+    "legacy_identifier_subject_classes": "passed: canonical math.GT, cs.SE, and nlin.CD subject classes are accepted without casefolding",
+    "legacy_identifier_version_handling": "passed: v1+ is removed from source IDs while v0 is rejected for modern and legacy forms",
+    "mixed_modern_legacy_atom_page": "passed: modern and legacy entries parse in feed order and retain the current query retrieval path",
+    "invalid_identifier_rejection": "passed: malformed archive/subject/serial forms retain INVALID_ARXIV_ENTRY"
   },
   "input_sha256": {
     "app/adapters/__init__.py": "9feed06d9bff1666552336e3f3f68223a042f9dd1e2c4ac6fa96ae5b9032e0fb",
-    "app/adapters/arxiv.py": "4ea5117852a0a415b2094575889a7a89109a0b44d52d99eee590dbb54d29688e",
+    "app/adapters/arxiv.py": "e87ea50be5e9f4eeb4d583945a83ef06af4effe0882021725a6c43371401db13",
     "app/models/enums.py": "25a0f237729076dc31e01e65242b7bf40a12c971d92d38c38eeacb2581b2720e",
     "app/models/paper.py": "a1f088883a7158d6991f5112ae65c1ef14fa4455649acdc8fd417402e31669d4",
     "app/models/query.py": "9c8bf9ff2b14dc0aeebbdda37d5e6ff64a622ea29cccbec219720bfb61997eee",
-    "docs/superpowers/plans/2026-07-27-research-retrieval-calibrator-m1-t02.md": "cf05251935e454c9c6ec5e4febfea0aacc322d6de069af8051340297c99bf1de",
+    "docs/superpowers/plans/2026-07-27-research-retrieval-calibrator-m1-t02.md": "222c1152b570f4fc86bc516cab8b12f73891457e2b6ab3fd13c86c05669208b4",
     "scripts/arxiv_smoke.py": "044d02d7181e55f1e89174ced4066b5de037ace0e3c02080c03d813015bcc7cc",
-    "tests/unit/test_arxiv_adapter.py": "eba4fb0a3ee3e28424ad178b903c252131a2675f24bededcb7fe2576be740cb5",
+    "tests/unit/test_arxiv_adapter.py": "1359d719038ae528a1e039830d1c116a19f2e9c0eedbd09b40e1fd2268ddf575",
     "tests/fixtures/arxiv/normal.xml": "b66b5a86e983ad2ddd1cb9a814be48523dc565620f440bf805f52aeea337e227",
     "tests/fixtures/arxiv/empty.xml": "8894e851c71b6842655b4540fb7837ce69fc123f8291ad0dd97e69aa6adef8d6",
     "tests/fixtures/arxiv/malformed.xml": "03caebe43e1d4db1c893efc3d8a543cb31951f4484b2bc83726abe1880f2af33",
@@ -116,5 +125,5 @@
     }
   ],
   "causal_link": "not_established",
-  "scope_note": "M1-T02 adapter contract complete. The previously attempted real_external smoke failed honestly. M1-T04 live-success acceptance gate remains unsatisfied. M1 remains IN_PROGRESS 2/4; M1-T03 is the next action but is not started by this change. M2 remains BLOCKED_BY_M1."
+  "scope_note": "M1-T02R3 accepts canonical legacy arXiv identifiers without changing transport, budgets, scheduling, cache provenance, smoke argument handling, or external evidence. The previously attempted real_external smoke failed honestly and was not rerun. M1-T04 live-success acceptance gate remains unsatisfied. M1 remains IN_PROGRESS 2/4; M1-T03 is the next action but is not started by this change. M2 remains BLOCKED_BY_M1."
 }
