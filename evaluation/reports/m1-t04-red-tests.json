@@ -1,0 +1,43 @@
+{
+  "task_id": "M1-T04",
+  "phase": "M1",
+  "evidence_type": "automated_red_test",
+  "red_light": [
+    {
+      "name": "first_round_contracts_before_implementation",
+      "executed_at_utc": "2026-07-27T11:54:51.724Z",
+      "command": "py -3.12 -m pytest tests/contract/test_m1_t04_contracts.py -q",
+      "exit_code": 1,
+      "summary": "Collection failed: ModuleNotFoundError: No module named 'app.models.first_round'.",
+      "test_file_sha256": "3ba8547e4725d7000f26c89d9d3302f8b59d90e8020a055b04f2b2cdf160b3d2",
+      "environment": {
+        "python": "3.12.10"
+      },
+      "classification": "automated"
+    },
+    {
+      "name": "first_round_recorded_pipeline_before_implementation",
+      "executed_at_utc": "2026-07-27T12:02:08.117Z",
+      "command": "py -3.12 -m pytest tests/integration/test_first_round_pipeline.py -q",
+      "exit_code": 1,
+      "summary": "Collection failed: ModuleNotFoundError: No module named 'app.core.first_round'.",
+      "test_file_sha256": "ebb96db35195d9465ab8cd3fdb47cd8a98dd739173810ecf75248adbe8381196",
+      "environment": {
+        "python": "3.12.10"
+      },
+      "classification": "automated"
+    },
+    {
+      "name": "first_round_cli_before_implementation",
+      "executed_at_utc": "2026-07-27T12:12:38.901Z",
+      "command": "py -3.12 -m pytest tests/unit/test_first_round_cli.py -q",
+      "exit_code": 1,
+      "summary": "Collection failed: ModuleNotFoundError: No module named 'app.cli'.",
+      "test_file_sha256": "729e4b77c8bfa9a294ac34caf58b4f765370fadec647d39824c2f1fcff4d3d67",
+      "environment": {
+        "python": "3.12.10"
+      },
+      "classification": "automated"
+    }
+  ]
+}

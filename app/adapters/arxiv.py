@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
+import os
 import re
 import time
+import uuid
 import xml.etree.ElementTree as element_tree
 from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
+from itertools import pairwise
+from pathlib import Path
 from typing import NamedTuple, Protocol
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlparse
@@ -51,6 +57,17 @@ class ArxivRequestObservation(NamedTuple):
     retry_after_was_capped: bool
     final_error_code: str | None
     elapsed_seconds: float
+    cache_hit: bool = False
+
+
+class ArxivRateLimitObservation(NamedTuple):
+    """Safe aggregate timing facts; request URLs are deliberately excluded."""
+
+    configured_min_request_interval_seconds: float
+    request_start_offsets_seconds: tuple[float, ...]
+    minimum_observed_request_start_delta_seconds: float | None
+    rate_limit_wait_count: int
+    rate_limit_wait_seconds: float
 
 
 class ArxivTransport(Protocol):
@@ -88,6 +105,9 @@ class ArxivAdapterConfig(BaseModel):
     max_total_attempts: int = Field(default=20, ge=1, le=100)
     max_retry_after_seconds: float = Field(default=60.0, ge=0, le=300)
     initial_backoff_seconds: float = Field(ge=0, le=60)
+    cache_dir: Path | None = None
+    cache_schema_version: str = Field(default="m1-t02.v1", min_length=1, max_length=100)
+    cache_namespace: str = Field(default="default", min_length=1, max_length=100)
 
 
 class ArxivAdapter:
@@ -112,11 +132,35 @@ class ArxivAdapter:
         self._remaining_attempts = config.max_total_attempts
         self._search_started_at = 0.0
         self._last_observation = ArxivRequestObservation(0, None, None, False, None, 0.0)
+        self._rate_limit_started_at = monotonic()
+        self._request_start_offsets: list[float] = []
+        self._rate_limit_wait_count = 0
+        self._rate_limit_wait_seconds = 0.0
 
     @property
     def last_observation(self) -> ArxivRequestObservation:
         """Return safe, URL-free facts from the most recent search call."""
         return self._last_observation
+
+    @property
+    def rate_limit_observation(self) -> ArxivRateLimitObservation:
+        """Return non-sensitive cumulative timing facts for this adapter instance."""
+        offsets = tuple(self._request_start_offsets)
+        deltas = [right - left for left, right in pairwise(offsets)]
+        return ArxivRateLimitObservation(
+            configured_min_request_interval_seconds=self._config.min_request_interval_seconds,
+            request_start_offsets_seconds=offsets,
+            minimum_observed_request_start_delta_seconds=min(deltas) if deltas else None,
+            rate_limit_wait_count=self._rate_limit_wait_count,
+            rate_limit_wait_seconds=self._rate_limit_wait_seconds,
+        )
+
+    def search_attempt_bound(self, *, max_results: int) -> int:
+        """Return the maximum transport attempts one ``search`` call can consume."""
+        if max_results < 1 or max_results > self._config.max_total_results:
+            raise ArxivAdapterError("INVALID_ARXIV_MAX_RESULTS")
+        page_count = (max_results + self._config.page_size - 1) // self._config.page_size
+        return min(self._config.max_total_attempts, page_count * self._config.max_attempts)
 
     def search(self, query: Query, *, max_results: int) -> list[PaperRecord]:
         if max_results < 1 or max_results > self._config.max_total_results:
@@ -127,7 +171,11 @@ class ArxivAdapter:
         key = (query.query_text, max_results)
         cached = self._cache.get(key)
         if cached is not None:
-            return self._for_query(cached, query.query_id)
+            return self._cached_result(cached, query.query_id)
+        persistent_cached = self._load_persistent_cache(query.query_text, max_results)
+        if persistent_cached is not None:
+            self._cache[key] = [paper.model_copy(deep=True) for paper in persistent_cached]
+            return self._cached_result(persistent_cached, query.query_id)
 
         try:
             papers: list[PaperRecord] = []
@@ -156,8 +204,76 @@ class ArxivAdapter:
             self._set_final_error(error.code)
             raise
         self._cache[key] = [paper.model_copy(deep=True) for paper in papers]
+        self._store_persistent_cache(query.query_text, max_results, papers)
         self._set_elapsed()
         return self._for_query(papers, query.query_id)
+
+    def _cached_result(self, papers: list[PaperRecord], query_id: str) -> list[PaperRecord]:
+        self._last_observation = self._last_observation._replace(cache_hit=True)
+        self._set_elapsed()
+        return self._for_query(papers, query_id)
+
+    def _persistent_cache_path(self, query_text: str, max_results: int) -> Path | None:
+        if self._config.cache_dir is None:
+            return None
+        manifest = self._cache_manifest(query_text, max_results)
+        encoded = json.dumps(manifest, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+        namespace = re.sub(r"[^A-Za-z0-9._-]+", "_", self._config.cache_namespace).strip("._")
+        return self._config.cache_dir / (namespace or "default") / f"{hashlib.sha256(encoded.encode('utf-8')).hexdigest()}.json"
+
+    def _cache_manifest(self, query_text: str, max_results: int) -> dict[str, object]:
+        return {
+            "adapter_schema_version": self._config.cache_schema_version,
+            "cache_namespace": self._config.cache_namespace,
+            "endpoint": self._config.endpoint,
+            "max_results": max_results,
+            "query_text": query_text,
+        }
+
+    def _load_persistent_cache(self, query_text: str, max_results: int) -> list[PaperRecord] | None:
+        path = self._persistent_cache_path(query_text, max_results)
+        if path is None:
+            return None
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            if not isinstance(payload, dict) or payload.get("manifest") != self._cache_manifest(
+                query_text, max_results
+            ):
+                return None
+            records = payload.get("records")
+            if not isinstance(records, list):
+                return None
+            return [PaperRecord.model_validate(item) for item in records]
+        except (OSError, ValueError, ValidationError):
+            return None
+
+    def _store_persistent_cache(
+        self, query_text: str, max_results: int, papers: list[PaperRecord]
+    ) -> None:
+        path = self._persistent_cache_path(query_text, max_results)
+        if path is None:
+            return
+        temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            temporary.write_text(
+                json.dumps(
+                    {
+                        "manifest": self._cache_manifest(query_text, max_results),
+                        "records": [paper.model_dump(mode="json") for paper in papers],
+                    },
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ),
+                encoding="utf-8",
+            )
+            os.replace(temporary, path)
+        except OSError:
+            try:
+                temporary.unlink(missing_ok=True)
+            except OSError:
+                pass
 
     def _request(self, search_query: str, *, start: int, max_results: int) -> ArxivResponse:
         url = f"{self._config.endpoint}?{urlencode({'search_query': search_query, 'start': start, 'max_results': max_results})}"
@@ -166,6 +282,7 @@ class ArxivAdapter:
             if self._remaining_attempts == 0:
                 raise ArxivAdapterError("ARXIV_REQUEST_BUDGET_EXHAUSTED")
             self._wait_for_attempt(retry_not_before)
+            self._request_start_offsets.append(self._monotonic() - self._rate_limit_started_at)
             self._remaining_attempts -= 1
             try:
                 response = self._transport.get(
@@ -201,6 +318,8 @@ class ArxivAdapter:
             return
         delay = max(targets) - self._monotonic()
         if delay > 0:
+            self._rate_limit_wait_count += 1
+            self._rate_limit_wait_seconds += delay
             self._sleeper(delay)
 
     def _record_attempt(self, *, http_status: int | None) -> None:

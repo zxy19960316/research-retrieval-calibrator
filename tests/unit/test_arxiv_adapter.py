@@ -151,6 +151,68 @@ def test_rate_limit_applies_before_uncached_second_request() -> None:
     assert sleeps == [1.0]
 
 
+def test_rate_limit_observation_records_real_request_starts_and_waits() -> None:
+    adapter, transport, sleeps = _adapter(
+        [_response("empty.xml"), _response("empty.xml")],
+        min_request_interval_seconds=3.0,
+    )
+
+    adapter.search(_query(), max_results=1)
+    adapter.search(
+        _query().model_copy(
+            update={"query_id": "Q1-other", "query_text": 'all:"different query"'}
+        ),
+        max_results=1,
+    )
+
+    observation = adapter.rate_limit_observation
+    assert len(transport.calls) == 2
+    assert sleeps == [3.0]
+    assert observation.configured_min_request_interval_seconds == 3.0
+    assert observation.request_start_offsets_seconds == (0.0, 3.0)
+    assert observation.minimum_observed_request_start_delta_seconds == 3.0
+    assert observation.rate_limit_wait_count == 1
+    assert observation.rate_limit_wait_seconds == 3.0
+
+
+def test_persistent_cache_does_not_cross_namespace_or_endpoint(tmp_path: Path) -> None:
+    cache_dir = tmp_path / "cache"
+    first, first_transport, _ = _adapter(
+        [_response("normal.xml")],
+        cache_dir=cache_dir,
+        cache_schema_version="m1-t04.v2",
+        cache_namespace="first-round:recorded",
+    )
+    second, second_transport, _ = _adapter(
+        [_response("empty.xml")],
+        cache_dir=cache_dir,
+        cache_schema_version="m1-t04.v2",
+        cache_namespace="first-round:real",
+    )
+    real_replay, replay_transport, _ = _adapter(
+        [],
+        cache_dir=cache_dir,
+        cache_schema_version="m1-t04.v2",
+        cache_namespace="first-round:real",
+    )
+    endpoint_changed, endpoint_transport, _ = _adapter(
+        [_response("empty.xml")],
+        cache_dir=cache_dir,
+        cache_schema_version="m1-t04.v2",
+        cache_namespace="first-round:real",
+        endpoint="https://example.test/arxiv",
+    )
+
+    assert first.search(_query(), max_results=1)
+    assert second.search(_query(), max_results=1) == []
+    assert real_replay.search(_query(), max_results=1) == []
+    assert endpoint_changed.search(_query(), max_results=1) == []
+    assert len(first_transport.calls) == 1
+    assert len(second_transport.calls) == 1
+    assert replay_transport.calls == []
+    assert len(endpoint_transport.calls) == 1
+
+
 def test_malformed_atom_and_non_transient_response_fail_closed() -> None:
     malformed, _, _ = _adapter([_response("malformed.xml")])
     rejected, _, _ = _adapter([_response("empty.xml", 400)])
