@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 from scripts.validate_m1_evidence import validate_current_m1_closure_status, validate_m1_evidence
@@ -23,7 +24,11 @@ def test_validator_rejects_evidence_without_live_source_id_samples(tmp_path: Pat
 
 
 def test_current_status_with_historical_in_progress_m1_prose_is_rejected() -> None:
-    status = Path("STATUS.md").read_text(encoding="utf-8")
+    status = subprocess.check_output(
+        ["git", "show", "49c9a9b1b3d38144827c2c2145b6f5ae361620b3:STATUS.md"],
+        text=True,
+        encoding="utf-8",
+    )
 
     errors = validate_current_m1_closure_status(status)
 
