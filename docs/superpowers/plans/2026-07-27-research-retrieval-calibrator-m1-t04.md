@@ -424,3 +424,11 @@ Which approach?
 - [ ] Add `Validate completed M1 evidence` after the retained M0 validator, using `actions/checkout@v4` with `fetch-depth: 0`.
 - [ ] Commit implementation and tests as `fix: harden M1 live provenance and closure gates` (K), without STATUS or `m1-validation.json`; run focused tests, full pytest, Ruff, mypy, docs validation, M0 validation, and pip check.
 - [ ] Run a fresh-cache real smoke for the specified graph-retrieval question, then an identical real-cache replay. Write v3 evidence from the observed output and hashes; only if every validator gate passes, commit exactly STATUS and report as `chore: finalize M1 validated closure evidence` (L).
+
+### Task R1.5: Reject contradictory current-state prose before final merge
+
+**Files:** Modify `scripts/validate_m1_evidence.py` and `tests/contract/test_m1_evidence_validation.py`; then modify only `STATUS.md` and `evaluation/reports/m1-validation.json` for L2.
+
+- [ ] Add a red test using the current pre-cleanup STATUS fixture. With M1 declared `COMPLETE 4/4`, validation must fail when current-state prose says `M1 is IN_PROGRESS`, `M2 remains BLOCKED_BY_M1`, `M1-T04 is NOT_STARTED`, or `live-success gate remains unsatisfied`.
+- [ ] Parse the phase-status table into a unique mapping and reject duplicate rows or any table state inconsistent with M1 `COMPLETE` / M2 `READY`. Historical narrative details may remain only when stripped of current-state assertions.
+- [ ] Commit K3 as `fix: reject contradictory M1 closure status`; update L2 with K3 as `validated_implementation_commit`, ancestry `[G, I, K, K2, K3]`, and new local validation results. Do not rerun a real arXiv smoke because this task changes only evidence validation and historical wording.

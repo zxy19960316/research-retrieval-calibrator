@@ -23,6 +23,16 @@ REQUIRED_CHECKS = {
     "m0_evidence_validation",
     "pip_check",
 }
+STATUS_ROW = re.compile(
+    r"^\|\s*(M\d+)\b[^|]*\|\s*([A-Z0-9_]+)\s*\|\s*(\d+)/(\d+)\s*\|",
+    re.MULTILINE,
+)
+CONTRADICTORY_M1_CLOSURE_PROSE = (
+    "M1 is IN_PROGRESS",
+    "M2 remains BLOCKED_BY_M1",
+    "M1-T04 is NOT_STARTED",
+    "live-success gate remains unsatisfied",
+)
 
 
 @dataclass(frozen=True)
@@ -161,10 +171,29 @@ def _validate_status_and_namespaces(payload: dict[str, Any], errors: list[str], 
     except OSError as error:
         errors.append(f"cannot read STATUS.md: {error}")
         return
-    if "| M1 首轮真实召回 | COMPLETE | 4/4 |" not in status:
+    errors.extend(validate_current_m1_closure_status(status))
+
+
+def validate_current_m1_closure_status(status: str) -> list[str]:
+    """Reject duplicate or stale current-state claims after the M1 closure gate."""
+
+    errors: list[str] = []
+    phases: dict[str, tuple[str, int, int]] = {}
+    for phase, state, completed, total in STATUS_ROW.findall(status):
+        if phase in phases:
+            errors.append(f"STATUS.md declares duplicate current state for {phase}")
+            continue
+        phases[phase] = (state, int(completed), int(total))
+    if phases.get("M1") != ("COMPLETE", 4, 4):
         errors.append("STATUS.md must declare M1 COMPLETE 4/4")
-    if "| M2 首轮排序与选择 | READY | 0/5 |" not in status:
+    if phases.get("M2") != ("READY", 0, 5):
         errors.append("STATUS.md must declare M2 READY")
+    if phases.get("M1") == ("COMPLETE", 4, 4):
+        prose = status.replace("`", "")
+        for phrase in CONTRADICTORY_M1_CLOSURE_PROSE:
+            if phrase in prose:
+                errors.append(f"contradictory M1 closure prose: {phrase}")
+    return errors
 
 
 def validate_m1_evidence(
