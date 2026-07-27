@@ -235,3 +235,96 @@ def test_expansion_field_is_restricted_and_exclusions_never_reach_any_query_text
     assert plan.positive_expansions == []
     assert all("radiation barrier" not in query.query_text for query in plan.queries)
     assert plan.excluded_term_conflicts[0].positive_source is TermSource.LLM_FAKE
+
+
+def _query_for(plan: object, branch: QueryBranch, breadth: QueryBreadth):
+    return next(
+        query
+        for query in plan.queries
+        if query.branch is branch and query.breadth is breadth
+    )
+
+
+def test_breadth_expressions_are_monotonic_serialized_and_anchor_each_branch() -> None:
+    plan = build_query_plan("RRC-2026-0001", _frozen_intent())
+
+    for branch in QueryBranch:
+        narrow = _query_for(plan, branch, QueryBreadth.NARROW)
+        medium = _query_for(plan, branch, QueryBreadth.MEDIUM)
+        wide = _query_for(plan, branch, QueryBreadth.WIDE)
+        narrow_expression = plan.expressions[narrow.query_id]
+        medium_expression = plan.expressions[medium.query_id]
+        wide_expression = plan.expressions[wide.query_id]
+
+        assert narrow_expression.required_group_count >= medium_expression.required_group_count
+        assert medium_expression.required_group_count > wide_expression.required_group_count
+        assert wide_expression.has_anchor()
+        assert wide_expression.serialize() == wide.query_text
+        assert all(
+            any(set(wide_group) & set(medium_group) for medium_group in medium_expression.required_groups)
+            for wide_group in wide_expression.required_groups
+        )
+        assert any(
+            len(medium_group) > len(narrow_group)
+            for narrow_group, medium_group in zip(
+                narrow_expression.required_groups, medium_expression.required_groups, strict=False
+            )
+        )
+
+    direct_wide = plan.expressions[
+        _query_for(plan, QueryBranch.DIRECT_INTERSECTION, QueryBreadth.WIDE).query_id
+    ]
+    problem_wide = plan.expressions[
+        _query_for(plan, QueryBranch.PROBLEM_DOMAIN, QueryBreadth.WIDE).query_id
+    ]
+    method_wide = plan.expressions[
+        _query_for(plan, QueryBranch.METHOD_DOMAIN, QueryBreadth.WIDE).query_id
+    ]
+    bridge_wide = plan.expressions[
+        _query_for(plan, QueryBranch.BRIDGE_DOMAIN, QueryBreadth.WIDE).query_id
+    ]
+    assert direct_wide.required_group_count == 2
+    assert problem_wide.required_group_count == 2
+    assert method_wide.required_group_count == 1
+    assert bridge_wide.required_group_count == 2
+
+
+@pytest.mark.parametrize("excluded_wide_term", ("framework", "application", "methodology", "benchmark"))
+def test_excluding_former_wide_terms_degrades_without_losing_twelve_queries(
+    excluded_wide_term: str,
+) -> None:
+    plan = build_query_plan("RRC-2026-0001", _frozen_intent(exclusions=[excluded_wide_term]))
+
+    assert len(plan.queries) == 12
+    assert all(excluded_wide_term not in query.query_text for query in plan.queries)
+    assert len({query.query_text for query in plan.queries}) == 12
+
+
+def test_bridge_vocabulary_exhaustion_uses_a_stable_business_error() -> None:
+    with pytest.raises(PlanningError, match="INVALID_QUERY_PLAN") as error:
+        build_query_plan(
+            "RRC-2026-0001",
+            _frozen_intent(exclusions=["application", "adaptation", "transfer", "framework", "methodology", "benchmark"]),
+        )
+
+    assert error.value.code == "INVALID_QUERY_PLAN"
+    assert error.value.reason == "bridge vocabulary exhausted"
+
+
+def test_exclusion_audit_preserves_chinese_original_and_canonical_english() -> None:
+    plan = build_query_plan("RRC-2026-0001", _frozen_intent(exclusions=["\u6846\u67b6"]))
+
+    assert [(term.original_text, term.canonical_text_en) for term in plan.exclusions] == [
+        ("\u6846\u67b6", "framework")
+    ]
+    assert all("framework" not in query.query_text for query in plan.queries)
+    assert plan.excluded_term_conflicts[0].exclusion_original_text == "\u6846\u67b6"
+
+
+def test_duplicate_canonical_exclusions_are_rejected_deterministically() -> None:
+    with pytest.raises(PlanningError, match="INVALID_QUERY_PLAN") as error:
+        build_query_plan(
+            "RRC-2026-0001", _frozen_intent(exclusions=["framework", "\u6846\u67b6"])
+        )
+
+    assert error.value.reason == "duplicate canonical exclusion"

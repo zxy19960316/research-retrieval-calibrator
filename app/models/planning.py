@@ -59,9 +59,10 @@ def _clean_term_collection(value: object) -> object:
 class PlanningError(ValueError):
     """Stable planning error that refuses malformed or incomplete input."""
 
-    def __init__(self, code: str) -> None:
+    def __init__(self, code: str, reason: str | None = None) -> None:
         self.code = code
-        super().__init__(code)
+        self.reason = reason
+        super().__init__(f"{code}: {reason}" if reason else code)
 
 
 class TermEvidence(BaseModel):
@@ -238,6 +239,70 @@ class TermConflict(BaseModel):
     term: str = Field(min_length=1)
     positive_source: TermSource
     exclusion_source: TermSource
+    exclusion_original_text: str = Field(min_length=1)
+
+
+class ExclusionTerm(BaseModel):
+    """An exclusion's original audit text and canonical English comparison key."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    original_text: str = Field(min_length=1)
+    canonical_text_en: str = Field(min_length=1)
+    source: TermSource
+
+    @field_validator("original_text")
+    @classmethod
+    def validate_original_text(cls, value: str) -> str:
+        return _trim_term(value)
+
+    @field_validator("canonical_text_en")
+    @classmethod
+    def validate_canonical_text(cls, value: str) -> str:
+        canonical = normalise_text(value)
+        if not canonical or not canonical.isascii() or '"' in canonical or "%" in canonical:
+            raise ValueError("Exclusion canonical text must be plain ASCII retrieval text")
+        return canonical
+
+
+class QueryExpression(BaseModel):
+    """Serializable required OR-groups used to prove query breadth semantics."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    required_groups: tuple[tuple[str, ...], ...]
+    anchor_terms: tuple[str, ...]
+
+    @model_validator(mode="after")
+    def validate_expression(self) -> "QueryExpression":
+        if not self.required_groups or any(not group for group in self.required_groups):
+            raise ValueError("QueryExpression required groups must be non-empty")
+        terms = self.terms()
+        if any(not term.isascii() or not normalise_text(term) or '"' in term or "%" in term for term in terms):
+            raise ValueError("QueryExpression terms must be plain ASCII retrieval text")
+        if len(terms) != len(set(terms)):
+            raise ValueError("QueryExpression terms must be unique")
+        if not self.anchor_terms or not self.has_anchor():
+            raise ValueError("QueryExpression must retain every anchor term")
+        return self
+
+    @property
+    def required_group_count(self) -> int:
+        return len(self.required_groups)
+
+    def terms(self) -> tuple[str, ...]:
+        return tuple(term for group in self.required_groups for term in group)
+
+    def has_anchor(self) -> bool:
+        terms = {normalise_text(term) for term in self.terms()}
+        return bool(self.anchor_terms) and all(normalise_text(term) in terms for term in self.anchor_terms)
+
+    def serialize(self) -> str:
+        def render_group(group: tuple[str, ...]) -> str:
+            clauses = [f'all:"{term}"' for term in group]
+            return clauses[0] if len(clauses) == 1 else "(" + " OR ".join(clauses) + ")"
+
+        return " AND ".join(render_group(group) for group in self.required_groups)
 
 
 class QueryPlan(BaseModel):
@@ -252,7 +317,8 @@ class QueryPlan(BaseModel):
     branch_weights: dict[QueryBranch, float]
     queries: list[Query]
     generated_at_utc: datetime
-    exclusions: list[str] = Field(default_factory=list)
+    exclusions: list[ExclusionTerm] = Field(default_factory=list)
+    expressions: dict[str, QueryExpression]
     positive_expansions: list[QueryExpansion] = Field(default_factory=list)
     excluded_term_conflicts: list[TermConflict] = Field(default_factory=list)
 
@@ -281,6 +347,8 @@ class QueryPlan(BaseModel):
             raise ValueError("QueryPlan query IDs must be unique")
         if len({query.query_text for query in self.queries}) != 12:
             raise ValueError("QueryPlan query text must be unique")
+        if set(self.expressions) != {query.query_id for query in self.queries}:
+            raise ValueError("QueryPlan must provide one expression for every query ID")
         if any(
             query.round_number != 1
             or query.language != "en"
@@ -301,7 +369,29 @@ class QueryPlan(BaseModel):
                 for query in branch_queries
             ):
                 raise ValueError("Each branch query weight must equal one third of its branch weight")
-        exclusion_clauses = {f'all:"{normalise_text(term)}"' for term in self.exclusions}
+            expressions = {
+                query.breadth: self.expressions[query.query_id]
+                for query in branch_queries
+            }
+            narrow = expressions[QueryBreadth.NARROW]
+            medium = expressions[QueryBreadth.MEDIUM]
+            wide = expressions[QueryBreadth.WIDE]
+            if not narrow.required_group_count >= medium.required_group_count > wide.required_group_count:
+                raise ValueError("QueryPlan breadth expressions must monotonically reduce required groups")
+            medium_groups = [set(group) for group in medium.required_groups]
+            if not wide.has_anchor() or not all(
+                any(set(wide_group) & medium_group for medium_group in medium_groups)
+                for wide_group in wide.required_groups
+            ):
+                raise ValueError("QueryPlan WIDE expression must retain anchors without new mandatory terms")
+        if any(
+            self.expressions[query.query_id].serialize() != query.query_text for query in self.queries
+        ):
+            raise ValueError("QueryPlan expression serialization must equal canonical query text")
+        canonical_exclusions = [term.canonical_text_en for term in self.exclusions]
+        if len(canonical_exclusions) != len(set(canonical_exclusions)):
+            raise ValueError("QueryPlan canonical exclusions must be unique")
+        exclusion_clauses = {f'all:"{term}"' for term in canonical_exclusions}
         query_texts = [normalise_text(query.query_text) for query in self.queries]
         if any(clause in text for clause in exclusion_clauses for text in query_texts):
             raise ValueError("QueryPlan query text must not include a canonical exclusion clause")

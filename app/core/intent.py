@@ -48,6 +48,7 @@ _RETRIEVAL_TRANSLATIONS = {
     "\u8bbe\u8ba1": "design",
     "\u8bc4\u4f30": "evaluation",
     "\u65b9\u6cd5": "method",
+    "\u6846\u67b6": "framework",
 }
 _CJK_PATTERN = re.compile(r"[\u3400-\u9fff]")
 

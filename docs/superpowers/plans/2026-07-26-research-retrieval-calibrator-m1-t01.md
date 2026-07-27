@@ -149,3 +149,96 @@ def build_query_plan(
 - [ ] Enforce `m1-t01.v2`, unique query text, exactly one query per branch/breadth, branch-weight equality, supported positive-expansion fields, and exclusion absence in `QueryPlan` model validation.
 - [ ] Add an M0 report gate test proving a live `M0 IN_PROGRESS 3/4` status is rejected after an immutable M0 report exists while legal M1 `0/4` through `4/4` transitions remain valid.
 - [ ] Run the focused red commands first; after implementation run focused tests, full regression, Ruff, mypy, document validation, historical M0 validation, and `pip check` before creating the implementation/evidence commit pair.
+
+---
+
+## M1-T01R3 breadth semantics and exclusion degradation
+
+**Goal:** Make the four M1-T01 query branches structurally prove that WIDE broadens MEDIUM while preserving auditable exclusion input, without beginning M1-T02.
+
+**Architecture:** `QueryExpression` is a strict serializable OR-group structure: each non-empty tuple is a mandatory group and terms inside a group are alternatives. `QueryPlan` stores one expression for each query ID and verifies its rendered canonical arXiv text, branch anchor, unique text, and NARROW/MEDIUM/WIDE required-group monotonicity. Exclusions become records containing original user text plus canonical English retrieval text; the planner applies their canonical values but retains the original input for conflict audit.
+
+**Tech Stack:** Python 3.12, Pydantic v2, pytest, Ruff, mypy, GitHub Actions.
+
+## Global Constraints
+
+- Continue existing Draft PR #6 on `agent/m1-t01-intent-query-plan`; do not create a branch or PR.
+- Preserve M1-T01 `m1-t01.v2`, twelve English canonical unencoded arXiv query texts, IDs, branch weights, fake-provider boundary, M0 immutable-evidence validation, and intent preparation behavior.
+- Do not implement HTTP, Atom, pagination, caching, real arXiv access, model download/inference, CNKI, platform work, or M1-T02.
+- Use implementation commit G `fix: align M1 query breadth semantics`, then evidence-only commit H `chore: refresh merge-ready M1-T01 evidence`; H contains only `evaluation/reports/m1-t01-intent-query-plan.json` and `STATUS.md`.
+
+---
+
+### Task 1: Write and preserve the R3 red tests
+
+**Files:**
+- Modify: `tests/unit/test_query_planner.py`
+
+**Interfaces:** Tests consume `QueryPlan.expressions: dict[str, QueryExpression]`, `QueryExpression.required_group_count`, `serialize()`, `terms()`, `has_anchor()`, `ExclusionTerm.original_text`, and `ExclusionTerm.canonical_text_en`.
+
+- [ ] Add `test_breadth_expressions_are_monotonic_serialized_and_anchor_each_branch` with the exact per-branch assertions `NARROW >= MEDIUM > WIDE`, WIDE anchors, rendered text equality, and counts DIRECT=2, PROBLEM=2, METHOD=1, BRIDGE=2.
+- [ ] Add a parameterized test for `framework`, `application`, `methodology`, and `benchmark`; each exclusion must still produce twelve unique texts and omit its term.
+- [ ] Add the exhausted six-bridge-term test; it must assert `PlanningError.code == "INVALID_QUERY_PLAN"` and `reason == "bridge vocabulary exhausted"`.
+- [ ] Add a Chinese `"\u6846\u67b6"` exclusion test asserting the stored `(original_text, canonical_text_en)` equals `("\u6846\u67b6", "framework")`.
+- [ ] Run `py -3.12 -m pytest tests/unit/test_query_planner.py -q`; record the expected current red result: no expression metadata, empty former-WIDE groups, unstable bridge error, and absent audit record.
+
+### Task 2: Add strict expression and exclusion-audit contracts
+
+**Files:**
+- Modify: `app/models/planning.py`
+- Modify: `tests/contract/test_m1_t01_contracts.py`
+
+**Interfaces:**
+
+```python
+class QueryExpression(BaseModel):
+    required_groups: tuple[tuple[str, ...], ...]
+    anchor_terms: tuple[str, ...]
+    @property
+    def required_group_count(self) -> int: ...
+    def terms(self) -> tuple[str, ...]: ...
+    def has_anchor(self) -> bool: ...
+    def serialize(self) -> str: ...
+
+class ExclusionTerm(BaseModel):
+    original_text: str
+    canonical_text_en: str
+    source: TermSource
+```
+
+- [ ] Make both models `extra="forbid"`, reject empty groups/anchors and duplicate canonical exclusions, and render each group as `all:"..."` joined by uppercase `AND`/`OR` only.
+- [ ] Change `QueryPlan.exclusions` to `list[ExclusionTerm]` and add `expressions: dict[str, QueryExpression]`.
+- [ ] Extend `QueryPlan.validate_first_round_structure` to require exactly one rendered expression for each query, matching text, canonical exclusion absence, WIDE term-subset-of-MEDIUM, and the four-branch group-count relation.
+- [ ] Run `py -3.12 -m pytest tests/contract/test_m1_t01_contracts.py tests/unit/test_query_planner.py -q`; expect all focused contract tests to pass after the planner task.
+
+### Task 3: Replace append-based WIDE construction with the four explicit matrices
+
+**Files:**
+- Modify: `app/core/query_planner.py`
+- Modify: `app/core/intent.py`
+
+**Interfaces:** `build_query_plan()` returns the contract from Task 2. `build_exclusion_set()` returns deterministic `ExclusionTerm` records. `PlanningError(code, reason=None)` exposes `code` and `reason` without changing existing code-only callers.
+
+- [ ] Add the retrieval mapping `"\u6846\u67b6": "framework"` so a Chinese exclusion is retained exactly while it is compared through canonical English.
+- [ ] Remove `_WIDE_TERMS` and build each expression directly: DIRECT `(object_group, task_group, method_group)` / `(object_group, task_group OR method_group)`; PROBLEM `(object_group, task_group, scope_group)` / `(object_group, task_group OR scope_group)`; METHOD `(method_group, task_group)` / `(method_group)`; BRIDGE `(object_group, task_group, method_group, bridge_group)` / `(object_group OR task_group, method_group OR bridge_group)`.
+- [ ] Keep NARROW on the first term of each required group; MEDIUM uses the corresponding expanded groups. WIDE may merge existing groups but may not add a mandatory topic or a former `_WIDE_TERMS` group.
+- [ ] Filter optional deterministic bridge terms by canonical exclusions. If at least one remains, build BRIDGE queries; if none remain, raise `PlanningError("INVALID_QUERY_PLAN", "bridge vocabulary exhausted")` before serialization.
+- [ ] Reject canonical duplicate exclusions deterministically; preserve every accepted original/canonical/source record and use its canonical value for conflict detection.
+- [ ] Run `py -3.12 -m pytest tests/unit/test_query_planner.py -q`; expected result: all query-planner tests pass and each former fixed WIDE term exclusion still yields a complete plan.
+
+### Task 4: Validate, commit, and refresh immutable R3 evidence
+
+**Files:**
+- Modify for commit G: `app/core/intent.py`, `app/core/query_planner.py`, `app/models/planning.py`, `tests/unit/test_query_planner.py`, `tests/contract/test_m1_t01_contracts.py`, this plan.
+- Modify for commit H only: `evaluation/reports/m1-t01-intent-query-plan.json`, `STATUS.md`.
+
+- [ ] Run `py -3.12 -m pytest tests/unit/test_intent_clarification.py tests/unit/test_query_planner.py tests/contract/test_m1_t01_contracts.py tests/contract/test_evidence_report.py -q`, then `py -3.12 -m pytest -q`, `py -3.12 -m ruff check app evaluation scripts tests`, `py -3.12 -m mypy app evaluation scripts`, `py -3.12 scripts/validate_project_docs.py`, `py -3.12 scripts/validate_phase.py M0`, and `py -3.12 -m pip check`; every command must exit 0.
+- [ ] Commit only implementation/tests/plan as `fix: align M1 query breadth semantics`; save its full SHA as `validated_implementation_commit` and hash all changed implementation blobs from that commit.
+- [ ] Write R3 evidence with actual red/green results and the six required review repairs: breadth monotonicity, fewer WIDE groups, no mandatory WIDE terms, safe optional-term exclusion degradation, stable bridge exhaustion, and original exclusion audit. Keep every real external operation `not_run` and M1-T02 not started.
+- [ ] Commit only the evidence report and `STATUS.md` as `chore: refresh merge-ready M1-T01 evidence`, push the existing branch, and update PR #6 while keeping it Draft. Record rollback as `git revert <H>` then `git revert <G>`.
+
+## Self-Review
+
+- Coverage: the explicit matrix covers all four branches and all three breadths; expression metadata proves breadth instead of counting raw `AND` strings; exclusion records preserve Chinese original text and canonical English comparison; every listed fixed WIDE exclusion degrades safely; bridge exhaustion has a stable business error.
+- Placeholder scan: no task requires HTTP, a real model, external retrieval, or M1-T02 work.
+- Type consistency: `QueryPlan.expressions` keys are query IDs; `QueryExpression.serialize()` is the only text renderer; `ExclusionTerm.canonical_text_en` is the sole comparison key while `original_text` remains audit data.
