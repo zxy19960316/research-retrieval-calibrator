@@ -22,5 +22,17 @@
     {"paper_id": "theme-b", "source": "crossref", "source_id": "n20", "title": "Retrieval for Satellite Images", "abstract": "Recorded", "authors": ["Liam Author"], "year": 2024, "doi": null, "url": "https://example.test/n20", "language": "en", "retrieval_paths": ["Q20"]}
   ],
   "protected_pairs": [["same-title-ada", "same-title-ben"], ["review-a", "review-b"], ["author-different-a", "author-different-b"], ["distant-year-a", "distant-year-b"], ["different-doi-a", "different-doi-b"], ["different-arxiv-a", "different-arxiv-b"], ["initial-a", "initial-b"], ["series-a", "series-b"], ["erratum-a", "erratum-b"], ["theme-a", "theme-b"]],
+  "duplicate_paper_id_conflict_cases": [
+    {"field": "source_id", "replacement": "2401.00002"},
+    {"field": "doi", "replacement": "10.1000/conflicting-doi"},
+    {"field": "title", "replacement": "A conflicting title"},
+    {"field": "url", "replacement": "https://arxiv.org/abs/2401.00001?conflict=1"}
+  ],
+  "identity_conflict_case": {
+    "left": {"paper_id": "identity-a", "source": "arxiv", "source_id": "2401.00001", "title": "Identity conflict", "abstract": "Recorded", "authors": ["Ada Author"], "year": 2024, "doi": "10.1000/shared", "url": "https://arxiv.org/abs/2401.00001", "language": "en", "retrieval_paths": ["Q-identity-a"]},
+    "right": {"paper_id": "identity-b", "source": "arxiv", "source_id": "2401.00002", "title": "Identity conflict", "abstract": "Recorded", "authors": ["Ada Author"], "year": 2024, "doi": "10.1000/shared", "url": "https://arxiv.org/abs/2401.00002", "language": "en", "retrieval_paths": ["Q-identity-b"]}
+  },
+  "bridge_cases": ["high_title_similarity_three_record_chain", "shared_author_three_record_chain"],
+  "part_series_case": ["series-a", "series-b"],
   "expected": {"false_auto_merge_count": 0}
 }
