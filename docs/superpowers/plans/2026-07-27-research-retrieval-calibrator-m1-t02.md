@@ -109,6 +109,24 @@ class ArxivAdapterConfig(BaseModel):
 - [x] Add recorded error Atom, modern/legacy ID, default-urllib transport retry, bounded retry, per-attempt interval, `Retry-After` and cache-isolation tests. The independent smoke reports URL-free `attempt_count`, HTTP status, error code, retry-after and elapsed time.
 - [x] Preserve scope: this closure does not implement M1-T03 normalization/deduplication, M1-T04 orchestration, ranking, models, CNKI, or platform work. Real smoke evidence reports adapter observation separately from connectivity diagnostics; a causal link is not established.
 
+### M1-T02R2 bounded-search and evidence closure
+
+**Goal:** Close the deterministic adapter contract without rerunning the independently failed real arXiv smoke.
+
+**Files:** Modify `app/adapters/arxiv.py`, `scripts/arxiv_smoke.py`, `tests/unit/test_arxiv_adapter.py`, and this plan; create `tests/fixtures/arxiv/wrong-root.xml`. The evidence-only closeout subsequently modifies only `evaluation/reports/m1-t02-arxiv-adapter.json` and `STATUS.md`.
+
+**Contract and test cycle:**
+
+- [ ] Add `max_total_results=100` (1..1000), `max_total_attempts=20` (1..100), and `max_retry_after_seconds=60` (0..300) to `ArxivAdapterConfig`. Reject a `search()` `max_results` below one or above `max_total_results` with `INVALID_ARXIV_MAX_RESULTS`; accept the exact limit.
+- [ ] Count every transport attempt over the entire uncached search, including retries and later pages. Once the total reaches `max_total_attempts`, raise `ARXIV_REQUEST_BUDGET_EXHAUSTED` before another request, do not cache partial records, and cache only a successfully complete search.
+- [ ] Apply numeric and HTTP-date `Retry-After` values as `min(parsed_value, max_retry_after_seconds)` and record both `retry_after_seconds` and `retry_after_was_capped`. Inject `utc_now: Callable[[], datetime]` for deterministic HTTP-date tests; malformed values use exponential backoff and negative values become zero but still obey the minimum request interval.
+- [ ] Require the Atom root to be exactly `{http://www.w3.org/2005/Atom}feed`. Well-formed XML with another root raises `INVALID_ARXIV_ATOM`, produces no records, is not cached, and sets `last_observation.final_error_code`; malformed XML continues to raise `MALFORMED_ARXIV_ATOM`.
+- [ ] Catch every `PaperRecord` `ValidationError` during one-entry conversion and expose only `INVALID_ARXIV_ENTRY`, covering invalid years, URLs/source IDs, blank title and blank summary without leaking Pydantic errors.
+- [ ] Make `scripts/arxiv_smoke.py` return JSON `{evidence_type: real_external, status: failed, error_code: INVALID_SMOKE_ARGUMENT}` for invalid max-results, blank User-Agent, or invalid/blank query before any transport call. Test only argument processing; do not run its network mode.
+- [ ] Preserve the historical real-external observation (`attempt_count=3`, `http_status=null`, `ARXIV_TRANSPORT_ERROR`, `causal_link=not_established`, and its original timestamp). The final evidence hashes all required F-commit blobs using `git show <F>:<path>`, records the bounded-search coverage, and does not claim a successful live arXiv search.
+
+**Boundaries:** M1-T02R2 does not implement M1-T03/M1-T04, M2-M6, ranking, normalization/deduplication, models, CNKI, platform deployment, or any real-network smoke/connectivity diagnostic. The implementation commit is `fix: bound M1 arXiv search execution`; the follow-on evidence/status commit is `chore: finalize M1-T02 evidence`; rollback is `git revert <evidence>` followed by `git revert <implementation>`.
+
 ## Self-Review
 
 - Coverage: HTTP boundary, Atom parsing, pagination, User-Agent, timeout, rate limit, retry/backoff, cache, recorded fixture, automated/recorded/real evidence separation and independent smoke each have a named task and test path.

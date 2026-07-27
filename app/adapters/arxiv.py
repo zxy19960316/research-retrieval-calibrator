@@ -13,7 +13,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlparse
 from urllib.request import Request, urlopen
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from app.models.paper import PaperRecord
 from app.models.query import Query
@@ -48,6 +48,7 @@ class ArxivRequestObservation(NamedTuple):
     attempt_count: int
     http_status: int | None
     retry_after_seconds: float | None
+    retry_after_was_capped: bool
     final_error_code: str | None
     elapsed_seconds: float
 
@@ -83,6 +84,9 @@ class ArxivAdapterConfig(BaseModel):
     page_size: int = Field(ge=1, le=100)
     min_request_interval_seconds: float = Field(ge=0, le=60)
     max_attempts: int = Field(ge=1, le=5)
+    max_total_results: int = Field(default=100, ge=1, le=1000)
+    max_total_attempts: int = Field(default=20, ge=1, le=100)
+    max_retry_after_seconds: float = Field(default=60.0, ge=0, le=300)
     initial_backoff_seconds: float = Field(ge=0, le=60)
 
 
@@ -96,15 +100,18 @@ class ArxivAdapter:
         transport: ArxivTransport | None = None,
         monotonic: Callable[[], float] = time.monotonic,
         sleeper: Callable[[float], None] = time.sleep,
+        utc_now: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
         self._config = config
         self._transport = transport or UrllibArxivTransport()
         self._monotonic = monotonic
         self._sleeper = sleeper
+        self._utc_now = utc_now
         self._cache: dict[tuple[str, int], list[PaperRecord]] = {}
         self._next_allowed_at: float | None = None
+        self._remaining_attempts = config.max_total_attempts
         self._search_started_at = 0.0
-        self._last_observation = ArxivRequestObservation(0, None, None, None, 0.0)
+        self._last_observation = ArxivRequestObservation(0, None, None, False, None, 0.0)
 
     @property
     def last_observation(self) -> ArxivRequestObservation:
@@ -112,10 +119,11 @@ class ArxivAdapter:
         return self._last_observation
 
     def search(self, query: Query, *, max_results: int) -> list[PaperRecord]:
-        if max_results < 1:
+        if max_results < 1 or max_results > self._config.max_total_results:
             raise ArxivAdapterError("INVALID_ARXIV_MAX_RESULTS")
         self._search_started_at = self._monotonic()
-        self._last_observation = ArxivRequestObservation(0, None, None, None, 0.0)
+        self._remaining_attempts = self._config.max_total_attempts
+        self._last_observation = ArxivRequestObservation(0, None, None, False, None, 0.0)
         key = (query.query_text, max_results)
         cached = self._cache.get(key)
         if cached is not None:
@@ -155,7 +163,10 @@ class ArxivAdapter:
         url = f"{self._config.endpoint}?{urlencode({'search_query': search_query, 'start': start, 'max_results': max_results})}"
         retry_not_before: float | None = None
         for attempt in range(self._config.max_attempts):
+            if self._remaining_attempts == 0:
+                raise ArxivAdapterError("ARXIV_REQUEST_BUDGET_EXHAUSTED")
             self._wait_for_attempt(retry_not_before)
+            self._remaining_attempts -= 1
             try:
                 response = self._transport.get(
                     url,
@@ -174,9 +185,10 @@ class ArxivAdapter:
                 return response
             if response.status_code not in _TRANSIENT_STATUSES or attempt == self._config.max_attempts - 1:
                 raise ArxivAdapterError(f"ARXIV_HTTP_{response.status_code}")
-            retry_after = self._retry_after_seconds(response.headers)
+            retry_after, retry_after_was_capped = self._retry_after_seconds(response.headers)
             self._last_observation = self._last_observation._replace(
-                retry_after_seconds=retry_after
+                retry_after_seconds=retry_after,
+                retry_after_was_capped=retry_after_was_capped,
             )
             retry_not_before = self._monotonic() + (
                 retry_after if retry_after is not None else self._backoff_seconds(attempt)
@@ -211,21 +223,27 @@ class ArxivAdapter:
     def _backoff_seconds(self, attempt: int) -> float:
         return float(self._config.initial_backoff_seconds * (2**attempt))
 
-    @staticmethod
-    def _retry_after_seconds(headers: Mapping[str, str]) -> float | None:
+    def _retry_after_seconds(self, headers: Mapping[str, str]) -> tuple[float | None, bool]:
         value = next((value for key, value in headers.items() if key.lower() == "retry-after"), None)
         if value is None:
-            return None
+            return None, False
         try:
-            return max(0.0, float(value))
+            parsed_retry_after = max(0.0, float(value))
         except ValueError:
             try:
                 parsed = parsedate_to_datetime(value)
             except (TypeError, ValueError):
-                return None
+                return None, False
             if parsed.tzinfo is None:
                 parsed = parsed.replace(tzinfo=UTC)
-            return max(0.0, float((parsed - datetime.now(UTC)).total_seconds()))
+            parsed_retry_after = max(
+                0.0, float((parsed - self._utc_now()).total_seconds())
+            )
+        retry_after_was_capped = parsed_retry_after > self._config.max_retry_after_seconds
+        return (
+            min(parsed_retry_after, self._config.max_retry_after_seconds),
+            retry_after_was_capped,
+        )
 
     @staticmethod
     def _for_query(papers: list[PaperRecord], query_id: str) -> list[PaperRecord]:
@@ -237,6 +255,8 @@ class ArxivAdapter:
             root = element_tree.fromstring(body)
         except element_tree.ParseError as error:
             raise ArxivAdapterError("MALFORMED_ARXIV_ATOM") from error
+        if root.tag != f"{_ATOM_NAMESPACE}feed":
+            raise ArxivAdapterError("INVALID_ARXIV_ATOM")
         papers: list[PaperRecord] = []
         for entry in root.findall(f"{_ATOM_NAMESPACE}entry"):
             source_url = ArxivAdapter._element_text(entry, "id")
@@ -252,20 +272,25 @@ class ArxivAdapter:
                 for author in entry.findall(f"{_ATOM_NAMESPACE}author")
                 if (name := ArxivAdapter._element_text(author, "name"))
             ]
-            papers.append(
-                PaperRecord(
-                    paper_id=f"arxiv:{source_id}",
-                    source="arxiv",
-                    source_id=source_id,
-                    title=title,
-                    abstract=abstract,
-                    authors=authors,
-                    year=ArxivAdapter._year(ArxivAdapter._element_text(entry, "published")),
-                    url=source_url,
-                    language="en",
-                    retrieval_paths=[query_id],
+            try:
+                papers.append(
+                    PaperRecord(
+                        paper_id=f"arxiv:{source_id}",
+                        source="arxiv",
+                        source_id=source_id,
+                        title=title,
+                        abstract=abstract,
+                        authors=authors,
+                        year=ArxivAdapter._year(
+                            ArxivAdapter._element_text(entry, "published")
+                        ),
+                        url=source_url,
+                        language="en",
+                        retrieval_paths=[query_id],
+                    )
                 )
-            )
+            except ValidationError as error:
+                raise ArxivAdapterError("INVALID_ARXIV_ENTRY") from error
         return papers
 
     @staticmethod

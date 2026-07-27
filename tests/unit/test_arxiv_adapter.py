@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from datetime import UTC, datetime, timedelta
+from email.utils import format_datetime
 from pathlib import Path
 from typing import Self
 from urllib.error import URLError
@@ -16,6 +18,7 @@ from app.adapters.arxiv import (
 )
 from app.models.enums import QueryBranch, QueryBreadth
 from app.models.query import Query
+from scripts import arxiv_smoke
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "arxiv"
 
@@ -35,6 +38,13 @@ class FakeTransport:
 
 def _response(name: str, status_code: int = 200) -> ArxivResponse:
     return ArxivResponse(status_code, (FIXTURES / name).read_bytes(), {})
+
+
+def _atom_record(source_id: str, *, title: str = "Recorded title", summary: str = "Recorded abstract", published: str = "2024-01-01") -> bytes:
+    return f'''<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"><entry>
+      <id>https://arxiv.org/abs/{source_id}</id><title>{title}</title><summary>{summary}</summary>
+      <published>{published}</published>
+    </entry></feed>'''.encode()
 
 
 def _query() -> Query:
@@ -61,6 +71,9 @@ def _adapter(
         "page_size": 2,
         "min_request_interval_seconds": 1.0,
         "max_attempts": 3,
+        "max_total_results": 100,
+        "max_total_attempts": 20,
+        "max_retry_after_seconds": 60.0,
         "initial_backoff_seconds": 0.25,
     }
     config_values.update(overrides)
@@ -72,7 +85,13 @@ def _adapter(
         clock[0] += seconds
 
     return (
-        ArxivAdapter(config, transport=transport, monotonic=lambda: clock[0], sleeper=sleep),
+        ArxivAdapter(
+            config,
+            transport=transport,
+            monotonic=lambda: clock[0],
+            sleeper=sleep,
+            utc_now=lambda: datetime(2026, 7, 27, tzinfo=UTC),
+        ),
         transport,
         sleeps,
     )
@@ -293,3 +312,132 @@ def test_cache_rebinds_provenance_and_defensively_copies() -> None:
     assert first[0].retrieval_paths == ["Q1-fixture"]
     assert second[0].retrieval_paths == ["Q1-second", "caller-mutation"]
     assert third[0].retrieval_paths == ["Q1-fixture"]
+
+
+def test_accepts_max_results_at_total_result_limit() -> None:
+    adapter, _, _ = _adapter([_response("normal.xml")], max_total_results=2)
+
+    assert len(adapter.search(_query(), max_results=2)) == 2
+
+
+def test_rejects_max_results_over_total_result_limit() -> None:
+    adapter, transport, _ = _adapter([], max_total_results=2)
+
+    with pytest.raises(ArxivAdapterError, match="INVALID_ARXIV_MAX_RESULTS"):
+        adapter.search(_query(), max_results=3)
+
+    assert transport.calls == []
+
+
+def test_total_attempt_budget_spans_pages_and_retries_without_caching_partial_results() -> None:
+    adapter, transport, _ = _adapter(
+        [
+            ArxivResponse(200, _atom_record("2401.00001"), {}),
+            ArxivResponse(429, b"", {}),
+            ArxivResponse(200, _atom_record("2401.00002"), {}),
+        ],
+        page_size=1,
+        max_total_attempts=3,
+        min_request_interval_seconds=0.0,
+    )
+
+    with pytest.raises(ArxivAdapterError, match="ARXIV_REQUEST_BUDGET_EXHAUSTED"):
+        adapter.search(_query(), max_results=3)
+
+    assert len(transport.calls) == 3
+    assert adapter.last_observation.attempt_count == 3
+    assert adapter._cache == {}
+
+
+def test_retry_after_is_capped_and_observation_records_the_cap() -> None:
+    adapter, _, sleeps = _adapter(
+        [ArxivResponse(429, b"", {"Retry-After": "86400"}), _response("normal.xml")],
+        min_request_interval_seconds=0.0,
+        initial_backoff_seconds=1.0,
+        max_retry_after_seconds=60.0,
+    )
+
+    adapter.search(_query(), max_results=1)
+
+    assert sleeps == [60.0]
+    assert adapter.last_observation.retry_after_seconds == 60.0
+    assert adapter.last_observation.retry_after_was_capped is True
+
+
+def test_http_date_retry_after_uses_injected_wall_clock_and_cap() -> None:
+    now = datetime(2026, 7, 27, tzinfo=UTC)
+    retry_after = format_datetime(now + timedelta(seconds=120), usegmt=True)
+    adapter, _, sleeps = _adapter(
+        [ArxivResponse(429, b"", {"Retry-After": retry_after}), _response("normal.xml")],
+        min_request_interval_seconds=0.0,
+        max_retry_after_seconds=30.0,
+    )
+
+    adapter.search(_query(), max_results=1)
+
+    assert sleeps == [30.0]
+    assert adapter.last_observation.retry_after_seconds == 30.0
+    assert adapter.last_observation.retry_after_was_capped is True
+
+
+def test_negative_retry_after_still_obeys_minimum_interval() -> None:
+    adapter, _, sleeps = _adapter(
+        [ArxivResponse(429, b"", {"Retry-After": "-4"}), _response("normal.xml")],
+        min_request_interval_seconds=3.0,
+        initial_backoff_seconds=1.0,
+    )
+
+    adapter.search(_query(), max_results=1)
+
+    assert sleeps == [3.0]
+
+
+def test_well_formed_non_atom_root_fails_closed_without_cache() -> None:
+    adapter, transport, _ = _adapter([_response("wrong-root.xml")])
+
+    with pytest.raises(ArxivAdapterError, match="INVALID_ARXIV_ATOM"):
+        adapter.search(_query(), max_results=1)
+
+    assert len(transport.calls) == 1
+    assert adapter._cache == {}
+    assert adapter.last_observation.final_error_code == "INVALID_ARXIV_ATOM"
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        _atom_record("2401.00001", published="1899-01-01"),
+        _atom_record("2401.00001", title=""),
+        _atom_record("2401.00001", summary=""),
+        _atom_record("not-an-arxiv-id"),
+    ],
+)
+def test_entry_validation_errors_are_wrapped_in_a_stable_adapter_error(body: bytes) -> None:
+    adapter, _, _ = _adapter([ArxivResponse(200, body, {})])
+
+    with pytest.raises(ArxivAdapterError) as raised:
+        adapter.search(_query(), max_results=1)
+
+    assert raised.value.code == "INVALID_ARXIV_ENTRY"
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        ["--max-results", "0"],
+        ["--max-results", "101"],
+        ["--user-agent", "   "],
+        ["--query", "   "],
+    ],
+)
+def test_smoke_invalid_arguments_emit_json_failure_without_a_traceback(
+    arguments: list[str], capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert arxiv_smoke.main(arguments) == 2
+
+    payload = __import__("json").loads(capsys.readouterr().out)
+    assert payload == {
+        "evidence_type": "real_external",
+        "status": "failed",
+        "error_code": "INVALID_SMOKE_ARGUMENT",
+    }
