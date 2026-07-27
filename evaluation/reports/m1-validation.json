@@ -1,0 +1,191 @@
+{
+  "report_version": "m1-t04-validation.v1",
+  "phase": "M1",
+  "task_id": "M1-T04",
+  "recorded_at_utc": "2026-07-27T12:29:26.733Z",
+  "baseline_commit": "f0f167766589e3321821b0caf7793b00c8ff7291",
+  "implementation_commit_g": "c5fe64e73ab951b3e7437f44c3d4b001d6428ced",
+  "environment": {
+    "python": "3.12.10",
+    "pydantic": "2.13.4",
+    "pytest": "8.4.2",
+    "ruff": "0.16.0",
+    "mypy": "1.20.2"
+  },
+  "validated_inputs": [
+    {
+      "path": "evaluation/reports/m1-t04-red-tests.json",
+      "sha256": "a95dffc688a4e1e488e3d4ebf30755a6fb344916b657553260c5bdbcacdf3d97"
+    },
+    {
+      "path": "tests/fixtures/arxiv/first_round_graph.xml",
+      "sha256": "480a1f1f4a86016ba7571b38229491811deb441fa88d83375d0c38db2b6580c1"
+    },
+    {
+      "path": "tests/fixtures/arxiv/first_round_empty.xml",
+      "sha256": "02bf2fc2be69d1bd6a92bc0f69eba3fed2665a0501bda9e1970a9e9cae3e5d88"
+    },
+    {
+      "path": "app/models/first_round.py",
+      "sha256": "cb72eff4b3a052d878673b87ec28e740b1184164fe2b46f1d3a774bd706eb652"
+    },
+    {
+      "path": "app/core/first_round.py",
+      "sha256": "0dfd2f75295fd59861131efa2d03214fa2da23f715f032ca41c510b286a668a4"
+    },
+    {
+      "path": "app/cli/first_round.py",
+      "sha256": "80ce0652d08aa524267b994b1de5095cf8e65d0c430ea75548c2ec5d3275f0aa"
+    },
+    {
+      "path": "scripts/first_round_retrieval.py",
+      "sha256": "85c6ef55cce8ea155a5d24d36c0758baf1f94134a6f6f39728e7afd8e18de728"
+    },
+    {
+      "path": "tests/contract/test_m1_t04_contracts.py",
+      "sha256": "3ba8547e4725d7000f26c89d9d3302f8b59d90e8020a055b04f2b2cdf160b3d2"
+    },
+    {
+      "path": "tests/integration/test_first_round_pipeline.py",
+      "sha256": "9a9510a87c703dcc3d78e235fd3ce081f6eb810526f1c17c791bb65ae4a7785f"
+    },
+    {
+      "path": "tests/unit/test_first_round_cli.py",
+      "sha256": "729e4b77c8bfa9a294ac34caf58b4f765370fadec647d39824c2f1fcff4d3d67"
+    }
+  ],
+  "automated": {
+    "red_tests": {
+      "classification": "automated",
+      "artifact": "evaluation/reports/m1-t04-red-tests.json",
+      "exit_codes": [1, 1, 1],
+      "summary": "Three pre-implementation collection failures were preserved before their corresponding contracts, orchestration module, and CLI module existed."
+    },
+    "pre_real_gates": [
+      {
+        "command": "py -3.12 -m pytest tests/unit/test_first_round_cli.py tests/integration/test_first_round_pipeline.py tests/contract/test_m1_t04_contracts.py -q",
+        "exit_code": 0,
+        "result": "22 passed",
+        "classification": "automated"
+      },
+      {
+        "command": "py -3.12 -m pytest -q",
+        "exit_code": 124,
+        "result": "Initial tool-bounded invocation timed out after 124 seconds without a test conclusion; it is not counted as a pass or failure of the suite.",
+        "classification": "automated_diagnostic"
+      },
+      {
+        "command": "py -3.12 -m pytest -vv -x --durations=20",
+        "exit_code": 0,
+        "result": "273 passed in 118.27 seconds",
+        "classification": "automated"
+      },
+      {
+        "command": "py -3.12 -m ruff check app evaluation scripts tests",
+        "exit_code": 0,
+        "result": "All checks passed",
+        "classification": "automated"
+      },
+      {
+        "command": "py -3.12 -m mypy app evaluation scripts",
+        "exit_code": 0,
+        "result": "Success: no issues found in 30 source files",
+        "classification": "automated"
+      },
+      {
+        "command": "py -3.12 scripts/validate_project_docs.py",
+        "exit_code": 0,
+        "result": "PASS: project docs are complete; 31 phase tasks are indexed; local links resolve",
+        "classification": "automated"
+      },
+      {
+        "command": "py -3.12 scripts/validate_phase.py M0",
+        "exit_code": 0,
+        "result": "PASS: M0 evidence report, inputs, git ancestry, and status gate are valid",
+        "classification": "automated"
+      },
+      {
+        "command": "py -3.12 -m pip check",
+        "exit_code": 0,
+        "result": "No broken requirements found",
+        "classification": "automated"
+      }
+    ]
+  },
+  "recorded_external": {
+    "classification": "recorded_external",
+    "source": "tests/fixtures/arxiv/first_round_graph.xml and tests/fixtures/arxiv/first_round_empty.xml only; no network transport",
+    "question": "How can graph-based retrieval support scientific literature discovery?",
+    "query_plan_count": 12,
+    "recorded_core_success": {
+      "raw_candidate_count": 3,
+      "deduplicated_candidate_count": 2,
+      "manual_review_count": 0,
+      "source_id_coverage": 1.0,
+      "url_coverage": 1.0,
+      "metadata_hallucination_rate": 0.0,
+      "transport_requests": 12,
+      "cache_hits": 0,
+      "candidate_budget_reached": false
+    },
+    "recorded_cache_replay": {
+      "first_run_transport_requests": "> 0",
+      "second_run_transport_requests": 0,
+      "second_run_cache_hits": 12,
+      "candidate_arrays_byte_equivalent": true
+    },
+    "honest_failure_coverage": [
+      "ARXIV_UNAVAILABLE when every recorded query fails",
+      "INSUFFICIENT_CANDIDATES for empty recorded responses",
+      "DEDUPLICATION_FAILED for conflicting source records",
+      "ARXIV_ATTEMPT_BUDGET_EXHAUSTED before an over-budget adapter call"
+    ],
+    "budgets": {
+      "max_results_per_query": 5,
+      "max_total_candidates": 60,
+      "max_total_attempts": 20,
+      "timeout_seconds": 20.0
+    }
+  },
+  "real_external": {
+    "classification": "not_run",
+    "requested_command": "py -3.12 scripts/first_round_retrieval.py --question \"How can graph-based retrieval support scientific literature discovery?\" --output-dir evaluation/runs/m1-live --mode real --user-agent \"research-retrieval-calibrator/0.1 (M1-T04 validation)\"",
+    "exit_code": 1,
+    "stdout": "{\"error_code\": \"INVALID_CLI_ARGUMENT\", \"failure\": {\"error_code\": \"INVALID_CLI_ARGUMENT\", \"reason\": \"output directory parent must already exist\", \"scope\": \"run\"}, \"status\": \"failed\"}",
+    "network_requests": 0,
+    "query_ids_observed": 0,
+    "attempt_count": 0,
+    "http_statuses": [],
+    "raw_candidate_count": null,
+    "deduplicated_candidate_count": null,
+    "source_id_coverage": null,
+    "url_coverage": null,
+    "metadata_hallucination_rate": null,
+    "cache_state": "not_created",
+    "candidate_budget_state": "not_reached; orchestration was not constructed",
+    "elapsed_seconds": null,
+    "causal_reason": "The required output directory parent evaluation/runs did not exist. Argument validation failed before the real transport was constructed, so no arXiv request or live run occurred. The command was not retried to preserve the one-smoke-command boundary."
+  },
+  "real_cache_replay": {
+    "classification": "not_run",
+    "causal_reason": "No successful real smoke produced a cache to replay; a second external command was prohibited after the bounded smoke command returned nonzero."
+  },
+  "completion_gates": {
+    "all_automated_gates_passed": true,
+    "recorded_source_id_coverage": 1.0,
+    "recorded_url_coverage": 1.0,
+    "recorded_metadata_hallucination_rate": 0.0,
+    "real_live_success": false,
+    "real_cache_replay_success": false,
+    "m1_completion_allowed": false
+  },
+  "status_after_evidence": {
+    "m1": "IN_PROGRESS 3/4",
+    "m2": "BLOCKED_BY_M1",
+    "reason": "The required real arXiv live-success and real cache-replay gates are absent."
+  },
+  "rollback_order": [
+    "git revert <H>",
+    "git revert c5fe64e73ab951b3e7437f44c3d4b001d6428ced"
+  ]
+}
