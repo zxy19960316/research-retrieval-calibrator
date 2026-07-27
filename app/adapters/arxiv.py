@@ -20,8 +20,8 @@ from app.models.query import Query
 
 _ATOM_NAMESPACE = "{http://www.w3.org/2005/Atom}"
 _TRANSIENT_STATUSES = {429, 500, 502, 503, 504}
-_MODERN_ARXIV_ID = re.compile(r"\d{4}\.\d{4,5}(?:v\d+)?$")
-_LEGACY_ARXIV_ID = re.compile(r"[a-z-]+(?:\.[a-z-]+)?/\d{7}(?:v\d+)?$")
+_MODERN_ARXIV_ID = re.compile(r"\d{4}\.\d{4,5}(?:v[1-9]\d*)?$")
+_LEGACY_ARXIV_ID = re.compile(r"[a-z-]+(?:\.[A-Z]{2})?/\d{7}(?:v[1-9]\d*)?$")
 _ARXIV_ID_VERSION = re.compile(r"v\d+$")
 
 

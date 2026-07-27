@@ -199,6 +199,73 @@ def test_validates_new_and_legacy_arxiv_ids() -> None:
     assert [paper.source_id for paper in papers] == ["2401.00001", "hep-ex/0307015"]
 
 
+@pytest.mark.parametrize(
+    ("source_url", "expected_source_id"),
+    [
+        ("https://arxiv.org/abs/math.GT/0309136", "math.GT/0309136"),
+        ("https://arxiv.org/abs/math.GT/0309136v2", "math.GT/0309136"),
+        ("https://arxiv.org/abs/cs.SE/0501001", "cs.SE/0501001"),
+        ("https://arxiv.org/abs/nlin.CD/0101001v1", "nlin.CD/0101001"),
+        ("https://arxiv.org/abs/hep-ex/0307015v1", "hep-ex/0307015"),
+        ("https://arxiv.org/abs/astro-ph/9901001", "astro-ph/9901001"),
+    ],
+)
+def test_accepts_canonical_legacy_arxiv_identifier_forms(
+    source_url: str, expected_source_id: str
+) -> None:
+    body = f'''<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"><entry>
+      <id>{source_url}</id><title>Recorded title</title><summary>Recorded abstract</summary>
+    </entry></feed>'''.encode()
+    adapter, _, _ = _adapter([ArxivResponse(200, body, {})])
+
+    papers = adapter.search(_query(), max_results=1)
+
+    assert [paper.source_id for paper in papers] == [expected_source_id]
+    assert papers[0].retrieval_paths == ["Q1-fixture"]
+
+
+def test_mixed_modern_and_canonical_legacy_atom_page_preserves_order() -> None:
+    body = b'''<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom">
+      <entry><id>https://arxiv.org/abs/2401.00001v2</id><title>Modern</title><summary>Modern</summary></entry>
+      <entry><id>https://arxiv.org/abs/math.GT/0309136</id><title>Math</title><summary>Math</summary></entry>
+      <entry><id>https://arxiv.org/abs/cs.SE/0501001v3</id><title>Computer science</title><summary>Computer science</summary></entry>
+    </feed>'''
+    adapter, _, _ = _adapter([ArxivResponse(200, body, {})])
+
+    papers = adapter.search(_query(), max_results=3)
+
+    assert [paper.source_id for paper in papers] == [
+        "2401.00001",
+        "math.GT/0309136",
+        "cs.SE/0501001",
+    ]
+    assert [paper.retrieval_paths for paper in papers] == [["Q1-fixture"]] * 3
+
+
+@pytest.mark.parametrize(
+    "source_url",
+    [
+        "https://arxiv.org/abs/math.gt/0309136",
+        "https://arxiv.org/abs/math.GT/0309136v0",
+        "https://arxiv.org/abs/cs.S/0501001",
+        "https://arxiv.org/abs/cs.TOOLONG/0501001",
+        "https://arxiv.org/abs/math.GT/030913",
+        "https://arxiv.org/abs/math.GT/03091360",
+        "https://arxiv.org/abs/2401.00001v0",
+    ],
+)
+def test_rejects_noncanonical_legacy_or_zero_version_identifier(source_url: str) -> None:
+    body = f'''<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"><entry>
+      <id>{source_url}</id><title>Recorded title</title><summary>Recorded abstract</summary>
+    </entry></feed>'''.encode()
+    adapter, _, _ = _adapter([ArxivResponse(200, body, {})])
+
+    with pytest.raises(ArxivAdapterError) as raised:
+        adapter.search(_query(), max_results=1)
+
+    assert raised.value.code == "INVALID_ARXIV_ENTRY"
+
+
 @pytest.mark.parametrize("failure", [URLError("temporary DNS failure"), TimeoutError("timeout")])
 def test_transport_failure_retries_through_default_urllib_boundary(
     monkeypatch: pytest.MonkeyPatch, failure: Exception

@@ -127,6 +127,21 @@ class ArxivAdapterConfig(BaseModel):
 
 **Boundaries:** M1-T02R2 does not implement M1-T03/M1-T04, M2-M6, ranking, normalization/deduplication, models, CNKI, platform deployment, or any real-network smoke/connectivity diagnostic. The implementation commit is `fix: bound M1 arXiv search execution`; the follow-on evidence/status commit is `chore: finalize M1-T02 evidence`; rollback is `git revert <evidence>` followed by `git revert <implementation>`.
 
+### M1-T02R3 legacy identifier compatibility
+
+**Goal:** Accept canonical pre-2007 arXiv identifiers with an optional uppercase subject class without weakening the bounded adapter contract.
+
+**Files:** Modify `app/adapters/arxiv.py`, `tests/unit/test_arxiv_adapter.py`, and this plan. The follow-on evidence-only update modifies `evaluation/reports/m1-t02-arxiv-adapter.json` and `STATUS.md`.
+
+**Contract and test cycle:**
+
+- [ ] Add failing parameterized parser tests for `math.GT/0309136`, its `v2` form, `cs.SE/0501001`, `nlin.CD/0101001v1`, and the existing `hep-ex/0307015v1` and `astro-ph/9901001` forms. Each must yield its version-free, case-preserved source ID.
+- [ ] Add an offline mixed Atom feed containing modern `2401.00001v2`, `math.GT/0309136`, and `cs.SE/0501001v3`; verify all three records retain source order, strip only the version suffix, and bind `retrieval_paths` to the current query ID.
+- [ ] Add rejection coverage for lowercase subject classes, `v0`, incomplete/oversized seven-digit sequences, invalid subject widths, and modern `v0`. Every invalid form must remain `INVALID_ARXIV_ENTRY`.
+- [ ] Change only the ID regular expressions to `r"\d{4}\.\d{4,5}(?:v[1-9]\d*)?$"` and `r"[a-z-]+(?:\.[A-Z]{2})?/\d{7}(?:v[1-9]\d*)?$"`. Do not casefold an identifier: the uppercase subject class is canonical data.
+- [ ] Keep total-result and total-attempt budgets, Retry-After scheduling, feed-root validation, transport retry, cache provenance, smoke argument JSON, preserved `real_external` evidence, and `M1 IN_PROGRESS 2/4` unchanged. Do not run a network request.
+- [ ] Commit implementation/tests/plan as `fix: accept canonical legacy arXiv identifiers`; commit evidence/status separately as `chore: refresh merge-ready M1-T02 evidence`. Evidence hashes all 13 inputs from the implementation commit with `git show <H>:<path>`; rollback is `git revert <evidence>` followed by `git revert <implementation>`.
+
 ## Self-Review
 
 - Coverage: HTTP boundary, Atom parsing, pagination, User-Agent, timeout, rate limit, retry/backoff, cache, recorded fixture, automated/recorded/real evidence separation and independent smoke each have a named task and test path.
