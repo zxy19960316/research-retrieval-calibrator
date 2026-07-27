@@ -1,0 +1,142 @@
+{
+  "task_id": "M1-T03",
+  "phase": "M1",
+  "status": "normalization_and_deduplication_complete_pending_m1_t04_live_gate",
+  "main_baseline": "3bb5da48912b43a2cc76ec8dd82ec553c66d549d",
+  "validated_implementation_commit": "64cfbfabcbdac3aec269fec61338b140748359ea",
+  "generated_at_utc": "2026-07-27T06:51:59Z",
+  "python_version": "3.12.10",
+  "red_light": [
+    {
+      "command": "py -3.12 -m pytest tests/unit/test_paper_normalization.py tests/unit/test_paper_dedup.py tests/contract/test_m1_t03_contracts.py -q",
+      "exit_code": 1,
+      "summary": "3 collection errors in 0.23s before implementation: app.core.paper_normalization, app.core.paper_dedup, and app.models.dedup did not exist."
+    }
+  ],
+  "green_light": [
+    {
+      "name": "focused_m1_t03_tests",
+      "command": "py -3.12 -m pytest tests/unit/test_paper_normalization.py tests/unit/test_paper_dedup.py tests/contract/test_m1_t03_contracts.py -q",
+      "exit_code": 0,
+      "summary": "24 passed in 0.16s; all inputs are offline fixtures."
+    },
+    {
+      "name": "full_regression",
+      "command": "py -3.12 -m pytest -q",
+      "exit_code": 0,
+      "summary": "237 passed in 83.38s."
+    },
+    {
+      "name": "ruff",
+      "command": "py -3.12 -m ruff check app evaluation scripts tests",
+      "exit_code": 0,
+      "summary": "All checks passed."
+    },
+    {
+      "name": "mypy",
+      "command": "py -3.12 -m mypy app evaluation scripts",
+      "exit_code": 0,
+      "summary": "Success: no issues found in 25 source files."
+    },
+    {
+      "name": "project_docs_validation",
+      "command": "py -3.12 scripts/validate_project_docs.py",
+      "exit_code": 0,
+      "summary": "PASS: project docs are complete; 31 phase tasks are indexed; local links resolve."
+    },
+    {
+      "name": "m0_historical_validation",
+      "command": "py -3.12 scripts/validate_phase.py M0",
+      "exit_code": 0,
+      "summary": "PASS: M0 evidence report, inputs, git ancestry, and status gate are valid."
+    },
+    {
+      "name": "pip_check",
+      "command": "py -3.12 -m pip check",
+      "exit_code": 0,
+      "summary": "No broken requirements found."
+    }
+  ],
+  "dedup_configuration": {
+    "title_token_jaccard_threshold": 0.92,
+    "title_sequence_ratio_threshold": 0.96,
+    "author_jaccard_threshold": 0.5,
+    "allowed_year_difference": 1,
+    "retrieval_path_order": "lexicographic"
+  },
+  "acceptance_coverage": {
+    "immutable_input_records": "passed: normalized values are derived into NormalizedPaper and tests snapshot every input record before deduplication.",
+    "doi_normalization": "passed: NFKC, trim, casefold, approved prefixes, terminal citation punctuation, and conservative DOI validation; no title, abstract, or URL inference.",
+    "arxiv_normalization": "passed: only PaperRecord.source == arxiv is considered; modern and canonical legacy source IDs remove v1+ only.",
+    "title_author_normalization": "passed: deterministic NFKC/casefold/token-boundary normalization retains Unicode content and preserves author token order without identity inference.",
+    "automatic_merge_tiers": "passed: exact DOI, exact arXiv ID, exact normalized title plus author, and thresholded title/author similarity are separately asserted.",
+    "manual_review_tiers": "passed: cross-language candidates, inadequate author evidence, year conflicts, and contradictory DOI/arXiv identities do not auto-merge.",
+    "canonical_selection": "passed: DOI, source identity, HTTP(S) URL, abstract, author count, year, title detail, then smallest paper_id are deterministic priorities.",
+    "frozen_negative_boundary": "passed: all ten protected negative-pair categories report false_auto_merge_count = 0.",
+    "retrieval_path_preservation": "passed: all fixture input paths are represented in lexicographically sorted unique cluster paths.",
+    "determinism": "passed: reversed input produces the same DeduplicationResult and repeated runs are idempotent."
+  },
+  "fixture_statistics": {
+    "positive": {
+      "input_records": 8,
+      "output_clusters": 4,
+      "auto_merge_count": 4,
+      "manual_review_count": 0,
+      "keep_separate_count": 24,
+      "input_retrieval_path_count": 8,
+      "output_retrieval_path_count": 8,
+      "retrieval_paths_preserved": true
+    },
+    "negative": {
+      "input_records": 20,
+      "output_clusters": 20,
+      "auto_merge_count": 0,
+      "manual_review_count": 10,
+      "keep_separate_count": 180,
+      "false_auto_merge_count": 0,
+      "input_retrieval_path_count": 20,
+      "output_retrieval_path_count": 20,
+      "retrieval_paths_preserved": true
+    },
+    "manual_review": {
+      "input_records": 8,
+      "output_clusters": 8,
+      "auto_merge_count": 0,
+      "manual_review_count": 4,
+      "keep_separate_count": 24,
+      "input_retrieval_path_count": 8,
+      "output_retrieval_path_count": 8,
+      "retrieval_paths_preserved": true
+    }
+  },
+  "input_sha256": {
+    "app/models/dedup.py": "3d011f6e451a4808e7a49dd89526348fe010330b29494a85582808594dc83aa0",
+    "app/core/paper_normalization.py": "542524da5fd9fd3cdc84645d0ac604c702a5e55d353b4740b3c6057de1a6a85f",
+    "app/core/paper_dedup.py": "1164eb129e4790af87a95c4b305aeae7e600d739c8a889071c73248ed38bcc4b",
+    "tests/unit/test_paper_normalization.py": "d0fd663c84b4dcf0262559ebca1d1397ee54dcf57f96fd3ddd5b464ae399adeb",
+    "tests/unit/test_paper_dedup.py": "50e8f142395825d472f6a56fe3b4b97156ba9f3adb5715f462893aa77d0a7f30",
+    "tests/contract/test_m1_t03_contracts.py": "1f5c2bf186a57e97ff2694abb14a74fcb12c8018e137e268095d7c8e15258402",
+    "tests/fixtures/dedup/positive.json": "986e12ad69f7cfbd90968ec28a3773ea8568a0bb29bc61de856e4deffa33c08c",
+    "tests/fixtures/dedup/negative.json": "d11bcd22d624e90f3a0b015318a6243ce11ec29d988812503909cbdd754d804f",
+    "tests/fixtures/dedup/manual_review.json": "28b68ba39112e942340ea14edad41104cce27c6543e19a4ed987103aa21a7dad",
+    "docs/superpowers/plans/2026-07-27-research-retrieval-calibrator-m1-t03.md": "f550436355e13faa3ca5c973bb4a6740ce68f406511eac70b8b0fff759661f0f"
+  },
+  "external_boundaries": [
+    {
+      "name": "real_external",
+      "status": "not_run",
+      "reason": "M1-T03 is deterministic offline normalization and deduplication; the task does not authorize an arXiv smoke request."
+    },
+    {
+      "name": "embedding_or_model",
+      "status": "not_run",
+      "reason": "No embedding, reranker, LLM judgment, or model download is in M1-T03 scope."
+    },
+    {
+      "name": "third_party_metadata_requests",
+      "status": "not_run",
+      "reason": "No Crossref, Semantic Scholar, translation, CNKI, or other network service was called."
+    }
+  ],
+  "scope_note": "M1-T03 implements only offline derived normalization and conservative deduplication. It preserves original records, source identities, metadata, and retrieval paths; it creates no CLI and does not begin M1-T04 or M2. M1-T04 real arXiv live-success acceptance remains unsatisfied."
+}
