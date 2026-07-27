@@ -440,3 +440,31 @@ Expected: the PR is Draft, targets `main`, points to B, and the worktree is clea
 - Cover same DOI with different arXiv IDs, requiring a manual `IDENTITY_CONFLICT`, two stable distinct fallback IDs, and no DOI-derived collision.
 - Cover high-title and shared-author three-record bridges. Each must retain a two-record cluster plus singleton rather than merge all three, and label the blocked edge `TRANSITIVE_BRIDGE_RISK`.
 - Keep `false_auto_merge_count = 0`, add repeated arXiv `paper_id` observations to the positive fixture, and record the additional coalescing, conflict, unique-ID, and bridge statistics in refreshed M1-T03 evidence.
+
+## M1-T03R2 deterministic complete-link closure
+
+**Goal:** Make title/author complete-link clustering independent of pair-processing order while retaining conservative rejection of genuine transitive bridges and deterministic selection of a repeated-observation representative.
+
+**Scope:** Modify `app/core/paper_dedup.py`, `app/models/dedup.py`, focused unit/contract tests, the dedup fixtures when aggregate counts change, this plan, then refresh only `evaluation/reports/m1-t03-normalization-dedup.json` and `STATUS.md` in a separate evidence commit. Do not start M1-T04 or run any real network request.
+
+### Task R2.1: Capture the order-dependent failures
+
+- [ ] Add tests for a three-record exact-title-and-author clique and a three-record high-similarity clique. Each test must assert one three-member cluster, exactly three automatic pair decisions, reverse-input equality, and repeat-run equality.
+- [ ] Retain the existing two-auto-edge/one-rejected-edge bridge tests and assert the blocked candidate remains `manual_review/TRANSITIVE_BRIDGE_RISK` with a 2+1 clustering result.
+- [ ] Add a same-`paper_id` observation test whose title, author casing, and abstract whitespace differ only in normalization-equivalent ways. Assert forward and reverse calls return byte-for-byte equal Pydantic results, the chosen canonical raw record is stable, retrieval paths are sorted/complete, and both inputs are unchanged.
+- [ ] Run the focused suite before implementation and record the expected failures for the two cliques and representative-order test.
+
+### Task R2.2: Precompute base decisions and materialize deterministic clusters
+
+- [ ] In `deduplicate_papers`, normalize all coalesced records and precompute `_classify_pair(left, right, config)` for every stable unique paper-ID pair before any union. Keep the mapping keyed by sorted `(left_paper_id, right_paper_id)` and never rewrite it.
+- [ ] Process exact DOI, exact arXiv, exact normalized title/author, then high-similarity title/author edges. Exact identity edges retain the existing component identity-conflict guard.
+- [ ] For a title/author candidate, inspect every cross-component pair in the immutable base-decision mapping. Union only when all cross pairs are `auto_merge` and none is an identity conflict; otherwise publish a final `manual_review/TRANSITIVE_BRIDGE_RISK` for the candidate edge without changing its base decision.
+- [ ] Emit one final decision per pair in stable pair order. Preserve base decisions for accepted clique edges; use only the bridge downgrade where a candidate edge cannot satisfy complete-link closure.
+- [ ] Select the repeated-observation reference using the lexicographically minimal JSON representation of `record.model_dump(mode="json", exclude={"retrieval_paths"})`, with `ensure_ascii=False`, sorted keys, and compact separators. Keep `_observation_key()` solely as the semantic coalescing eligibility check.
+
+### Task R2.3: Harden result invariants and verify
+
+- [ ] Validate unique cluster member paper IDs in `DedupCluster` and unique, stably sorted pair identifiers in `DeduplicationResult`; retain the existing unique cluster-ID and sorted unique retrieval-path checks.
+- [ ] Add contract tests for these rejected model shapes and focused tests for deterministic decision order.
+- [ ] Run the focused tests, full regression, Ruff, mypy, project-doc validation, historical M0 validation, and `pip check`. Record actual test totals, fixture SHA-256 values, clique/bridge counts, and offline boundaries.
+- [ ] Commit implementation/tests/fixtures/plan as `fix: make M1 complete-link clustering deterministic`; then commit only evidence plus `STATUS.md` as `chore: refresh M1-T03 deterministic evidence`, with the evidence report referencing the first full hash.

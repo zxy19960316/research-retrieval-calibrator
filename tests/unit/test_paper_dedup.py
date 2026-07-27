@@ -8,7 +8,7 @@ from typing import Any, cast
 import pytest
 
 from app.adapters.arxiv import ArxivAdapter, ArxivAdapterConfig, ArxivResponse
-from app.core.paper_dedup import deduplicate_papers
+from app.core.paper_dedup import _representation_key, deduplicate_papers
 from app.models.dedup import DedupReason
 from app.models.enums import QueryBranch, QueryBreadth
 from app.models.paper import PaperRecord
@@ -339,6 +339,85 @@ def test_author_bridge_does_not_transitively_merge_three_records() -> None:
     ]
     assert decisions[("b", "c")].action == "manual_review"
     assert decisions[("b", "c")].reason is DedupReason.TRANSITIVE_BRIDGE_RISK
+
+
+def test_exact_title_author_clique_merges_all_three_records_deterministically() -> None:
+    records = [_paper(paper_id, retrieval_paths=[f"Q-{paper_id}"]) for paper_id in ["a", "b", "c"]]
+
+    forward = deduplicate_papers(records)
+    reverse = deduplicate_papers(list(reversed(records)))
+    repeated = deduplicate_papers(records)
+
+    assert forward == reverse == repeated
+    assert [[record.paper_id for record in cluster.member_records] for cluster in forward.clusters] == [
+        ["a", "b", "c"]
+    ]
+    assert [(decision.action, decision.reason) for decision in forward.decisions] == [
+        ("auto_merge", DedupReason.EXACT_NORMALIZED_TITLE_WITH_AUTHOR),
+        ("auto_merge", DedupReason.EXACT_NORMALIZED_TITLE_WITH_AUTHOR),
+        ("auto_merge", DedupReason.EXACT_NORMALIZED_TITLE_WITH_AUTHOR),
+    ]
+    assert [(decision.left_paper_id, decision.right_paper_id) for decision in forward.decisions] == [
+        ("a", "b"),
+        ("a", "c"),
+        ("b", "c"),
+    ]
+
+
+def test_high_similarity_clique_merges_all_three_records_deterministically() -> None:
+    shared_title = (
+        "deterministic graph based retrieval for comprehensive scientific literature discovery "
+        "evaluation benchmark methodology applications workflows protocols datasets validation "
+        "reproducibility transparency governance systems architecture analysis implementation "
+        "traceability auditability"
+    )
+    records = [
+        _paper("a", title=f"{shared_title} benchmark"),
+        _paper("b", title=f"{shared_title} validation"),
+        _paper("c", title=f"{shared_title} analysis"),
+    ]
+
+    forward = deduplicate_papers(records)
+    reverse = deduplicate_papers(list(reversed(records)))
+    repeated = deduplicate_papers(records)
+
+    assert forward == reverse == repeated
+    assert [[record.paper_id for record in cluster.member_records] for cluster in forward.clusters] == [
+        ["a", "b", "c"]
+    ]
+    assert [(decision.action, decision.reason) for decision in forward.decisions] == [
+        ("auto_merge", DedupReason.HIGH_TITLE_SIMILARITY_WITH_AUTHOR),
+        ("auto_merge", DedupReason.HIGH_TITLE_SIMILARITY_WITH_AUTHOR),
+        ("auto_merge", DedupReason.HIGH_TITLE_SIMILARITY_WITH_AUTHOR),
+    ]
+
+
+def test_normalization_equivalent_observations_choose_a_stable_raw_representative() -> None:
+    first = _paper(
+        "same-paper",
+        title="Graph-Based Retrieval",
+        authors=["ADA AUTHOR"],
+        abstract="Recorded   Abstract",
+        retrieval_paths=["Q-b"],
+    )
+    second = _paper(
+        "same-paper",
+        title="graph based retrieval",
+        authors=["Ada Author"],
+        abstract="recorded abstract",
+        retrieval_paths=["Q-a"],
+    )
+    before = copy.deepcopy([first.model_dump(), second.model_dump()])
+
+    forward = deduplicate_papers([first, second])
+    reverse = deduplicate_papers([second, first])
+
+    assert forward == reverse
+    assert forward.clusters[0].canonical_record.model_dump(
+        exclude={"retrieval_paths"}
+    ) == min([first, second], key=_representation_key).model_dump(exclude={"retrieval_paths"})
+    assert forward.clusters[0].retrieval_paths == ["Q-a", "Q-b"]
+    assert [first.model_dump(), second.model_dump()] == before
 
 
 def test_order_invariance_cluster_identity_and_idempotence() -> None:

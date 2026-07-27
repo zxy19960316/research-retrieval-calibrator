@@ -77,3 +77,34 @@ def test_decision_and_cluster_contracts_forbid_unknown_or_invalid_fields() -> No
         DedupCluster.model_validate({**cluster.model_dump(), "retrieval_paths": ["", "Q1"]})
     with pytest.raises(ValidationError, match="Cluster IDs must be unique"):
         DeduplicationResult(clusters=[cluster, cluster], decisions=[])
+
+
+def test_result_contract_rejects_duplicate_cluster_members_and_pair_decisions() -> None:
+    record = _paper()
+    cluster = DedupCluster(
+        cluster_id="paper:paper-1",
+        canonical_record=record,
+        member_records=[record],
+        retrieval_paths=["Q1"],
+        source_identities=[
+            SourceIdentity(
+                source="arxiv",
+                source_id="2401.00001",
+                url="https://arxiv.org/abs/2401.00001",
+            )
+        ],
+        merge_reasons=[],
+    )
+    decision = DedupDecision(
+        left_paper_id="paper-1",
+        right_paper_id="paper-2",
+        action="keep_separate",
+        reason=DedupReason.INSUFFICIENT_EVIDENCE,
+    )
+
+    with pytest.raises(ValidationError, match="Cluster member paper IDs must be unique"):
+        cluster.model_copy(update={"member_records": [record, record]}).model_validate(
+            cluster.model_copy(update={"member_records": [record, record]}).model_dump()
+        )
+    with pytest.raises(ValidationError, match="Pair decisions must be unique and sorted"):
+        DeduplicationResult(clusters=[cluster], decisions=[decision, decision])

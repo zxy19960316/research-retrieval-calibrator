@@ -106,9 +106,10 @@ class DedupCluster(BaseModel):
 
     @model_validator(mode="after")
     def retain_canonical_record(self) -> DedupCluster:
-        if self.canonical_record.paper_id not in {
-            record.paper_id for record in self.member_records
-        }:
+        member_ids = [record.paper_id for record in self.member_records]
+        if len(member_ids) != len(set(member_ids)):
+            raise ValueError("Cluster member paper IDs must be unique")
+        if self.canonical_record.paper_id not in set(member_ids):
             raise ValueError("Canonical record must be a cluster member")
         return self
 
@@ -126,6 +127,14 @@ class DeduplicationResult(BaseModel):
         cluster_ids = [cluster.cluster_id for cluster in self.clusters]
         if len(cluster_ids) != len(set(cluster_ids)):
             raise ValueError("Cluster IDs must be unique")
+        decision_pairs = [
+            (decision.left_paper_id, decision.right_paper_id) for decision in self.decisions
+        ]
+        if (
+            any(left >= right for left, right in decision_pairs)
+            or decision_pairs != sorted(set(decision_pairs))
+        ):
+            raise ValueError("Pair decisions must be unique and sorted")
         return self
 
 

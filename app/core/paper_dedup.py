@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import json
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from difflib import SequenceMatcher
 from typing import Literal, NamedTuple
 from unicodedata import normalize as unicode_normalize
@@ -38,34 +39,58 @@ def deduplicate_papers(
     ordered = _coalesce_observations(records)
     normalized = {record.paper_id: normalize_paper(record) for record in ordered}
     parent = {record.paper_id: record.paper_id for record in ordered}
-    decisions: list[DedupDecision] = []
+    base_decisions = _base_pair_decisions(ordered, normalized, config)
+    final_decisions = dict(base_decisions)
 
-    for left_index, left_record in enumerate(ordered):
-        for right_record in ordered[left_index + 1 :]:
-            left = normalized[left_record.paper_id]
-            right = normalized[right_record.paper_id]
-            decision = _classify_pair(left, right, config)
-            if decision.action == "auto_merge" and _would_conflict(parent, normalized, left, right):
-                decision = decision.model_copy(
-                    update={"action": "manual_review", "reason": DedupReason.IDENTITY_CONFLICT}
+    for reason in (
+        DedupReason.EXACT_DOI,
+        DedupReason.EXACT_ARXIV_ID,
+        DedupReason.EXACT_NORMALIZED_TITLE_WITH_AUTHOR,
+        DedupReason.HIGH_TITLE_SIMILARITY_WITH_AUTHOR,
+    ):
+        for pair_key, base_decision in base_decisions.items():
+            if base_decision.action != "auto_merge" or base_decision.reason is not reason:
+                continue
+            left = normalized[pair_key[0]]
+            right = normalized[pair_key[1]]
+            if _would_conflict(parent, normalized, left, right):
+                final_decisions[pair_key] = _manual_decision(
+                    base_decision, DedupReason.IDENTITY_CONFLICT
                 )
-            if (
-                decision.action == "auto_merge"
-                and _requires_complete_link(decision)
-                and not _has_complete_auto_merge_link(parent, decisions, left, right)
+                continue
+            if _requires_complete_link(base_decision) and not _has_complete_auto_merge_link(
+                parent, base_decisions, left, right
             ):
-                decision = decision.model_copy(
-                    update={
-                        "action": "manual_review",
-                        "reason": DedupReason.TRANSITIVE_BRIDGE_RISK,
-                    }
+                final_decisions[pair_key] = _manual_decision(
+                    base_decision, DedupReason.TRANSITIVE_BRIDGE_RISK
                 )
-            if decision.action == "auto_merge":
-                _union(parent, left.record.paper_id, right.record.paper_id)
-            decisions.append(decision)
+                continue
+            _union(parent, left.record.paper_id, right.record.paper_id)
+
+    decisions = [final_decisions[pair_key] for pair_key in base_decisions]
 
     clusters = _materialize_clusters(ordered, normalized, parent, decisions)
     return DeduplicationResult(clusters=clusters, decisions=decisions)
+
+
+def _base_pair_decisions(
+    ordered: Sequence[PaperRecord],
+    normalized: Mapping[str, NormalizedPaper],
+    config: DedupConfig,
+) -> dict[tuple[str, str], DedupDecision]:
+    """Classify every stable pair before clustering can affect any decision."""
+
+    return {
+        (left_record.paper_id, right_record.paper_id): _classify_pair(
+            normalized[left_record.paper_id], normalized[right_record.paper_id], config
+        )
+        for left_index, left_record in enumerate(ordered)
+        for right_record in ordered[left_index + 1 :]
+    }
+
+
+def _manual_decision(decision: DedupDecision, reason: DedupReason) -> DedupDecision:
+    return decision.model_copy(update={"action": "manual_review", "reason": reason})
 
 
 def _classify_pair(
@@ -177,13 +202,24 @@ def _coalesce_observations(records: Sequence[PaperRecord]) -> list[PaperRecord]:
     coalesced: list[PaperRecord] = []
     for paper_id in sorted(groups):
         observations = groups[paper_id]
-        reference = observations[0]
+        reference = min(observations, key=_representation_key)
         reference_key = _observation_key(reference)
-        if any(_observation_key(record) != reference_key for record in observations[1:]):
+        if any(_observation_key(record) != reference_key for record in observations):
             raise PaperDeduplicationError("DUPLICATE_PAPER_ID_CONFLICT")
         retrieval_paths = sorted({path for record in observations for path in record.retrieval_paths})
         coalesced.append(reference.model_copy(update={"retrieval_paths": retrieval_paths}, deep=True))
     return coalesced
+
+
+def _representation_key(record: PaperRecord) -> str:
+    """Return a stable raw-record key without paths, which are merged separately."""
+
+    return json.dumps(
+        record.model_dump(mode="json", exclude={"retrieval_paths"}),
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
 
 
 def _observation_key(record: PaperRecord) -> tuple[object, ...]:
@@ -228,7 +264,7 @@ def _requires_complete_link(decision: DedupDecision) -> bool:
 
 def _has_complete_auto_merge_link(
     parent: dict[str, str],
-    decisions: Sequence[DedupDecision],
+    base_decisions: Mapping[tuple[str, str], DedupDecision],
     left: NormalizedPaper,
     right: NormalizedPaper,
 ) -> bool:
@@ -236,10 +272,6 @@ def _has_complete_auto_merge_link(
     right_root = _root(parent, right.record.paper_id)
     if left_root == right_root:
         return True
-    pair_actions = {
-        (decision.left_paper_id, decision.right_paper_id): decision
-        for decision in decisions
-    }
     left_members = sorted(
         paper_id for paper_id in parent if _root(parent, paper_id) == left_root
     )
@@ -251,7 +283,7 @@ def _has_complete_auto_merge_link(
             if {left_id, right_id} == {left.record.paper_id, right.record.paper_id}:
                 continue
             pair_key = (left_id, right_id) if left_id < right_id else (right_id, left_id)
-            decision = pair_actions.get(pair_key)
+            decision = base_decisions.get(pair_key)
             if decision is None or decision.action != "auto_merge":
                 return False
             if decision.reason is DedupReason.IDENTITY_CONFLICT:
