@@ -36,7 +36,7 @@ M0-T01、M0-T02、M0-T03、M0-T03R 与 M0-T04 已完成：领域契约、状态�
 
 ## M1-T03 normalization and deduplication evidence
 
-`evaluation/reports/m1-t03-normalization-dedup.json` records implementation commit `64cfbfabcbdac3aec269fec61338b140748359ea`, a 24-test focused suite, a 237-test full regression, frozen negative fixture `false_auto_merge_count = 0`, complete retrieval-path preservation, input-order invariance, and idempotent reruns. This task is deterministic and offline; no arXiv smoke was run. M1 is `IN_PROGRESS 3/4`; M1-T04 is `NOT_STARTED`, its live-success gate remains unsatisfied, and M2 remains `BLOCKED_BY_M1`.
+`evaluation/reports/m1-t03-normalization-dedup.json` records M1-T03R1 implementation commit `32bad697f626cfc1d1ad73fb697a9e62a36fe74f`, a 34-test focused suite, and a 247-test full regression. It proves recorded adapter-to-dedup integration, same-`paper_id` retrieval-path coalescing, stable `DUPLICATE_PAPER_ID_CONFLICT` failures, globally unique cluster IDs, and title/author transitive-bridge blocks, while retaining frozen negative `false_auto_merge_count = 0`, complete retrieval-path preservation, input-order invariance, and idempotence. This task is deterministic and offline; no arXiv smoke was run. M1 is `IN_PROGRESS 3/4` on this PR branch; M1-T04 is `NOT_STARTED`, its live-success gate remains unsatisfied, M2 remains `BLOCKED_BY_M1`, and main remains M1 `2/4` until PR #8 is merged.
 
 ## M1-T02 arXiv adapter evidence
 
