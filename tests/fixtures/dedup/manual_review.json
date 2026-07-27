@@ -1,0 +1,18 @@
+{
+  "records": [
+    {"paper_id": "cross-zh", "source": "crossref", "source_id": "m1", "title": "图检索研究", "abstract": "Recorded", "authors": ["Ada Author"], "year": 2024, "doi": null, "url": "https://example.test/m1", "language": "zh", "retrieval_paths": ["Q1"]},
+    {"paper_id": "cross-en", "source": "crossref", "source_id": "m2", "title": "Graph retrieval study", "abstract": "Recorded", "authors": ["Ada Author"], "year": 2024, "doi": null, "url": "https://example.test/m2", "language": "en", "retrieval_paths": ["Q2"]},
+    {"paper_id": "no-author-a", "source": "crossref", "source_id": "m3", "title": "Highly Similar Retrieval Study", "abstract": "Recorded", "authors": [], "year": 2024, "doi": null, "url": "https://example.test/m3", "language": "en", "retrieval_paths": ["Q3"]},
+    {"paper_id": "no-author-b", "source": "crossref", "source_id": "m4", "title": "Highly Similar Retrieval Study!", "abstract": "Recorded", "authors": [], "year": 2024, "doi": null, "url": "https://example.test/m4", "language": "en", "retrieval_paths": ["Q4"]},
+    {"paper_id": "identity-a", "source": "arxiv", "source_id": "2401.00021", "title": "Identity Conflict", "abstract": "Recorded", "authors": ["Ben Author"], "year": 2024, "doi": "10.1000/conflict", "url": "https://arxiv.org/abs/2401.00021", "language": "en", "retrieval_paths": ["Q5"]},
+    {"paper_id": "identity-b", "source": "arxiv", "source_id": "2401.00022", "title": "Identity Conflict", "abstract": "Recorded", "authors": ["Ben Author"], "year": 2024, "doi": "10.1000/conflict", "url": "https://arxiv.org/abs/2401.00022", "language": "en", "retrieval_paths": ["Q6"]},
+    {"paper_id": "year-a", "source": "crossref", "source_id": "m7", "title": "Year Conflict Study", "abstract": "Recorded", "authors": ["Cara Author"], "year": 2018, "doi": null, "url": "https://example.test/m7", "language": "en", "retrieval_paths": ["Q7"]},
+    {"paper_id": "year-b", "source": "crossref", "source_id": "m8", "title": "Year Conflict Study", "abstract": "Recorded", "authors": ["Cara Author"], "year": 2024, "doi": null, "url": "https://example.test/m8", "language": "en", "retrieval_paths": ["Q8"]}
+  ],
+  "expected_manual_reviews": [
+    {"pair": ["cross-zh", "cross-en"], "reason": "CROSS_LANGUAGE_POSSIBLE_DUPLICATE"},
+    {"pair": ["no-author-a", "no-author-b"], "reason": "INSUFFICIENT_EVIDENCE"},
+    {"pair": ["identity-a", "identity-b"], "reason": "IDENTITY_CONFLICT"},
+    {"pair": ["year-a", "year-b"], "reason": "INSUFFICIENT_EVIDENCE"}
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "records": [
+    {"paper_id": "arxiv-a", "source": "arxiv", "source_id": "2401.00001v2", "title": "A Retrieved Paper", "abstract": "Recorded", "authors": ["Ada Author"], "year": 2024, "doi": null, "url": "https://arxiv.org/abs/2401.00001v2", "language": "en", "retrieval_paths": ["Q2"]},
+    {"paper_id": "arxiv-b", "source": "arxiv", "source_id": "2401.00001", "title": "A Retrieved Paper", "abstract": "Recorded", "authors": ["Ada Author"], "year": 2024, "doi": null, "url": "https://arxiv.org/abs/2401.00001", "language": "en", "retrieval_paths": ["Q1"]},
+    {"paper_id": "doi-a", "source": "crossref", "source_id": "10.1000/example", "title": "DOI Paper", "abstract": "Recorded", "authors": ["Ben Author"], "year": 2023, "doi": "doi:10.1000/EXAMPLE", "url": "https://example.test/doi-a", "language": "en", "retrieval_paths": ["Q3"]},
+    {"paper_id": "doi-b", "source": "publisher", "source_id": "publisher-42", "title": "A Different Display Title", "abstract": "Recorded", "authors": ["Ben Author"], "year": 2023, "doi": "https://doi.org/10.1000/example", "url": "https://example.test/doi-b", "language": "en", "retrieval_paths": ["Q4", "Q3"]},
+    {"paper_id": "title-a", "source": "crossref", "source_id": "title-a", "title": "Graph-Based Retrieval: A Study", "abstract": "Recorded", "authors": ["Cara Author"], "year": 2024, "doi": null, "url": "https://example.test/title-a", "language": "en", "retrieval_paths": ["Q5"]},
+    {"paper_id": "title-b", "source": "publisher", "source_id": "title-b", "title": " graph based retrieval — a study ", "abstract": "Recorded", "authors": ["Cara Author"], "year": 2025, "doi": null, "url": "https://example.test/title-b", "language": "en", "retrieval_paths": ["Q6"]},
+    {"paper_id": "similar-a", "source": "crossref", "source_id": "similar-a", "title": "Deterministic Graph Based Retrieval for Scientific Literature Discovery and Evaluation Benchmark Studies", "abstract": "Recorded", "authors": ["Dora Author", "Evan Author"], "year": 2024, "doi": null, "url": "https://example.test/similar-a", "language": "en", "retrieval_paths": ["Q7"]},
+    {"paper_id": "similar-b", "source": "publisher", "source_id": "similar-b", "title": "Deterministic Graph Based Retrieval for Scientific Literature Discovery and Evaluation Benchmark Studies Robust", "abstract": "Recorded", "authors": ["Dora Author", "Evan Author", "Faye Author"], "year": 2024, "doi": null, "url": "https://example.test/similar-b", "language": "en", "retrieval_paths": ["Q8"]}
+  ],
+  "expected": {"cluster_count": 4, "auto_merge_count": 4, "manual_review_count": 0, "keep_separate_count": 24}
+}
