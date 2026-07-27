@@ -1,17 +1,23 @@
 {
   "task_id": "M1-T03",
-  "repair_id": "M1-T03R1",
+  "repair_id": "M1-T03R2",
   "phase": "M1",
-  "status": "integration_safe_conservative_clustering_complete_pending_pr_merge_and_m1_t04_live_gate",
+  "status": "deterministic_complete_link_closure_complete_pending_pr_merge_and_m1_t04_live_gate",
   "main_baseline": "3bb5da48912b43a2cc76ec8dd82ec553c66d549d",
-  "validated_implementation_commit": "32bad697f626cfc1d1ad73fb697a9e62a36fe74f",
-  "generated_at_utc": "2026-07-27T10:31:10Z",
-  "python_version": "3.12.10",
+  "validated_implementation_commit": "fa2c9151e34ad4bb06716eebdebe933b5e71a2f8",
+  "generated_at_utc": "2026-07-27T11:10:06Z",
+  "environment": {
+    "python": "3.12.10",
+    "pydantic": "2.13.4",
+    "pytest": "8.4.2",
+    "ruff": "0.16.0",
+    "mypy": "1.20.2"
+  },
   "red_light": [
     {
-      "command": "py -3.12 -m pytest tests/unit/test_paper_dedup.py tests/contract/test_m1_t03_contracts.py -q",
+      "command": "py -3.12 -m pytest tests/unit/test_paper_dedup.py::test_exact_title_author_clique_merges_all_three_records_deterministically tests/unit/test_paper_dedup.py::test_high_similarity_clique_merges_all_three_records_deterministically tests/unit/test_paper_dedup.py::test_normalization_equivalent_observations_choose_a_stable_raw_representative tests/contract/test_m1_t03_contracts.py::test_result_contract_rejects_duplicate_cluster_members_and_pair_decisions -q",
       "exit_code": 1,
-      "summary": "12 failed, 11 passed in 0.36s: duplicate arXiv paper_id observations raised ValueError, DOI/arXiv identity conflicts emitted duplicate DOI cluster IDs, and title/author bridges merged all three records."
+      "summary": "4 failed in 0.25s: both valid three-record cliques materialized as 2+1, normalization-equivalent duplicate observations selected different raw representatives after reversal, and duplicate cluster member IDs were not rejected."
     }
   ],
   "green_light": [
@@ -19,13 +25,13 @@
       "name": "focused_m1_t03_tests",
       "command": "py -3.12 -m pytest tests/unit/test_paper_normalization.py tests/unit/test_paper_dedup.py tests/contract/test_m1_t03_contracts.py -q",
       "exit_code": 0,
-      "summary": "34 passed in 0.19s; all inputs are offline fixtures or recorded Atom responses."
+      "summary": "38 passed in 0.22s; all inputs are offline fixtures or recorded Atom responses."
     },
     {
       "name": "full_regression",
       "command": "py -3.12 -m pytest -q",
       "exit_code": 0,
-      "summary": "247 passed in 84.22s."
+      "summary": "251 passed in 100.58s."
     },
     {
       "name": "ruff",
@@ -59,33 +65,44 @@
     }
   ],
   "dedup_configuration": {
+    "pair_classification": "all unique pairs are classified before any union; base decisions are immutable",
+    "tier_order": [
+      "EXACT_DOI",
+      "EXACT_ARXIV_ID",
+      "EXACT_NORMALIZED_TITLE_WITH_AUTHOR",
+      "HIGH_TITLE_SIMILARITY_WITH_AUTHOR"
+    ],
     "title_token_jaccard_threshold": 0.92,
     "title_sequence_ratio_threshold": 0.96,
     "author_jaccard_threshold": 0.5,
     "allowed_year_difference": 1,
-    "retrieval_path_order": "lexicographic"
+    "retrieval_path_order": "lexicographic",
+    "observation_representative": "minimum JSON model_dump excluding retrieval_paths, with sorted keys and compact separators"
   },
   "acceptance_coverage": {
-    "duplicate_paper_id_retrieval_paths": "passed: same arXiv paper_id observations from recorded adapter queries coalesce into one cluster with Q-direct and Q-method, without input mutation.",
-    "duplicate_paper_id_conflict": "passed: source_id, DOI, title, and URL conflicts fail closed with DUPLICATE_PAPER_ID_CONFLICT.",
-    "unique_cluster_ids": "passed: DeduplicationResult validates uniqueness; DOI/arXiv identity conflicts use stable paper:<minimum-paper-id> fallback IDs.",
-    "transitive_similarity_bridge_block": "passed: high-title and shared-author three-record bridges retain a two-record component plus singleton and downgrade the blocked edge to TRANSITIVE_BRIDGE_RISK.",
-    "adapter_to_dedup_recorded_integration": "passed: real ArxivAdapter parsing against normal.xml fixture feeds directly into deduplicate_papers without manual paper_id changes.",
+    "three_record_exact_title_clique": "passed: three exact normalized title-and-author records have three base auto-merge decisions and materialize as one three-member cluster under forward, reverse, and repeated input.",
+    "three_record_similarity_clique": "passed: three distinct high-similarity titles have three base auto-merge decisions, one three-member cluster, and no TRANSITIVE_BRIDGE_RISK.",
+    "transitive_bridge_rejection": "passed: existing title and author bridge cases retain 2+1 clusters; each blocked candidate is manual_review/TRANSITIVE_BRIDGE_RISK.",
+    "normalized_equivalent_observation_order_invariance": "passed: same-paper_id normalization-equivalent title, author, and abstract variants produce identical forward and reverse results while preserving both retrieval paths and both inputs.",
+    "deterministic_observation_representative": "passed: the canonical raw metadata is the minimum stable representation key, independent of input order; retrieval paths are merged separately.",
+    "duplicate_paper_id_conflict": "passed: conflicting source ID, DOI, title, or URL observations fail closed with DUPLICATE_PAPER_ID_CONFLICT.",
+    "unique_cluster_id": "passed: cluster IDs remain globally unique; member paper IDs and final decision pair IDs are validated as unique and stable.",
     "frozen_negative_boundary": "passed: false_auto_merge_count = 0.",
-    "input_order_invariance": "passed: duplicate observation coalescing and all bridge/identity outcomes are invariant to input reversal.",
-    "input_non_mutation": "passed: tests snapshot original PaperRecord payloads before deduplication."
+    "input_non_mutation": "passed: tests snapshot source PaperRecord payloads before deduplication.",
+    "retrieval_path_preservation": "passed: paths are complete, lexicographically sorted, and unique."
   },
   "fixture_statistics": {
     "positive": {
-      "input_record_count": 8,
-      "coalesced_observation_count": 7,
+      "input_record_count": 14,
+      "coalesced_observation_count": 13,
       "duplicate_paper_id_group_count": 1,
       "duplicate_paper_id_conflict_count": 0,
-      "auto_merge_pair_count": 3,
+      "auto_merge_pair_count": 9,
       "manual_review_pair_count": 0,
-      "keep_separate_pair_count": 18,
-      "output_cluster_count": 4,
-      "unique_cluster_id_count": 4,
+      "keep_separate_pair_count": 69,
+      "output_cluster_count": 6,
+      "unique_cluster_id_count": 6,
+      "complete_link_positive_clique_count": 2,
       "transitive_bridge_block_count": 0,
       "retrieval_paths_preserved": true
     },
@@ -99,7 +116,8 @@
       "keep_separate_pair_count": 180,
       "output_cluster_count": 20,
       "unique_cluster_id_count": 20,
-      "transitive_bridge_block_count": 2,
+      "complete_link_positive_clique_count": 0,
+      "transitive_bridge_block_count": 0,
       "false_auto_merge_count": 0,
       "retrieval_paths_preserved": true
     },
@@ -113,27 +131,33 @@
       "keep_separate_pair_count": 24,
       "output_cluster_count": 8,
       "unique_cluster_id_count": 8,
+      "complete_link_positive_clique_count": 0,
       "transitive_bridge_block_count": 0,
       "retrieval_paths_preserved": true
+    },
+    "focused_acceptance_tests": {
+      "complete_link_positive_clique_count": 2,
+      "transitive_bridge_block_count": 2,
+      "false_auto_merge_count": 0
     }
   },
   "input_sha256": {
-    "app/models/dedup.py": "a6e6143da5f1aad103ccf87354c40ed8281138e918dce7ec3434373d860f9914",
+    "app/models/dedup.py": "ad6e8210fa3856e1027c9d6775769f80cba0797c39ec7c7ecc43beae4bc6a5ea",
     "app/core/paper_normalization.py": "542524da5fd9fd3cdc84645d0ac604c702a5e55d353b4740b3c6057de1a6a85f",
-    "app/core/paper_dedup.py": "67d9ffb4813eb10ea7a64e823451bca33f336c0860d3d8c792623e5c4209ec8b",
+    "app/core/paper_dedup.py": "035abc51e7633ae8355380e2e58a0363c03a9276c0d53e92c1b4998c8fd8df0f",
     "tests/unit/test_paper_normalization.py": "d0fd663c84b4dcf0262559ebca1d1397ee54dcf57f96fd3ddd5b464ae399adeb",
-    "tests/unit/test_paper_dedup.py": "3ff8dfc6dd555db8b1612dedd0f098a45f85e403c2d9fa4c7e2d2300ecf6f7d1",
-    "tests/contract/test_m1_t03_contracts.py": "55e51ffc992a52c817205fbf9d4667bce9c1063c5f810cfb79d7b809ea7aab8a",
-    "tests/fixtures/dedup/positive.json": "048605c4b9727f103616100557db76f3907eee304647e9dc9b8f5712941167ed",
+    "tests/unit/test_paper_dedup.py": "083984cae057359ae322b948ad478af679466f7517cb2be7fd9f8002a0d73b9b",
+    "tests/contract/test_m1_t03_contracts.py": "c8eabb9df3004c8b1ad7c646953a4a85c248b96a4dced9e56212619f2fdcb48a",
+    "tests/fixtures/dedup/positive.json": "23d25f82fdc42565ac9217e20d5bf5a701546f6a4ae3a9407941e5e6b68b767b",
     "tests/fixtures/dedup/negative.json": "d469df641c22d32a01f63ad62dafdd4eb96750bf9ce44b3b0422e75a30b9096c",
     "tests/fixtures/dedup/manual_review.json": "28b68ba39112e942340ea14edad41104cce27c6543e19a4ed987103aa21a7dad",
-    "docs/superpowers/plans/2026-07-27-research-retrieval-calibrator-m1-t03.md": "a20df881f6ab297b57a8f76562ecbd104684f3aeb81e9c947568d248bcee17b2"
+    "docs/superpowers/plans/2026-07-27-research-retrieval-calibrator-m1-t03.md": "999ffd90494e8c78e410cd29a06db8d1bf097eb8035ad600ae31ad10b616de95"
   },
   "external_boundaries": [
     {
       "name": "real_external",
       "status": "not_run",
-      "reason": "M1-T03R1 is deterministic offline normalization and deduplication; this task does not authorize an arXiv smoke request."
+      "reason": "M1-T03R2 is deterministic offline normalization and deduplication; this task does not authorize an arXiv smoke request."
     },
     {
       "name": "embedding_or_model",
@@ -146,5 +170,5 @@
       "reason": "No Crossref, Semantic Scholar, translation, CNKI, or other network service was called."
     }
   ],
-  "scope_note": "M1-T03R1 changes only offline deduplication integration boundaries. M1 remains IN_PROGRESS 3/4 on this PR branch; M1-T04 is not started, its real arXiv live-success gate remains unsatisfied, and main remains M1 2/4 until PR #8 is merged."
+  "scope_note": "M1-T03R2 changes only offline deterministic deduplication. M1 remains IN_PROGRESS 3/4 on this PR branch; M1-T04 is not started, its real arXiv live-success gate remains unsatisfied, and main remains M1 2/4 until PR #8 is merged."
 }
