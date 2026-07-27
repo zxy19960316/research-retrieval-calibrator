@@ -4,19 +4,19 @@
 
 ## 当前门禁
 
-- 当前阶段：`M1`
-- 当前状态：`IN_PROGRESS`
-- 当前入口：`docs/phases/M1-real-first-round-retrieval.md`
-- 允许执行：仅 M1 范围内且从 M1-T02 开始的任务
-- 禁止执行：M2-M6 实现、模型下载、平台部署、CNKI 自动化
+- 当前阶段：`M2`
+- 当前状态：`READY`
+- 当前入口：`docs/phases/M2-ranking-and-round1-selection.md`
+- 允许执行：仅 M2 范围内且从 M2-T01 开始的任务
+- 禁止执行：M3-M6 实现、模型下载、平台部署、CNKI 自动化
 
 ## 阶段状态
 
 | 阶段 | 状态 | 已通过任务 | 阶段证据 |
 |---|---|---:|---|
 | M0 产品与评测契约 | COMPLETE | 4/4 | M0-T01 domain contracts, M0-T02 state-machine guard, M0-T03 evaluation contracts, and M0-T04 evidence gate validated |
-| M1 首轮真实召回 | IN_PROGRESS | 3/4 | M1-T01 意图 IR、澄清问题与四路线查询规划、M1-T02 arXiv adapter contract，以及 M1-T03 确定性标准化和保守去重均已验证 |
-| M2 首轮排序与选择 | BLOCKED_BY_M1 | 0/5 | 尚未生成 |
+| M1 首轮真实召回 | COMPLETE | 4/4 | M1-T01 意图 IR、澄清问题与四路线查询规划、M1-T02 arXiv adapter contract、M1-T03 确定性标准化和保守去重，以及 M1-T04 real arXiv CLI retrieval、缓存回放和证据均已验证 |
+| M2 首轮排序与选择 | READY | 0/5 | M1 已完成；可从 M2-T01 开始 |
 | M3 反馈与第二轮校准 | BLOCKED_BY_M2 | 0/5 | 尚未生成 |
 | M4 十题离线评测 | BLOCKED_BY_M3 | 0/4 | 尚未生成 |
 | M5 OpenAI 兼容服务 | BLOCKED_BY_M4 | 0/4 | 尚未生成 |
@@ -32,7 +32,7 @@
 
 ## 下一动作
 
-M0-T01、M0-T02、M0-T03、M0-T03R 与 M0-T04 已完成：领域契约、状态机、十题评测模板与指标、负向抑制修正，以及机器可读的证据报告和阶段自校验均已通过。M1-T01、M1-T02 与 M1-T03 已完成：意图 IR、澄清问题、严格 LLM fake 边界、四路线三宽度查询规划、bounded arXiv adapter contract，以及离线的确定性标准化和保守去重均已验证。下一动作：`M1-T04`；其 real arXiv live-success gate 仍未满足，且在 M1-T03 PR 最终审查和合并前不开始实现。
+M0-T01、M0-T02、M0-T03、M0-T03R 与 M0-T04 已完成：领域契约、状态机、十题评测模板与指标、负向抑制修正，以及机器可读的证据报告和阶段自校验均已通过。M1-T01 至 M1-T04 已完成：M1-T04 的 12-query real arXiv smoke 返回 12 个 HTTP 200，产生 51 条原始记录和 33 条去重候选，source-ID/URL coverage 均为 100%，metadata hallucination rate 为 0；同配置缓存回放产生 0 次传输、12 次缓存命中且候选一致。下一动作：`M2-T01`；本次变更不开始 M2 实现。
 
 ## M1-T03 normalization and deduplication evidence
 
