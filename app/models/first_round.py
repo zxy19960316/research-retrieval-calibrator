@@ -31,9 +31,17 @@ class FirstRoundConfig(BaseModel):
     max_total_candidates: int = Field(default=60, ge=1, le=60)
     max_total_attempts: int = Field(default=20, ge=1, le=100)
     timeout_seconds: float = Field(default=20.0, gt=0, le=120)
+    min_request_interval_seconds: float = Field(default=3.0, ge=0, le=60)
     cache_dir: Path
     mode: Literal["recorded", "real"]
-    adapter_schema_version: Literal["m1-t04.v1"] = "m1-t04.v1"
+    cache_namespace: str = Field(default="first-round:recorded", min_length=1, max_length=100)
+    adapter_schema_version: Literal["m1-t04.v2"] = "m1-t04.v2"
+
+    @model_validator(mode="after")
+    def require_real_mode_rate_limit(self) -> Self:
+        if self.mode == "real" and self.min_request_interval_seconds < 1.0:
+            raise ValueError("real mode requires min_request_interval_seconds >= 1.0")
+        return self
 
 
 class QueryExecutionResult(BaseModel):
@@ -149,10 +157,16 @@ class RunMetrics(BaseModel):
     source_id_coverage: float = Field(ge=0, le=1)
     url_coverage: float = Field(ge=0, le=1)
     metadata_hallucination_rate: float = Field(ge=0, le=1)
+    metadata_projection_mismatch_count: int = Field(ge=0)
     candidate_budget_reached: bool
     transport_requests: int = Field(ge=0)
     cache_hits: int = Field(ge=0)
     elapsed_seconds: float = Field(ge=0)
+    configured_min_request_interval_seconds: float = Field(ge=0)
+    request_start_offsets_seconds: list[float] = Field(default_factory=list)
+    minimum_observed_request_start_delta_seconds: float | None = Field(default=None, ge=0)
+    rate_limit_wait_count: int = Field(ge=0)
+    rate_limit_wait_seconds: float = Field(ge=0)
 
 
 class FirstRoundRun(BaseModel):

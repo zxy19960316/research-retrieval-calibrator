@@ -12,6 +12,7 @@ import xml.etree.ElementTree as element_tree
 from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
+from itertools import pairwise
 from pathlib import Path
 from typing import NamedTuple, Protocol
 from urllib.error import HTTPError, URLError
@@ -59,6 +60,16 @@ class ArxivRequestObservation(NamedTuple):
     cache_hit: bool = False
 
 
+class ArxivRateLimitObservation(NamedTuple):
+    """Safe aggregate timing facts; request URLs are deliberately excluded."""
+
+    configured_min_request_interval_seconds: float
+    request_start_offsets_seconds: tuple[float, ...]
+    minimum_observed_request_start_delta_seconds: float | None
+    rate_limit_wait_count: int
+    rate_limit_wait_seconds: float
+
+
 class ArxivTransport(Protocol):
     def get(
         self, url: str, *, headers: Mapping[str, str], timeout_seconds: float
@@ -96,6 +107,7 @@ class ArxivAdapterConfig(BaseModel):
     initial_backoff_seconds: float = Field(ge=0, le=60)
     cache_dir: Path | None = None
     cache_schema_version: str = Field(default="m1-t02.v1", min_length=1, max_length=100)
+    cache_namespace: str = Field(default="default", min_length=1, max_length=100)
 
 
 class ArxivAdapter:
@@ -120,11 +132,28 @@ class ArxivAdapter:
         self._remaining_attempts = config.max_total_attempts
         self._search_started_at = 0.0
         self._last_observation = ArxivRequestObservation(0, None, None, False, None, 0.0)
+        self._rate_limit_started_at = monotonic()
+        self._request_start_offsets: list[float] = []
+        self._rate_limit_wait_count = 0
+        self._rate_limit_wait_seconds = 0.0
 
     @property
     def last_observation(self) -> ArxivRequestObservation:
         """Return safe, URL-free facts from the most recent search call."""
         return self._last_observation
+
+    @property
+    def rate_limit_observation(self) -> ArxivRateLimitObservation:
+        """Return non-sensitive cumulative timing facts for this adapter instance."""
+        offsets = tuple(self._request_start_offsets)
+        deltas = [right - left for left, right in pairwise(offsets)]
+        return ArxivRateLimitObservation(
+            configured_min_request_interval_seconds=self._config.min_request_interval_seconds,
+            request_start_offsets_seconds=offsets,
+            minimum_observed_request_start_delta_seconds=min(deltas) if deltas else None,
+            rate_limit_wait_count=self._rate_limit_wait_count,
+            rate_limit_wait_seconds=self._rate_limit_wait_seconds,
+        )
 
     def search_attempt_bound(self, *, max_results: int) -> int:
         """Return the maximum transport attempts one ``search`` call can consume."""
@@ -187,13 +216,19 @@ class ArxivAdapter:
     def _persistent_cache_path(self, query_text: str, max_results: int) -> Path | None:
         if self._config.cache_dir is None:
             return None
-        manifest = {
+        manifest = self._cache_manifest(query_text, max_results)
+        encoded = json.dumps(manifest, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+        namespace = re.sub(r"[^A-Za-z0-9._-]+", "_", self._config.cache_namespace).strip("._")
+        return self._config.cache_dir / (namespace or "default") / f"{hashlib.sha256(encoded.encode('utf-8')).hexdigest()}.json"
+
+    def _cache_manifest(self, query_text: str, max_results: int) -> dict[str, object]:
+        return {
             "adapter_schema_version": self._config.cache_schema_version,
+            "cache_namespace": self._config.cache_namespace,
+            "endpoint": self._config.endpoint,
             "max_results": max_results,
             "query_text": query_text,
         }
-        encoded = json.dumps(manifest, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
-        return self._config.cache_dir / f"{hashlib.sha256(encoded.encode('utf-8')).hexdigest()}.json"
 
     def _load_persistent_cache(self, query_text: str, max_results: int) -> list[PaperRecord] | None:
         path = self._persistent_cache_path(query_text, max_results)
@@ -201,9 +236,14 @@ class ArxivAdapter:
             return None
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
-            if not isinstance(payload, list):
+            if not isinstance(payload, dict) or payload.get("manifest") != self._cache_manifest(
+                query_text, max_results
+            ):
                 return None
-            return [PaperRecord.model_validate(item) for item in payload]
+            records = payload.get("records")
+            if not isinstance(records, list):
+                return None
+            return [PaperRecord.model_validate(item) for item in records]
         except (OSError, ValueError, ValidationError):
             return None
 
@@ -218,7 +258,10 @@ class ArxivAdapter:
             path.parent.mkdir(parents=True, exist_ok=True)
             temporary.write_text(
                 json.dumps(
-                    [paper.model_dump(mode="json") for paper in papers],
+                    {
+                        "manifest": self._cache_manifest(query_text, max_results),
+                        "records": [paper.model_dump(mode="json") for paper in papers],
+                    },
                     ensure_ascii=False,
                     sort_keys=True,
                     separators=(",", ":"),
@@ -239,6 +282,7 @@ class ArxivAdapter:
             if self._remaining_attempts == 0:
                 raise ArxivAdapterError("ARXIV_REQUEST_BUDGET_EXHAUSTED")
             self._wait_for_attempt(retry_not_before)
+            self._request_start_offsets.append(self._monotonic() - self._rate_limit_started_at)
             self._remaining_attempts -= 1
             try:
                 response = self._transport.get(
@@ -274,6 +318,8 @@ class ArxivAdapter:
             return
         delay = max(targets) - self._monotonic()
         if delay > 0:
+            self._rate_limit_wait_count += 1
+            self._rate_limit_wait_seconds += delay
             self._sleeper(delay)
 
     def _record_attempt(self, *, http_status: int | None) -> None:

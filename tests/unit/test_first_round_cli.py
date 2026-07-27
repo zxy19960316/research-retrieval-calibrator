@@ -7,7 +7,13 @@ from pathlib import Path
 
 import pytest
 
-from app.cli.first_round import main
+from app.adapters import arxiv
+from app.cli.first_round import (
+    _adapter_from_arguments,
+    _config_from_arguments,
+    _parse_arguments,
+    main,
+)
 
 QUESTION = "How can graph-based retrieval support scientific literature discovery?"
 
@@ -109,3 +115,14 @@ def test_recorded_cache_replay_has_no_transport_requests_and_preserves_candidate
     assert second["metrics"]["cache_hits"] > 0
     assert all(result["cache_hit"] for result in second["query_results"])
     assert first["candidates"] == second["candidates"]
+
+
+def test_real_cli_uses_the_adapter_default_sleeper_and_a_positive_interval(tmp_path: Path) -> None:
+    arguments = _parse_arguments(
+        ["--question", QUESTION, "--output-dir", str(tmp_path), "--mode", "real"]
+    )
+    config = _config_from_arguments(arguments)
+    adapter = _adapter_from_arguments(arguments, config)
+
+    assert config.min_request_interval_seconds == 3.0
+    assert adapter._sleeper is arxiv.time.sleep

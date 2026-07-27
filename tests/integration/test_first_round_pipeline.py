@@ -9,8 +9,15 @@ from pathlib import Path
 import pytest
 
 from app.adapters.arxiv import ArxivAdapter, ArxivAdapterConfig, ArxivResponse
-from app.core.first_round import run_first_round
-from app.models.first_round import FirstRoundConfig, FirstRoundRun, FirstRoundStatus
+from app.core.first_round import audit_candidate_provenance, run_first_round
+from app.models.dedup import DedupCluster
+from app.models.first_round import (
+    CandidateOutput,
+    FirstRoundConfig,
+    FirstRoundRun,
+    FirstRoundStatus,
+)
+from app.models.paper import PaperRecord
 
 QUESTION = "How can graph-based retrieval support scientific literature discovery?"
 FIXED_NOW = datetime(2026, 7, 27, 12, 0, tzinfo=UTC)
@@ -87,6 +94,29 @@ def _run(adapter: ArxivAdapter, config: FirstRoundConfig) -> FirstRoundRun:
         adapter=adapter,
         now=lambda: FIXED_NOW,
         monotonic=lambda: 100.0,
+    )
+
+
+def _cluster_for_candidate(source: CandidateOutput) -> DedupCluster:
+    record = PaperRecord(
+        paper_id=source.paper_id,
+        source=source.source,
+        source_id=source.source_id,
+        title=source.title,
+        authors=source.authors,
+        year=source.year,
+        doi=source.doi,
+        url=source.url,
+        language="en",
+        retrieval_paths=source.retrieval_paths,
+    )
+    return DedupCluster(
+        cluster_id=source.cluster_id,
+        canonical_record=record,
+        member_records=[record],
+        retrieval_paths=source.retrieval_paths,
+        source_identities=source.member_source_identities,
+        merge_reasons=source.merge_reasons,
     )
 
 
@@ -275,3 +305,32 @@ def test_persistent_cache_replay_has_zero_transport_requests(tmp_path: Path) -> 
     assert second.metrics.cache_hits == len(second.query_results)
     assert not second_transport.calls
     assert first.candidates == second.candidates
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("title", "Altered title"),
+        ("authors", ["Altered Author"]),
+        ("source_id", "9999.99999"),
+        ("url", "https://arxiv.org/abs/9999.99999"),
+        ("year", 2025),
+        ("doi", "10.1000/altered"),
+        ("retrieval_paths", ["Q-altered"]),
+    ],
+)
+def test_metadata_provenance_audit_detects_candidate_mutations(
+    tmp_path: Path, field: str, value: object
+) -> None:
+    adapter, _ = _adapter([_response(("2401.00001", "Graph Retrieval")), *[_response() for _ in range(11)]])
+    run = _run(adapter, _config(tmp_path))
+
+    mutated = run.candidates[0].model_copy(update={field: value})
+    assert audit_candidate_provenance([mutated], [_cluster_for_candidate(run.candidates[0])]) == 1
+
+
+def test_metadata_provenance_audit_accepts_exact_cluster_projection(tmp_path: Path) -> None:
+    adapter, _ = _adapter([_response(("2401.00001", "Graph Retrieval")), *[_response() for _ in range(11)]])
+    run = _run(adapter, _config(tmp_path))
+
+    assert audit_candidate_provenance(run.candidates, [_cluster_for_candidate(run.candidates[0])]) == 0

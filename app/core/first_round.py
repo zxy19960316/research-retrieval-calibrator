@@ -145,6 +145,9 @@ def run_first_round(
         )
 
     candidates = [_candidate_from_cluster(cluster) for cluster in deduplicated.clusters]
+    metadata_projection_mismatch_count = audit_candidate_provenance(
+        candidates, deduplicated.clusters
+    )
     manual_review_count = sum(
         decision.action == "manual_review" for decision in deduplicated.decisions
     )
@@ -172,6 +175,18 @@ def run_first_round(
         query_results=query_results,
         elapsed_seconds=_elapsed(started_monotonic, monotonic()),
         max_total_attempts=config.max_total_attempts,
+        metadata_projection_mismatch_count=metadata_projection_mismatch_count,
+        configured_min_request_interval_seconds=(
+            adapter.rate_limit_observation.configured_min_request_interval_seconds
+        ),
+        request_start_offsets_seconds=list(
+            adapter.rate_limit_observation.request_start_offsets_seconds
+        ),
+        minimum_observed_request_start_delta_seconds=(
+            adapter.rate_limit_observation.minimum_observed_request_start_delta_seconds
+        ),
+        rate_limit_wait_count=adapter.rate_limit_observation.rate_limit_wait_count,
+        rate_limit_wait_seconds=adapter.rate_limit_observation.rate_limit_wait_seconds,
     )
     status = (
         FirstRoundStatus.PARTIAL_SUCCESS
@@ -273,6 +288,33 @@ def _candidate_from_cluster(cluster: DedupCluster) -> CandidateOutput:
     return candidate
 
 
+def audit_candidate_provenance(
+    candidates: list[CandidateOutput], clusters: list[DedupCluster]
+) -> int:
+    """Count visible candidates that differ from their canonical dedup projection."""
+
+    mismatch_count = abs(len(candidates) - len(clusters))
+    for candidate, cluster in zip(candidates, clusters, strict=False):
+        record = cluster.canonical_record
+        projected_values = (
+            candidate.paper_id == record.paper_id,
+            candidate.source == record.source,
+            candidate.source_id == record.source_id,
+            candidate.title == record.title,
+            candidate.authors == record.authors,
+            candidate.year == record.year,
+            candidate.doi == record.doi,
+            candidate.url == record.url,
+            candidate.retrieval_paths == cluster.retrieval_paths,
+            candidate.cluster_id == cluster.cluster_id,
+            candidate.member_source_identities == cluster.source_identities,
+            candidate.merge_reasons == cluster.merge_reasons,
+        )
+        if not all(projected_values):
+            mismatch_count += 1
+    return mismatch_count
+
+
 def _map_arxiv_error(error: ArxivAdapterError) -> str:
     return "ARXIV_PARTIAL_FAILURE" if error.code.startswith("ARXIV_") else "ARXIV_UNAVAILABLE"
 
@@ -329,6 +371,12 @@ def _metrics(
     query_results: list[QueryExecutionResult],
     elapsed_seconds: float,
     max_total_attempts: int,
+    metadata_projection_mismatch_count: int,
+    configured_min_request_interval_seconds: float,
+    request_start_offsets_seconds: list[float],
+    minimum_observed_request_start_delta_seconds: float | None,
+    rate_limit_wait_count: int,
+    rate_limit_wait_seconds: float,
 ) -> RunMetrics:
     candidate_count = len(candidates)
     source_coverage = (
@@ -342,8 +390,9 @@ def _metrics(
         if candidate_count
         else 0.0
     )
-    metadata_hallucination_rate = 0.0
-    assert metadata_hallucination_rate == 0.0
+    metadata_hallucination_rate = (
+        metadata_projection_mismatch_count / candidate_count if candidate_count else 0.0
+    )
     return RunMetrics(
         raw_candidate_count=raw_candidate_count,
         deduplicated_candidate_count=candidate_count,
@@ -351,10 +400,18 @@ def _metrics(
         source_id_coverage=source_coverage,
         url_coverage=url_coverage,
         metadata_hallucination_rate=metadata_hallucination_rate,
+        metadata_projection_mismatch_count=metadata_projection_mismatch_count,
         candidate_budget_reached=candidate_budget_reached,
         transport_requests=_transport_requests(query_results, max_total_attempts),
         cache_hits=sum(result.cache_hit for result in query_results),
         elapsed_seconds=elapsed_seconds,
+        configured_min_request_interval_seconds=configured_min_request_interval_seconds,
+        request_start_offsets_seconds=request_start_offsets_seconds,
+        minimum_observed_request_start_delta_seconds=(
+            minimum_observed_request_start_delta_seconds
+        ),
+        rate_limit_wait_count=rate_limit_wait_count,
+        rate_limit_wait_seconds=rate_limit_wait_seconds,
     )
 
 
@@ -394,10 +451,16 @@ def _failed_run(
             source_id_coverage=0.0,
             url_coverage=0.0,
             metadata_hallucination_rate=0.0,
+            metadata_projection_mismatch_count=0,
             candidate_budget_reached=raw_candidate_count == config.max_total_candidates,
             transport_requests=_transport_requests(results, config.max_total_attempts),
             cache_hits=sum(result.cache_hit for result in results),
             elapsed_seconds=_elapsed(started_monotonic, monotonic()),
+            configured_min_request_interval_seconds=config.min_request_interval_seconds,
+            request_start_offsets_seconds=[],
+            minimum_observed_request_start_delta_seconds=None,
+            rate_limit_wait_count=0,
+            rate_limit_wait_seconds=0.0,
         ),
         failure=FailureReport(error_code=error_code, scope="run"),
         error_code=error_code,

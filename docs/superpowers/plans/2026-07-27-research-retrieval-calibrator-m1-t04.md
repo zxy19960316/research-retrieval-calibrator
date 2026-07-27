@@ -382,3 +382,45 @@ Plan complete and saved to `docs/superpowers/plans/2026-07-27-research-retrieval
 2. **Inline Execution** — Execute tasks in this session using executing-plans, batch execution with checkpoints.
 
 Which approach?
+
+---
+
+## M1-T04R1: provenance-safe live closure
+
+**Goal:** Close the already-implemented M1-T04 path only after a fresh live arXiv run proves rate-limit behaviour, cache-mode isolation, exact metadata provenance, and a machine-validated evidence report.
+
+**Constraints:** Continue on `agent/m1-t04-first-round-cli` / Draft PR #9; do not create a branch or PR, do not begin M2, use `m1-t04.v2`, default real interval `3.0`, permit recorded interval `0.0`, and keep `STATUS.md` plus `evaluation/reports/m1-validation.json` out of the implementation commit.
+
+### Task R1.1: Red tests for rate limiting and cache identity
+
+**Files:** Modify `tests/unit/test_arxiv_adapter.py`, `tests/unit/test_first_round_cli.py`, `tests/integration/test_first_round_pipeline.py`, and `tests/contract/test_m1_t04_contracts.py`.
+
+- [ ] Add fake-clock/fake-transport tests that prove real mode rejects `0.0` (and cannot receive a no-op sleeper), makes the second request wait at least the configured positive interval, and chooses the larger of Retry-After and the interval.
+- [ ] Add tests that use one cache root, equal query/max-results, and fixture then fake-live transports: recorded data must not satisfy the first real request; the second real run must use only the real cache. Add a differing-endpoint cache miss case.
+- [ ] Add candidate mutations for title, authors, source ID, URL, year/DOI, and retrieval paths. Each must be detected by the provenance audit; an unmodified cluster projection must have zero mismatches.
+- [ ] Run `py -3.12 -m pytest tests/unit/test_arxiv_adapter.py tests/unit/test_first_round_cli.py tests/integration/test_first_round_pipeline.py tests/contract/test_m1_t04_contracts.py -q` and preserve the nonzero red result before implementation.
+
+### Task R1.2: Implement mode-safe configuration, request observations, and cache manifests
+
+**Files:** Modify `app/adapters/arxiv.py`, `app/models/first_round.py`, `app/cli/first_round.py`, `app/core/first_round.py`.
+
+- [ ] Add `cache_namespace` to `ArxivAdapterConfig`; include `adapter_schema_version`, namespace, endpoint, query text, and max results in the cache manifest and use the namespace as a directory boundary. Reject a cache payload whose manifest does not exactly match.
+- [ ] Make `FirstRoundConfig` expose `min_request_interval_seconds`, validate `recorded >= 0` and `real >= 1`, and default the CLI to `0.0` for recorded / `3.0` for real unless `--min-request-interval-seconds` is explicitly supplied.
+- [ ] In real mode construct the adapter with its default `time.sleep`; only recorded mode may receive a no-op sleeper. Record request-start offsets, observed minimum start delta, wait count, and wait seconds without recording complete request URLs.
+- [ ] Raise the schema version to `m1-t04.v2`, pass `first-round:recorded` or `first-round:real` from the CLI, and verify that endpoint changes never reuse cache.
+
+### Task R1.3: Replace the hallucination constant with an audit
+
+**Files:** Modify `app/core/first_round.py` and `app/models/first_round.py`; add any focused helper tests to `tests/integration/test_first_round_pipeline.py`.
+
+- [ ] Implement a helper that compares every `CandidateOutput` field to the canonical record and its `DedupCluster`: `paper_id`, source, source ID, title, authors, year, DOI, URL, retrieval paths, cluster ID, source identities, and merge reasons.
+- [ ] Emit `metadata_projection_mismatch_count` and compute `metadata_hallucination_rate = mismatch_candidate_count / candidate_count`; do not set it through a constant or assertion. The normal emitted projection must audit to `0`.
+
+### Task R1.4: Machine-validate evidence, CI, live closure, and separate commits
+
+**Files:** Create `scripts/validate_m1_evidence.py` and `tests/contract/test_m1_evidence_validation.py`; modify `.github/workflows/docs-validation.yml`; then, only after implementation commit, modify `evaluation/reports/m1-validation.json` and `STATUS.md`.
+
+- [ ] The validator must reject old reports and require current-head ancestry for G, I, and K; matching input SHA-256s; all automated exits zero; a successful live run with requests > 0 and zero live-cache hits; zero-request replay with cache hits; equal candidates; non-empty live-derived source-ID/URL samples at coverage 1; audit rate 0; positive rate limit evidence; distinct cache namespaces; and `M1 COMPLETE 4/4` / `M2 READY` in STATUS.
+- [ ] Add `Validate completed M1 evidence` after the retained M0 validator, using `actions/checkout@v4` with `fetch-depth: 0`.
+- [ ] Commit implementation and tests as `fix: harden M1 live provenance and closure gates` (K), without STATUS or `m1-validation.json`; run focused tests, full pytest, Ruff, mypy, docs validation, M0 validation, and pip check.
+- [ ] Run a fresh-cache real smoke for the specified graph-retrieval question, then an identical real-cache replay. Write v3 evidence from the observed output and hashes; only if every validator gate passes, commit exactly STATUS and report as `chore: finalize M1 validated closure evidence` (L).

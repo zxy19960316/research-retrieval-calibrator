@@ -29,6 +29,23 @@ def test_config_rejects_unbounded_or_inconsistent_limits() -> None:
         )
 
 
+def test_real_mode_requires_a_positive_request_interval_but_recorded_can_disable_it() -> None:
+    with pytest.raises(ValidationError):
+        FirstRoundConfig(
+            cache_dir=Path("cache"),
+            mode="real",
+            min_request_interval_seconds=0.0,
+        )
+
+    config = FirstRoundConfig(
+        cache_dir=Path("cache"),
+        mode="recorded",
+        min_request_interval_seconds=0.0,
+    )
+
+    assert config.min_request_interval_seconds == 0.0
+
+
 def test_visible_candidate_requires_source_identity_and_http_url() -> None:
     with pytest.raises(ValidationError):
         CandidateOutput.model_validate({"paper_id": "arxiv:1", "source": "arxiv"})

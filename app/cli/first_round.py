@@ -128,6 +128,7 @@ def _parse_arguments(argv: Sequence[str] | None) -> argparse.Namespace:
     parser.add_argument("--max-results-per-query", type=int, default=5)
     parser.add_argument("--max-total-candidates", type=int, default=60)
     parser.add_argument("--timeout-seconds", type=float, default=20.0)
+    parser.add_argument("--min-request-interval-seconds", type=float)
     parser.add_argument("--cache-dir", type=Path)
     parser.add_argument("--mode", choices=("recorded", "real"), default="recorded")
     arguments = parser.parse_args(argv)
@@ -145,33 +146,38 @@ def _parse_arguments(argv: Sequence[str] | None) -> argparse.Namespace:
 
 def _config_from_arguments(arguments: argparse.Namespace) -> FirstRoundConfig:
     cache_dir = arguments.cache_dir or arguments.output_dir.parent / ".first-round-cache"
+    min_request_interval_seconds = arguments.min_request_interval_seconds
+    if min_request_interval_seconds is None:
+        min_request_interval_seconds = 0.0 if arguments.mode == "recorded" else 3.0
     return FirstRoundConfig(
         max_results_per_query=arguments.max_results_per_query,
         max_total_candidates=arguments.max_total_candidates,
         timeout_seconds=arguments.timeout_seconds,
+        min_request_interval_seconds=min_request_interval_seconds,
         cache_dir=cache_dir,
         mode=arguments.mode,
+        cache_namespace=f"first-round:{arguments.mode}",
     )
 
 
 def _adapter_from_arguments(arguments: argparse.Namespace, config: FirstRoundConfig) -> ArxivAdapter:
     transport = RecordedArxivTransport() if config.mode == "recorded" else UrllibArxivTransport()
-    return ArxivAdapter(
-        ArxivAdapterConfig(
-            user_agent=arguments.user_agent,
-            timeout_seconds=config.timeout_seconds,
-            page_size=config.max_results_per_query,
-            min_request_interval_seconds=0.0,
-            max_attempts=1,
-            max_total_results=config.max_results_per_query,
-            max_total_attempts=config.max_total_attempts,
-            initial_backoff_seconds=0.0,
-            cache_dir=config.cache_dir,
-            cache_schema_version=config.adapter_schema_version,
-        ),
-        transport=transport,
-        sleeper=lambda _: None,
+    adapter_config = ArxivAdapterConfig(
+        user_agent=arguments.user_agent,
+        timeout_seconds=config.timeout_seconds,
+        page_size=config.max_results_per_query,
+        min_request_interval_seconds=config.min_request_interval_seconds,
+        max_attempts=1,
+        max_total_results=config.max_results_per_query,
+        max_total_attempts=config.max_total_attempts,
+        initial_backoff_seconds=0.0,
+        cache_dir=config.cache_dir,
+        cache_schema_version=config.adapter_schema_version,
+        cache_namespace=config.cache_namespace,
     )
+    if config.mode == "recorded":
+        return ArxivAdapter(adapter_config, transport=transport, sleeper=lambda _: None)
+    return ArxivAdapter(adapter_config, transport=transport)
 
 
 def _write_text(path: Path, contents: str) -> None:
