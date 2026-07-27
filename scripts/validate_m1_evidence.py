@@ -41,6 +41,15 @@ def _git(*arguments: str, repository_root: Path) -> subprocess.CompletedProcess[
     )
 
 
+def _git_bytes(*arguments: str, repository_root: Path) -> subprocess.CompletedProcess[bytes]:
+    return subprocess.run(
+        ["git", *arguments],
+        cwd=repository_root,
+        capture_output=True,
+        check=False,
+    )
+
+
 def _safe_path(value: object, repository_root: Path) -> Path | None:
     if not isinstance(value, str):
         return None
@@ -63,10 +72,11 @@ def _is_ancestor(commit: object, repository_root: Path) -> bool:
 
 
 def _blob_sha256(commit: str, path: str, repository_root: Path) -> str | None:
-    shown = _git("show", f"{commit}:{path.replace('\\', '/')}", repository_root=repository_root)
+    git_path = path.replace("\\", "/")
+    shown = _git_bytes("show", f"{commit}:{git_path}", repository_root=repository_root)
     if shown.returncode != 0:
         return None
-    return hashlib.sha256(shown.stdout.encode("utf-8")).hexdigest()
+    return hashlib.sha256(shown.stdout).hexdigest()
 
 
 def _validate_inputs(payload: dict[str, Any], implementation_commit: str, errors: list[str], repository_root: Path) -> None:
