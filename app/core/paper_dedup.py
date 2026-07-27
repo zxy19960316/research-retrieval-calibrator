@@ -6,6 +6,7 @@ from collections import defaultdict
 from collections.abc import Sequence
 from difflib import SequenceMatcher
 from typing import Literal, NamedTuple
+from unicodedata import normalize as unicode_normalize
 
 from app.core.paper_normalization import normalize_paper
 from app.models.dedup import (
@@ -15,6 +16,7 @@ from app.models.dedup import (
     DeduplicationResult,
     DedupReason,
     NormalizedPaper,
+    PaperDeduplicationError,
     SourceIdentity,
 )
 from app.models.paper import PaperRecord
@@ -33,8 +35,7 @@ def deduplicate_papers(
 ) -> DeduplicationResult:
     """Classify every stable pair and cluster only conservatively justified duplicates."""
 
-    ordered = sorted(records, key=lambda record: record.paper_id)
-    _require_unique_paper_ids(ordered)
+    ordered = _coalesce_observations(records)
     normalized = {record.paper_id: normalize_paper(record) for record in ordered}
     parent = {record.paper_id: record.paper_id for record in ordered}
     decisions: list[DedupDecision] = []
@@ -47,6 +48,17 @@ def deduplicate_papers(
             if decision.action == "auto_merge" and _would_conflict(parent, normalized, left, right):
                 decision = decision.model_copy(
                     update={"action": "manual_review", "reason": DedupReason.IDENTITY_CONFLICT}
+                )
+            if (
+                decision.action == "auto_merge"
+                and _requires_complete_link(decision)
+                and not _has_complete_auto_merge_link(parent, decisions, left, right)
+            ):
+                decision = decision.model_copy(
+                    update={
+                        "action": "manual_review",
+                        "reason": DedupReason.TRANSITIVE_BRIDGE_RISK,
+                    }
                 )
             if decision.action == "auto_merge":
                 _union(parent, left.record.paper_id, right.record.paper_id)
@@ -155,10 +167,96 @@ def _year_difference(left: int | None, right: int | None) -> int | None:
     return abs(left - right)
 
 
-def _require_unique_paper_ids(records: Sequence[PaperRecord]) -> None:
-    paper_ids = [record.paper_id for record in records]
-    if len(paper_ids) != len(set(paper_ids)):
-        raise ValueError("Duplicate paper_id values are not supported for deterministic deduplication")
+def _coalesce_observations(records: Sequence[PaperRecord]) -> list[PaperRecord]:
+    """Merge repeated observations only when every non-path field agrees safely."""
+
+    groups: dict[str, list[PaperRecord]] = defaultdict(list)
+    for record in records:
+        groups[record.paper_id].append(record)
+
+    coalesced: list[PaperRecord] = []
+    for paper_id in sorted(groups):
+        observations = groups[paper_id]
+        reference = observations[0]
+        reference_key = _observation_key(reference)
+        if any(_observation_key(record) != reference_key for record in observations[1:]):
+            raise PaperDeduplicationError("DUPLICATE_PAPER_ID_CONFLICT")
+        retrieval_paths = sorted({path for record in observations for path in record.retrieval_paths})
+        coalesced.append(reference.model_copy(update={"retrieval_paths": retrieval_paths}, deep=True))
+    return coalesced
+
+
+def _observation_key(record: PaperRecord) -> tuple[object, ...]:
+    normalized = normalize_paper(record)
+    return (
+        record.paper_id,
+        _normalize_scalar(record.source),
+        _canonical_source_id(record, normalized),
+        normalized.normalized_title,
+        _normalize_scalar(record.abstract),
+        normalized.normalized_authors,
+        record.year,
+        normalized.canonical_doi,
+        _normalize_url(record.url),
+        _normalize_scalar(record.language),
+        record.user_visible,
+    )
+
+
+def _canonical_source_id(record: PaperRecord, normalized: NormalizedPaper) -> str:
+    if normalized.canonical_arxiv_id is not None:
+        return normalized.canonical_arxiv_id
+    return _normalize_url(record.source_id)
+
+
+def _normalize_scalar(value: str | None) -> str | None:
+    if value is None:
+        return None
+    return " ".join(unicode_normalize("NFKC", value).split()).casefold()
+
+
+def _normalize_url(value: str) -> str:
+    return unicode_normalize("NFKC", value).strip()
+
+
+def _requires_complete_link(decision: DedupDecision) -> bool:
+    return decision.reason in {
+        DedupReason.EXACT_NORMALIZED_TITLE_WITH_AUTHOR,
+        DedupReason.HIGH_TITLE_SIMILARITY_WITH_AUTHOR,
+    }
+
+
+def _has_complete_auto_merge_link(
+    parent: dict[str, str],
+    decisions: Sequence[DedupDecision],
+    left: NormalizedPaper,
+    right: NormalizedPaper,
+) -> bool:
+    left_root = _root(parent, left.record.paper_id)
+    right_root = _root(parent, right.record.paper_id)
+    if left_root == right_root:
+        return True
+    pair_actions = {
+        (decision.left_paper_id, decision.right_paper_id): decision
+        for decision in decisions
+    }
+    left_members = sorted(
+        paper_id for paper_id in parent if _root(parent, paper_id) == left_root
+    )
+    right_members = sorted(
+        paper_id for paper_id in parent if _root(parent, paper_id) == right_root
+    )
+    for left_id in left_members:
+        for right_id in right_members:
+            if {left_id, right_id} == {left.record.paper_id, right.record.paper_id}:
+                continue
+            pair_key = (left_id, right_id) if left_id < right_id else (right_id, left_id)
+            decision = pair_actions.get(pair_key)
+            if decision is None or decision.action != "auto_merge":
+                return False
+            if decision.reason is DedupReason.IDENTITY_CONFLICT:
+                return False
+    return True
 
 
 def _root(parent: dict[str, str], paper_id: str) -> str:
@@ -200,6 +298,12 @@ def _materialize_clusters(
     for record in ordered:
         components[_root(parent, record.paper_id)].append(record)
 
+    contested_paper_ids = {
+        paper_id
+        for decision in decisions
+        if decision.reason is DedupReason.IDENTITY_CONFLICT
+        for paper_id in (decision.left_paper_id, decision.right_paper_id)
+    }
     clusters: list[DedupCluster] = []
     for members in components.values():
         members.sort(key=lambda record: record.paper_id)
@@ -213,7 +317,7 @@ def _materialize_clusters(
         canonical = min(members, key=lambda record: _canonical_key(normalized[record.paper_id]))
         clusters.append(
             DedupCluster(
-                cluster_id=_cluster_id(members, normalized),
+                cluster_id=_cluster_id(members, normalized, contested_paper_ids),
                 canonical_record=canonical,
                 member_records=members,
                 retrieval_paths=sorted(
@@ -248,7 +352,13 @@ def _canonical_key(normalized: NormalizedPaper) -> tuple[bool, bool, bool, bool,
     )
 
 
-def _cluster_id(members: Sequence[PaperRecord], normalized: dict[str, NormalizedPaper]) -> str:
+def _cluster_id(
+    members: Sequence[PaperRecord],
+    normalized: dict[str, NormalizedPaper],
+    contested_paper_ids: set[str],
+) -> str:
+    if any(record.paper_id in contested_paper_ids for record in members):
+        return f"paper:{min(record.paper_id for record in members)}"
     dois = sorted(
         value
         for record in members

@@ -422,3 +422,21 @@ Expected: the PR is Draft, targets `main`, points to B, and the worktree is clea
 2. **Placeholder scan:** No task uses TODO/TBD or defers behavior; threshold values, data shapes, commands, expected results, and commit boundaries are concrete.
 3. **Type consistency:** `normalize_paper` returns `NormalizedPaper`; `deduplicate_papers` consumes `Sequence[PaperRecord]` and returns `DeduplicationResult`; its `DedupDecision` and `DedupCluster` use the contracts defined in Task 1.
 
+## M1-T03R1 integration-safe conservative clustering
+
+**Goal:** Repair integration boundaries exposed by repeated arXiv observations without relaxing the M1-T03 conservative false-merge contract.
+
+### Required behavior
+
+1. Before pairwise clustering, deterministically coalesce records with the same `paper_id` only when `paper_id`, source, canonical source ID, normalized title and abstract, normalized authors, year, canonical DOI, URL, language, and `user_visible` agree. The only permitted difference is `retrieval_paths`; emit a deep-copied derived observation with lexicographically sorted unique paths and never mutate either input record.
+2. If a same-`paper_id` group differs on any protected field, fail closed with `PaperDeduplicationError("DUPLICATE_PAPER_ID_CONFLICT")`. Do not choose a record, fill metadata, or silently overwrite a source identity.
+3. `DeduplicationResult` validates globally unique `cluster_id` values. Cluster generation must avoid conflicts: clusters involved in an `IDENTITY_CONFLICT` use `paper:<minimum-paper-id>` instead of a disputed DOI/arXiv identity.
+4. DOI/arXiv exact identity may remain transitive. Before unioning an automatic title/author similarity edge, however, apply a complete-link check: every cross-component pair must already be `auto_merge` and have no identity conflict. Otherwise preserve the existing components and downgrade the candidate edge to `manual_review/TRANSITIVE_BRIDGE_RISK`.
+
+### Acceptance tests and fixtures
+
+- Recorded `ArxivAdapter` output from two query IDs must flow directly into `deduplicate_papers()` as repeated `arxiv:<id>` observations, producing one cluster with both paths, no input mutation, order invariance, and idempotence.
+- Cover duplicate IDs with differing source ID, DOI, title, and URL; only retrieval-path differences may coalesce.
+- Cover same DOI with different arXiv IDs, requiring a manual `IDENTITY_CONFLICT`, two stable distinct fallback IDs, and no DOI-derived collision.
+- Cover high-title and shared-author three-record bridges. Each must retain a two-record cluster plus singleton rather than merge all three, and label the blocked edge `TRANSITIVE_BRIDGE_RISK`.
+- Keep `false_auto_merge_count = 0`, add repeated arXiv `paper_id` observations to the positive fixture, and record the additional coalescing, conflict, unique-ID, and bridge statistics in refreshed M1-T03 evidence.

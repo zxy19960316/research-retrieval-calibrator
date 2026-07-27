@@ -9,5 +9,5 @@
     {"paper_id": "similar-a", "source": "crossref", "source_id": "similar-a", "title": "Deterministic Graph Based Retrieval for Scientific Literature Discovery and Evaluation Benchmark Studies", "abstract": "Recorded", "authors": ["Dora Author", "Evan Author"], "year": 2024, "doi": null, "url": "https://example.test/similar-a", "language": "en", "retrieval_paths": ["Q7"]},
     {"paper_id": "similar-b", "source": "publisher", "source_id": "similar-b", "title": "Deterministic Graph Based Retrieval for Scientific Literature Discovery and Evaluation Benchmark Studies Robust", "abstract": "Recorded", "authors": ["Dora Author", "Evan Author", "Faye Author"], "year": 2024, "doi": null, "url": "https://example.test/similar-b", "language": "en", "retrieval_paths": ["Q8"]}
   ],
-  "expected": {"cluster_count": 4, "auto_merge_count": 3, "manual_review_count": 0, "keep_separate_count": 25}
+  "expected": {"cluster_count": 4, "auto_merge_count": 3, "manual_review_count": 0, "keep_separate_count": 18}
 }

@@ -48,6 +48,15 @@ class DedupReason(str, Enum):
     CROSS_LANGUAGE_POSSIBLE_DUPLICATE = "CROSS_LANGUAGE_POSSIBLE_DUPLICATE"
     INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
     IDENTITY_CONFLICT = "IDENTITY_CONFLICT"
+    TRANSITIVE_BRIDGE_RISK = "TRANSITIVE_BRIDGE_RISK"
+
+
+class PaperDeduplicationError(ValueError):
+    """A stable rejection for incompatible duplicate source observations."""
+
+    def __init__(self, code: str) -> None:
+        self.code = code
+        super().__init__(code)
 
 
 class DedupDecision(BaseModel):
@@ -111,6 +120,13 @@ class DeduplicationResult(BaseModel):
 
     clusters: list[DedupCluster]
     decisions: list[DedupDecision]
+
+    @model_validator(mode="after")
+    def require_unique_cluster_ids(self) -> DeduplicationResult:
+        cluster_ids = [cluster.cluster_id for cluster in self.clusters]
+        if len(cluster_ids) != len(set(cluster_ids)):
+            raise ValueError("Cluster IDs must be unique")
+        return self
 
 
 class DedupConfig(BaseModel):

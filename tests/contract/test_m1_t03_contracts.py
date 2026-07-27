@@ -6,6 +6,7 @@ from pydantic import ValidationError
 from app.models.dedup import (
     DedupCluster,
     DedupDecision,
+    DeduplicationResult,
     DedupReason,
     NormalizedPaper,
     SourceIdentity,
@@ -74,3 +75,5 @@ def test_decision_and_cluster_contracts_forbid_unknown_or_invalid_fields() -> No
         DedupDecision.model_validate({**decision.model_dump(), "unexpected": True})
     with pytest.raises(ValidationError):
         DedupCluster.model_validate({**cluster.model_dump(), "retrieval_paths": ["", "Q1"]})
+    with pytest.raises(ValidationError, match="Cluster IDs must be unique"):
+        DeduplicationResult(clusters=[cluster, cluster], decisions=[])
