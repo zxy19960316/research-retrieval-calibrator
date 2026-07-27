@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Recorded M1-T04 graph retrieval response</title>
+  <entry>
+    <id>https://arxiv.org/abs/2401.00001</id>
+    <title>Graph Retrieval for Scientific Literature Discovery</title>
+    <summary>Recorded source metadata for graph retrieval.</summary>
+    <published>2024-01-01T00:00:00Z</published>
+    <author><name>Ada Author</name></author>
+  </entry>
+  <entry>
+    <id>https://arxiv.org/abs/2401.00002</id>
+    <title>Structured Retrieval for Literature Discovery</title>
+    <summary>Recorded source metadata for structured retrieval.</summary>
+    <published>2024-02-01T00:00:00Z</published>
+    <author><name>Bea Author</name></author>
+  </entry>
+</feed>

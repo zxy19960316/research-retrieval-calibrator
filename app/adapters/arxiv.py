@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
+import os
 import re
 import time
+import uuid
 import xml.etree.ElementTree as element_tree
 from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
+from pathlib import Path
 from typing import NamedTuple, Protocol
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlparse
@@ -51,6 +56,7 @@ class ArxivRequestObservation(NamedTuple):
     retry_after_was_capped: bool
     final_error_code: str | None
     elapsed_seconds: float
+    cache_hit: bool = False
 
 
 class ArxivTransport(Protocol):
@@ -88,6 +94,8 @@ class ArxivAdapterConfig(BaseModel):
     max_total_attempts: int = Field(default=20, ge=1, le=100)
     max_retry_after_seconds: float = Field(default=60.0, ge=0, le=300)
     initial_backoff_seconds: float = Field(ge=0, le=60)
+    cache_dir: Path | None = None
+    cache_schema_version: str = Field(default="m1-t02.v1", min_length=1, max_length=100)
 
 
 class ArxivAdapter:
@@ -118,6 +126,13 @@ class ArxivAdapter:
         """Return safe, URL-free facts from the most recent search call."""
         return self._last_observation
 
+    def search_attempt_bound(self, *, max_results: int) -> int:
+        """Return the maximum transport attempts one ``search`` call can consume."""
+        if max_results < 1 or max_results > self._config.max_total_results:
+            raise ArxivAdapterError("INVALID_ARXIV_MAX_RESULTS")
+        page_count = (max_results + self._config.page_size - 1) // self._config.page_size
+        return min(self._config.max_total_attempts, page_count * self._config.max_attempts)
+
     def search(self, query: Query, *, max_results: int) -> list[PaperRecord]:
         if max_results < 1 or max_results > self._config.max_total_results:
             raise ArxivAdapterError("INVALID_ARXIV_MAX_RESULTS")
@@ -127,7 +142,11 @@ class ArxivAdapter:
         key = (query.query_text, max_results)
         cached = self._cache.get(key)
         if cached is not None:
-            return self._for_query(cached, query.query_id)
+            return self._cached_result(cached, query.query_id)
+        persistent_cached = self._load_persistent_cache(query.query_text, max_results)
+        if persistent_cached is not None:
+            self._cache[key] = [paper.model_copy(deep=True) for paper in persistent_cached]
+            return self._cached_result(persistent_cached, query.query_id)
 
         try:
             papers: list[PaperRecord] = []
@@ -156,8 +175,62 @@ class ArxivAdapter:
             self._set_final_error(error.code)
             raise
         self._cache[key] = [paper.model_copy(deep=True) for paper in papers]
+        self._store_persistent_cache(query.query_text, max_results, papers)
         self._set_elapsed()
         return self._for_query(papers, query.query_id)
+
+    def _cached_result(self, papers: list[PaperRecord], query_id: str) -> list[PaperRecord]:
+        self._last_observation = self._last_observation._replace(cache_hit=True)
+        self._set_elapsed()
+        return self._for_query(papers, query_id)
+
+    def _persistent_cache_path(self, query_text: str, max_results: int) -> Path | None:
+        if self._config.cache_dir is None:
+            return None
+        manifest = {
+            "adapter_schema_version": self._config.cache_schema_version,
+            "max_results": max_results,
+            "query_text": query_text,
+        }
+        encoded = json.dumps(manifest, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+        return self._config.cache_dir / f"{hashlib.sha256(encoded.encode('utf-8')).hexdigest()}.json"
+
+    def _load_persistent_cache(self, query_text: str, max_results: int) -> list[PaperRecord] | None:
+        path = self._persistent_cache_path(query_text, max_results)
+        if path is None:
+            return None
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            if not isinstance(payload, list):
+                return None
+            return [PaperRecord.model_validate(item) for item in payload]
+        except (OSError, ValueError, ValidationError):
+            return None
+
+    def _store_persistent_cache(
+        self, query_text: str, max_results: int, papers: list[PaperRecord]
+    ) -> None:
+        path = self._persistent_cache_path(query_text, max_results)
+        if path is None:
+            return
+        temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            temporary.write_text(
+                json.dumps(
+                    [paper.model_dump(mode="json") for paper in papers],
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ),
+                encoding="utf-8",
+            )
+            os.replace(temporary, path)
+        except OSError:
+            try:
+                temporary.unlink(missing_ok=True)
+            except OSError:
+                pass
 
     def _request(self, search_query: str, *, start: int, max_results: int) -> ArxivResponse:
         url = f"{self._config.endpoint}?{urlencode({'search_query': search_query, 'start': start, 'max_results': max_results})}"
