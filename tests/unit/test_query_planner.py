@@ -9,6 +9,7 @@ from app.models.planning import (
     IntentDraft,
     PlanningError,
     QueryExpansion,
+    RetrievalIntentField,
     TermEvidence,
     TermSource,
 )
@@ -168,3 +169,69 @@ def test_clock_injection_is_reproducible_without_fixed_default_time() -> None:
     assert first.generated_at_utc == second.generated_at_utc == fixed
     assert first.plan_id == second.plan_id == default.plan_id
     assert default.generated_at_utc.year >= 2026
+
+
+def test_exclusions_close_fixed_synonym_and_bridge_paths_with_provenance() -> None:
+    synonym_plan = build_query_plan(
+        "RRC-2026-0001", _frozen_intent(exclusions=["domain adaptation"])
+    )
+    bridge_plan = build_query_plan("RRC-2026-0001", _frozen_intent(exclusions=["transfer"]))
+
+    assert all("domain adaptation" not in query.query_text for query in synonym_plan.queries)
+    assert all('all:"transfer"' not in query.query_text for query in bridge_plan.queries)
+    assert synonym_plan.excluded_term_conflicts[0].positive_source is TermSource.DETERMINISTIC_RULE
+    assert bridge_plan.excluded_term_conflicts[0].positive_source is TermSource.DETERMINISTIC_RULE
+
+
+def test_exclusions_close_design_synonym_and_preserve_exact_matching() -> None:
+    plan = build_query_plan(
+        "RRC-2026-0001",
+        _frozen_intent(exclusions=["optimization", "linear"]),
+        positive_expansions=[
+            QueryExpansion(
+                target_field=RetrievalIntentField.METHOD,
+                term_en="nonlinear",
+                source=TermSource.LLM_FAKE,
+            )
+        ],
+    )
+
+    assert all("optimization" not in query.query_text for query in plan.queries)
+    assert all('all:"linear"' not in query.query_text for query in plan.queries)
+    assert any('all:"nonlinear"' in query.query_text for query in plan.queries)
+
+
+def test_exclusion_mapping_rejects_unmapped_chinese_and_core_conflicts() -> None:
+    with pytest.raises(PlanningError, match="UNMAPPED_RETRIEVAL_TERM"):
+        build_query_plan("RRC-2026-0001", _frozen_intent(exclusions=["未知术语"]))
+
+    with pytest.raises(PlanningError, match="CONTRADICTORY_INTENT"):
+        build_query_plan("RRC-2026-0001", _frozen_intent(exclusions=["迁移学习"]))
+
+
+@pytest.mark.parametrize("target_field", ("accepted_paper_roles", "exclusions"))
+def test_expansion_field_is_restricted_and_exclusions_never_reach_any_query_text(
+    target_field: str,
+) -> None:
+    with pytest.raises(ValueError, match="INVALID_QUERY_PLAN"):
+        QueryExpansion(
+            target_field=target_field,
+            term_en="survey",
+            source=TermSource.LLM_FAKE,
+        )
+
+    plan = build_query_plan(
+        "RRC-2026-0001",
+        _frozen_intent(exclusions=["radiation barrier"]),
+        positive_expansions=[
+            QueryExpansion(
+                target_field=RetrievalIntentField.OBJECT,
+                term_en="radiation barrier",
+                source=TermSource.LLM_FAKE,
+            )
+        ],
+    )
+
+    assert plan.positive_expansions == []
+    assert all("radiation barrier" not in query.query_text for query in plan.queries)
+    assert plan.excluded_term_conflicts[0].positive_source is TermSource.LLM_FAKE

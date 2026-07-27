@@ -1,12 +1,12 @@
 """Pure M1-T01 intent normalisation, clarification, and freeze functions."""
 
 import re
-import unicodedata
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Literal, cast
 
 from app.adapters.llm import LLMProvider, StructuredRequest, validate_llm_candidate
+from app.core.text_normalization import normalise_text
 from app.models.planning import (
     ClarificationQuestion,
     IntentDraft,
@@ -14,6 +14,8 @@ from app.models.planning import (
     IntentGap,
     IntentPreparationResult,
     PlanningError,
+    QueryExpansion,
+    RetrievalIntentField,
     RetrievalTerm,
     TermEvidence,
     TermSource,
@@ -53,7 +55,7 @@ _CJK_PATTERN = re.compile(r"[\u3400-\u9fff]")
 def normalise_term(value: str) -> str:
     """Canonical comparison form required by the M1-T01 exclusion contract."""
 
-    return re.sub(r"\s+", " ", unicodedata.normalize("NFKC", value).strip()).casefold()
+    return normalise_text(value)
 
 
 def build_retrieval_term(
@@ -64,7 +66,7 @@ def build_retrieval_term(
 ) -> RetrievalTerm:
     """Map a required term to English or fail closed without content loss."""
 
-    retrieval_text = original_text
+    retrieval_text = normalise_text(original_text)
     for chinese, english in sorted(_RETRIEVAL_TRANSLATIONS.items(), key=lambda item: -len(item[0])):
         retrieval_text = retrieval_text.replace(chinese, english)
     if _CJK_PATTERN.search(retrieval_text):
@@ -196,6 +198,24 @@ def prepare_intent(
         for field, terms in terms_by_field.items()
         if terms
     }
+    query_expansions: list[QueryExpansion] = []
+    for field, synonyms in candidate.candidate_synonyms.items():
+        if field.value not in {item.value for item in RetrievalIntentField}:
+            raise PlanningError("INVALID_QUERY_PLAN")
+        target_field = RetrievalIntentField(field.value)
+        for synonym in synonyms:
+            mapped = build_retrieval_term(
+                synonym,
+                source=TermSource.LLM_FAKE,
+                target_field=field,
+            )
+            query_expansions.append(
+                QueryExpansion(
+                    target_field=target_field,
+                    term_en=mapped.retrieval_text_en,
+                    source=TermSource.LLM_FAKE,
+                )
+            )
     source_language = cast(Literal["zh", "en", "mixed"], candidate.source_language)
     draft = IntentDraft(
         original_input=request.original_input,
@@ -216,10 +236,12 @@ def prepare_intent(
         return IntentPreparationResult(
             draft=draft,
             retrieval_terms=retrieval_terms,
+            query_expansions=query_expansions,
             clarification_questions=questions,
         )
     return IntentPreparationResult(
         draft=draft,
         retrieval_terms=retrieval_terms,
+        query_expansions=query_expansions,
         research_intent=freeze_research_intent(draft, datetime.now(UTC)),
     )

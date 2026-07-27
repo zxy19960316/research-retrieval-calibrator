@@ -258,7 +258,7 @@ def _report(root: Path) -> dict[str, Any]:
 @pytest.fixture
 def valid_report(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Any, Path, dict[str, Any]]:
     validator = _load_validator()
-    _seed_repository(tmp_path)
+    _seed_repository(tmp_path, final_status=True)
 
     def fake_git(*arguments: str, cwd: Path) -> subprocess.CompletedProcess[str]:
         if arguments[:2] == ("diff", "--name-only"):
@@ -290,11 +290,8 @@ def test_report_schema_is_valid_draft_2020_12() -> None:
     jsonschema.Draft202012Validator.check_schema(schema)
 
 
-def test_valid_pre_transition_and_final_transition_reports_pass(valid_report: tuple[Any, Path, dict[str, Any]]) -> None:
+def test_valid_final_transition_report_passes(valid_report: tuple[Any, Path, dict[str, Any]]) -> None:
     validator, root, payload = valid_report
-    assert _errors(validator, root, payload) == []
-
-    _write(root, "STATUS.md", _status(final=True))
     assert _errors(validator, root, payload) == []
 
 
@@ -411,6 +408,16 @@ def test_historical_m0_validator_allows_legal_m1_t01_in_progress_status(
     _write(root, "STATUS.md", m1_status)
 
     assert _errors(validator, root, payload) == []
+
+
+def test_historical_m0_validator_rejects_live_m0_completion_regression(
+    valid_report: tuple[Any, Path, dict[str, Any]],
+) -> None:
+    validator, root, payload = valid_report
+    regressed = _status(final=True).replace("| M0 phase | COMPLETE | 4/4 |", "| M0 phase | IN_PROGRESS | 3/4 |")
+    _write(root, "STATUS.md", regressed)
+
+    assert "STATUS.md regresses historical M0 completion" in _errors(validator, root, payload)
 
 
 def test_historical_report_uses_validated_commit_blobs_after_later_shared_input_change(

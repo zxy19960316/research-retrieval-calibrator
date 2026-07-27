@@ -133,3 +133,19 @@ def build_query_plan(
 - Coverage: Tasks 1-5 implement all requested validator, preparation, retrieval-term, grammar, expansion, timestamp, evidence, commit, PR, and verification requirements.
 - No placeholders: every task names exact files, interfaces, test targets, red/green commands, and resulting commit.
 - Type consistency: `prepare_intent` consumes `StructuredRequest`/`LLMProvider` and returns `IntentPreparationResult`; `build_query_plan` consumes a frozen intent plus `QueryExpansion` values and returns `QueryPlan`.
+
+---
+
+## M1-T01R2 exclusion and lifecycle closure
+
+**Goal:** Close the remaining deterministic query-planning review gaps without starting M1-T02.
+
+**Files:** `app/core/text_normalization.py`, `app/core/intent.py`, `app/core/query_planner.py`, `app/models/planning.py`, `scripts/validate_phase.py`, the M1 unit/contract tests, and this plan.
+
+- [ ] Add red tests showing that normalized exclusions remove fixed synonyms and bridge terms, do not substring-match `linear` against `nonlinear`, reject unmapped Chinese, and reject exact conflicts with core object/task/method/scope terms.
+- [ ] Centralize NFKC, trim, whitespace collapse, and casefold in a dependency-free normalizer; route retrieval mapping, exclusion comparison, and evidence equality through it.
+- [ ] Build a mapped English exclusion set that retains original audit text and produces provenance-bearing conflicts for deterministic rules, fake-provider synonyms, and original core terms.
+- [ ] Restrict `QueryExpansion` and `candidate_synonyms` to object/task/method/scope; map candidate synonyms to `query_expansions` with `LLM_FAKE` provenance, fail unsupported fields as `INVALID_QUERY_PLAN`, and fail unmapped Chinese as `UNMAPPED_RETRIEVAL_TERM`.
+- [ ] Enforce `m1-t01.v2`, unique query text, exactly one query per branch/breadth, branch-weight equality, supported positive-expansion fields, and exclusion absence in `QueryPlan` model validation.
+- [ ] Add an M0 report gate test proving a live `M0 IN_PROGRESS 3/4` status is rejected after an immutable M0 report exists while legal M1 `0/4` through `4/4` transitions remain valid.
+- [ ] Run the focused red commands first; after implementation run focused tests, full regression, Ruff, mypy, document validation, historical M0 validation, and `pip check` before creating the implementation/evidence commit pair.

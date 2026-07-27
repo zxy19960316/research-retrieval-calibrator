@@ -4,6 +4,8 @@ import pytest
 from pydantic import ValidationError
 
 from app.adapters.llm import validate_llm_candidate
+from app.core.intent import freeze_research_intent
+from app.core.query_planner import build_query_plan
 from app.models.enums import MethodConstraint, QueryBranch, QueryBreadth
 from app.models.planning import (
     ClarificationQuestion,
@@ -12,6 +14,7 @@ from app.models.planning import (
     IntentGap,
     PlanningError,
     QueryPlan,
+    RetrievalIntentField,
     TermEvidence,
     TermSource,
 )
@@ -121,6 +124,58 @@ def test_intent_draft_requires_exact_nonduplicated_evidence_per_term() -> None:
     }
     with pytest.raises(ValidationError):
         IntentDraft.model_validate(payload)
+
+
+def test_intent_evidence_uses_nfkc_for_matching_and_duplicate_detection() -> None:
+    payload = _draft_payload()
+    payload["object_terms"] = ["ＡＢＣ"]
+    payload["field_evidence"] = {
+        **payload["field_evidence"],
+        IntentField.OBJECT: [TermEvidence(term="ABC", source=TermSource.ORIGINAL_INPUT)],
+    }
+    assert IntentDraft.model_validate(payload).object_terms == ["ＡＢＣ"]
+
+    payload["object_terms"] = ["ＡＢＣ", "ABC"]
+    payload["field_evidence"] = {
+        **payload["field_evidence"],
+        IntentField.OBJECT: [
+            TermEvidence(term="ＡＢＣ", source=TermSource.ORIGINAL_INPUT),
+            TermEvidence(term="ABC", source=TermSource.ORIGINAL_INPUT),
+        ],
+    }
+    with pytest.raises(ValidationError):
+        IntentDraft.model_validate(payload)
+
+
+def _complete_intent_for_query_contract() -> object:
+    return freeze_research_intent(IntentDraft.model_validate(_draft_payload()), datetime(2026, 1, 1, tzinfo=UTC))
+
+
+def test_query_plan_enforces_version_text_branch_weights_and_expansion_fields() -> None:
+    plan = build_query_plan("RRC-2026-0001", _complete_intent_for_query_contract())
+    payload = plan.model_dump(mode="python")
+    payload["planning_config_version"] = "m1-t01.v1"
+    with pytest.raises(ValidationError):
+        QueryPlan.model_validate(payload)
+
+    payload = plan.model_dump(mode="python")
+    payload["queries"][1] = payload["queries"][0]
+    with pytest.raises(ValidationError):
+        QueryPlan.model_validate(payload)
+
+    payload = plan.model_dump(mode="python")
+    payload["queries"][0]["weight"] = 0.2
+    with pytest.raises(ValidationError):
+        QueryPlan.model_validate(payload)
+
+    payload = plan.model_dump(mode="python")
+    payload["positive_expansions"] = [
+        {"target_field": "accepted_paper_roles", "term_en": "survey", "source": "llm_fake"}
+    ]
+    with pytest.raises(ValidationError):
+        QueryPlan.model_validate(payload)
+
+    assert RetrievalIntentField.OBJECT.value == "object"
 
     payload = _draft_payload()
     payload["field_evidence"] = {

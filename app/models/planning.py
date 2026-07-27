@@ -7,6 +7,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.core.text_normalization import normalise_text
 from app.models.enums import MethodConstraint, QueryBranch, QueryBreadth
 from app.models.project import ResearchIntent
 from app.models.query import Query
@@ -19,6 +20,15 @@ class IntentField(StrEnum):
     SCOPE = "scope"
     ACCEPTED_PAPER_ROLES = "accepted_paper_roles"
     EXCLUSIONS = "exclusions"
+
+
+class RetrievalIntentField(StrEnum):
+    """The only intent fields that can influence positive retrieval queries."""
+
+    OBJECT = "object"
+    TASK = "task"
+    METHOD = "method"
+    SCOPE = "scope"
 
 
 class TermSource(StrEnum):
@@ -95,9 +105,18 @@ class QueryExpansion(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    target_field: IntentField
+    target_field: RetrievalIntentField
     term_en: str = Field(min_length=1)
     source: TermSource
+
+    @field_validator("target_field", mode="before")
+    @classmethod
+    def validate_target_field(cls, value: object) -> object:
+        allowed = {field.value for field in RetrievalIntentField}
+        observed = value.value if isinstance(value, StrEnum) else value
+        if observed not in allowed:
+            raise ValueError("INVALID_QUERY_PLAN")
+        return value
 
     @field_validator("term_en")
     @classmethod
@@ -157,8 +176,8 @@ class IntentDraft(BaseModel):
             IntentField.EXCLUSIONS: self.exclusions,
         }
         for field, evidence_items in self.field_evidence.items():
-            declared = [_trim_term(term).casefold() for term in terms[field]]
-            evidence = [_trim_term(item.term).casefold() for item in evidence_items]
+            declared = [normalise_text(term) for term in terms[field]]
+            evidence = [normalise_text(item.term) for item in evidence_items]
             if len(declared) != len(set(declared)):
                 raise ValueError("Declared terms must not contain normalized duplicates")
             if len(evidence) != len(set(evidence)) or set(evidence) != set(declared):
@@ -200,6 +219,7 @@ class IntentPreparationResult(BaseModel):
 
     draft: IntentDraft
     retrieval_terms: list[RetrievalTerm]
+    query_expansions: list[QueryExpansion] = Field(default_factory=list)
     clarification_questions: list[ClarificationQuestion] = Field(default_factory=list)
     research_intent: ResearchIntent | None = None
 
@@ -247,6 +267,8 @@ class QueryPlan(BaseModel):
     def validate_first_round_structure(self) -> "QueryPlan":
         if self.round_number != 1:
             raise ValueError("M1-T01 QueryPlan round_number must be 1")
+        if self.planning_config_version != "m1-t01.v2":
+            raise ValueError("QueryPlan must use planning_config_version m1-t01.v2")
         if set(self.branch_weights) != set(QueryBranch):
             raise ValueError("QueryPlan must declare all four branch weights")
         if any(weight <= 0 for weight in self.branch_weights.values()):
@@ -257,6 +279,8 @@ class QueryPlan(BaseModel):
             raise ValueError("QueryPlan must contain exactly 12 queries")
         if len({query.query_id for query in self.queries}) != 12:
             raise ValueError("QueryPlan query IDs must be unique")
+        if len({query.query_text for query in self.queries}) != 12:
+            raise ValueError("QueryPlan query text must be unique")
         if any(
             query.round_number != 1
             or query.language != "en"
@@ -268,7 +292,17 @@ class QueryPlan(BaseModel):
         if not isclose(sum(query.weight for query in self.queries), 1.0, abs_tol=1e-9):
             raise ValueError("QueryPlan query weights must sum to 1")
         for branch in QueryBranch:
-            breadths = {query.breadth for query in self.queries if query.branch is branch}
-            if breadths != set(QueryBreadth):
+            branch_queries = [query for query in self.queries if query.branch is branch]
+            breadths = {query.breadth for query in branch_queries}
+            if len(branch_queries) != 3 or breadths != set(QueryBreadth):
                 raise ValueError("Each branch must contain all three query breadths")
+            if not all(
+                isclose(query.weight, self.branch_weights[branch] / 3, abs_tol=1e-9)
+                for query in branch_queries
+            ):
+                raise ValueError("Each branch query weight must equal one third of its branch weight")
+        exclusion_clauses = {f'all:"{normalise_text(term)}"' for term in self.exclusions}
+        query_texts = [normalise_text(query.query_text) for query in self.queries]
+        if any(clause in text for clause in exclusion_clauses for text in query_texts):
+            raise ValueError("QueryPlan query text must not include a canonical exclusion clause")
         return self

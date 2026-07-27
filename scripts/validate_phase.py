@@ -330,11 +330,9 @@ def _validate_status(payload: dict[str, Any], repo_root: Path, errors: list[str]
     if status is None:
         errors.append("STATUS.md cannot be parsed for M0 gate")
         return
-    if status["m0_status"] not in {"IN_PROGRESS", "COMPLETE"}:
-        errors.append("STATUS.md has an invalid M0 historical state")
-        return
-    if status["m0_status"] == "COMPLETE" and status["m0_tasks"] != "4/4":
+    if status["m0_status"] != "COMPLETE" or status["m0_tasks"] != "4/4":
         errors.append("STATUS.md regresses historical M0 completion")
+        return
     phase_statuses = {
         "M0": status["m0_status"],
         "M1": status["m1_status"],

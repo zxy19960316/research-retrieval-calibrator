@@ -10,7 +10,14 @@ from app.core.intent import (
     prepare_intent,
 )
 from app.models.enums import MethodConstraint
-from app.models.planning import IntentDraft, IntentField, PlanningError, TermEvidence, TermSource
+from app.models.planning import (
+    IntentDraft,
+    IntentField,
+    PlanningError,
+    RetrievalIntentField,
+    TermEvidence,
+    TermSource,
+)
 
 
 def _draft(**overrides: object) -> IntentDraft:
@@ -202,4 +209,39 @@ def test_prepare_intent_rejects_invalid_fake_output_without_repair() -> None:
         prepare_intent(
             StructuredRequest(original_input="Find shielding.", target_fields=tuple(IntentField)),
             provider,
+        )
+
+
+def test_candidate_synonyms_become_mapped_query_expansions_with_llm_provenance() -> None:
+    candidate = _complete_candidate()
+    candidate["candidate_synonyms"] = {
+        "method": ["domain adaptation"],
+        "object": ["radiation barrier"],
+    }
+    result = prepare_intent(
+        StructuredRequest(original_input="Find shielding methods.", target_fields=tuple(IntentField)),
+        _FakeProvider(candidate),
+    )
+
+    assert {(item.target_field, item.term_en, item.source) for item in result.query_expansions} == {
+        (RetrievalIntentField.METHOD, "domain adaptation", TermSource.LLM_FAKE),
+        (RetrievalIntentField.OBJECT, "radiation barrier", TermSource.LLM_FAKE),
+    }
+
+
+def test_candidate_synonyms_reject_unsupported_fields_and_unmapped_chinese() -> None:
+    unsupported = _complete_candidate()
+    unsupported["candidate_synonyms"] = {"exclusions": ["survey"]}
+    with pytest.raises(PlanningError, match="INVALID_QUERY_PLAN"):
+        prepare_intent(
+            StructuredRequest(original_input="Find shielding methods.", target_fields=tuple(IntentField)),
+            _FakeProvider(unsupported),
+        )
+
+    unmapped = _complete_candidate()
+    unmapped["candidate_synonyms"] = {"method": ["未知术语"]}
+    with pytest.raises(PlanningError, match="UNMAPPED_RETRIEVAL_TERM"):
+        prepare_intent(
+            StructuredRequest(original_input="Find shielding methods.", target_fields=tuple(IntentField)),
+            _FakeProvider(unmapped),
         )
