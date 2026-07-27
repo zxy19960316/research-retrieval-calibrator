@@ -1,20 +1,16 @@
 {
   "task_id": "M1-T02",
+  "repair_id": "M1-T02R",
   "phase": "M1",
   "status": "in_progress_external_validation",
-  "validated_implementation_commit": "15a55a08670fd799176f74dde2e2186094abec1d",
-  "generated_at_utc": "2026-07-27T03:24:23Z",
+  "validated_implementation_commit": "2e00101351ba5787fe959d13fa170a6d9d7b0bd1",
+  "generated_at_utc": "2026-07-27T03:54:23Z",
   "python_version": "3.12.10",
   "red_light": [
     {
       "command": "py -3.12 -m pytest tests/unit/test_arxiv_adapter.py -q",
       "exit_code": 1,
-      "summary": "Collection failed before implementation: app.adapters.arxiv did not exist."
-    },
-    {
-      "command": "py -3.12 scripts/arxiv_smoke.py --query 'all:\"radiation shielding\"' --max-results 1",
-      "exit_code": 1,
-      "summary": "First independent smoke invocation failed before network access because scripts/ was not able to import the repository app package; fixed in a separate implementation commit."
+      "summary": "5 passed, 12 failed before the M1-T02R implementation: error Atom was accepted as a paper; source identity accepted invalid URLs and truncated legacy IDs; urllib transport did not retry; every-attempt scheduling and Retry-After were absent; cache provenance was retained from the first query."
     }
   ],
   "green_light": [
@@ -22,13 +18,13 @@
       "name": "adapter_unit_tests",
       "command": "py -3.12 -m pytest tests/unit/test_arxiv_adapter.py -q",
       "exit_code": 0,
-      "summary": "5 passed; recorded Atom parsing, empty feed, pagination start/max_results, User-Agent, timeout, cache, deduplication, 429 retry/backoff, rate wait, malformed Atom, and non-transient failures run without network access."
+      "summary": "18 passed in 0.16s; all tests are offline. Covers error Atom rejection, source identities, real urllib exception translation/retry, bounded failures, every-attempt interval, Retry-After, pagination, cache provenance and defensive copying."
     },
     {
       "name": "full_regression",
       "command": "py -3.12 -m pytest -q",
       "exit_code": 0,
-      "summary": "171 passed in 107.33s"
+      "summary": "184 passed in 103.07s"
     },
     {
       "name": "ruff",
@@ -61,31 +57,49 @@
       "summary": "No broken requirements found"
     }
   ],
+  "non_accepted_execution": [
+    {
+      "command": "py -3.12 -m pytest tests/unit/test_arxiv_adapter.py -q; py -3.12 -m pytest -q; py -3.12 -m ruff check app evaluation scripts tests; py -3.12 -m mypy app evaluation scripts; py -3.12 scripts/validate_project_docs.py; py -3.12 scripts/validate_phase.py M0; py -3.12 -m pip check",
+      "exit_code": 124,
+      "summary": "The combined verification command exceeded the 124-second tool limit without a final test summary; it was not accepted as a pass. Each command was then rerun separately, including the accepted full regression above."
+    }
+  ],
   "input_sha256": {
-    "app/adapters/__init__.py": "9feed06d9bff1666552336e3f3f68223a042f9dd1e2c4ac6fa96ae5b9032e0fb",
-    "app/adapters/arxiv.py": "1038fd660e03e6c06b6eb35892fac575f72ebdb61d007214f672a23535a909e3",
-    "docs/superpowers/plans/2026-07-27-research-retrieval-calibrator-m1-t02.md": "0be3555ef478e0a0f2d5ed81f92e2fa2c7d3282681a67645774829e5ff682927",
-    "scripts/arxiv_smoke.py": "e9b5ca3a5f969a4e7318bacfbee7affd5c75a18d503aedd817d09fd359bcb8dd",
-    "tests/fixtures/arxiv/empty.xml": "8894e851c71b6842655b4540fb7837ce69fc123f8291ad0dd97e69aa6adef8d6",
-    "tests/fixtures/arxiv/malformed.xml": "03caebe43e1d4db1c893efc3d8a543cb31951f4484b2bc83726abe1880f2af33",
-    "tests/fixtures/arxiv/normal.xml": "b66b5a86e983ad2ddd1cb9a814be48523dc565620f440bf805f52aeea337e227",
-    "tests/unit/test_arxiv_adapter.py": "325dc2e491db537f224a1ccde80bab1df05a4fa26cc2a162381e50927d67d9f8"
+    "app/adapters/arxiv.py": "4911363ea7e8fd51173ba35ed6f64e4af9bfb3c568f6bfe07e9b18240a651b35",
+    "docs/superpowers/plans/2026-07-27-research-retrieval-calibrator-m1-t02.md": "520de67cc63f30c82b914d32d3dbce7f5585705c38c7f33d05252e21a321df73",
+    "scripts/arxiv_smoke.py": "38510e6ea0f990feeea5677c93299634e6892c28b681cd14c26a6c047d306128",
+    "tests/fixtures/arxiv/error.xml": "e877049d2efbc6a4b5c73fe9f9310c7bd5bfddfe4412aa5c073287d4b08ebf4c",
+    "tests/unit/test_arxiv_adapter.py": "01a35399d40b53ff670b3ee982e7605e47dfe0ab6088a5f273e9a4d3e60c47de"
   },
   "external_evidence": [
     {
-      "name": "recorded_atom_fixture",
+      "name": "recorded_atom_fixtures",
       "evidence_type": "recorded_external",
       "status": "passed",
-      "reason": "Recorded normal, empty, and malformed Atom responses cover deterministic parser and protocol behavior without a socket."
+      "reason": "Recorded normal, empty, malformed and arXiv error Atom responses cover deterministic parser and protocol behavior without a socket."
     },
     {
       "name": "arxiv_real_network_smoke",
       "evidence_type": "real_external",
       "status": "failed",
-      "observed_at_utc": "2026-07-27T03:22:34.929647Z",
+      "observed_at_utc": "2026-07-27T03:53:27.144186Z",
       "query": "all:radiation shielding",
-      "reason": "Adapter smoke exhausted bounded transport attempts and returned ARXIV_TRANSPORT_ERROR. A read-only curl diagnosis immediately afterward reached export.arxiv.org but received HTTP 429, indicating environment/external rate limiting rather than recorded-fixture success."
+      "adapter_observation": {
+        "attempt_count": 3,
+        "http_status": null,
+        "error_code": "ARXIV_TRANSPORT_ERROR",
+        "retry_after_seconds": null,
+        "elapsed_seconds": 51.954
+      },
+      "reason": "The one bounded smoke exhausted its configured transport attempts. It did not return a confirmed source record or an HTTP response."
+    },
+    {
+      "name": "connectivity_diagnostic",
+      "evidence_type": "not_run",
+      "status": "not_run",
+      "reason": "No additional network diagnostic was run after the one permitted smoke request, so the external-call boundary was preserved."
     }
   ],
-  "scope_note": "M1-T02 implements only the arXiv HTTP/Atom adapter boundary. M1-T03 normalization/deduplication, M1-T04 CLI orchestration, M2 ranking, real-model work, CNKI automation, and platform deployment are not implemented. The real-network smoke was executed and failed, so M1-T02 is not marked complete and M1 remains IN_PROGRESS 1/4."
+  "causal_link": "not_established",
+  "scope_note": "M1-T02R hardens only the arXiv transport and Atom adapter boundary. The live-success acceptance condition remains unsatisfied after the recorded transport failure, so M1 remains IN_PROGRESS 1/4 and M1-T03/M1-T04 are not started. M1-T03 normalization/deduplication, M1-T04 CLI orchestration, M2 ranking, real-model work, CNKI automation and platform deployment are not implemented."
 }

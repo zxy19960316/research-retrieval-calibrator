@@ -36,7 +36,7 @@ M0-T01、M0-T02、M0-T03、M0-T03R 与 M0-T04 已完成：领域契约、状态�
 
 ## M1-T02 arXiv adapter evidence
 
-M1-T02 now has an implemented deterministic arXiv adapter with an explicit HTTP boundary, Atom parsing, start/max_results pagination, configured User-Agent and timeout, request rate limiting, bounded exponential retry, successful-search cache, and recorded normal/empty/malformed Atom fixtures. Offline adapter and full regression checks passed. The independent real arXiv smoke was executed but failed with `ARXIV_TRANSPORT_ERROR`; a direct connectivity diagnostic reached the API and received HTTP 429. This is recorded as failed `real_external` evidence, not replaced by fixture evidence. M1 remains `IN_PROGRESS 1/4`; M1-T02 must continue until a successful independent real-network smoke is recorded, and M1-T03/M1-T04 are not started.
+M1-T02R hardens the deterministic arXiv adapter with an explicit urllib transport boundary, Atom error-feed detection, strict modern/legacy source identity validation, start/max_results pagination, configured User-Agent and timeout, every-attempt request scheduling, Retry-After handling, and query-independent cached metadata with defensively rebuilt retrieval provenance. The 18 offline adapter tests and 184-test full regression passed. The one independent real arXiv smoke on 2026-07-27 exhausted three transport attempts and returned `ARXIV_TRANSPORT_ERROR` without an HTTP status; no additional connectivity diagnostic was run, so no causal link is claimed. This failed `real_external` evidence is not replaced by fixture evidence. M1 remains `IN_PROGRESS 1/4`; M1-T02 must continue until a successful independent real-network smoke is recorded, and M1-T03/M1-T04 are not started.
 
 ## M1-T01R3 repair evidence
 
