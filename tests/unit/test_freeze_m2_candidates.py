@@ -27,6 +27,7 @@ def test_pure_validator_accepts_only_matching_real_33_candidate_payload() -> Non
         raw_output,
         expected_output_sha256=hashlib.sha256(raw_output).hexdigest(),
         expected_candidate_array_sha256=_canonical_json_sha256(payload["candidates"]),
+        expected_candidate_count=33,
     ) is None
 
     non_real = _synthetic_m1_json(mode="recorded")
@@ -34,7 +35,26 @@ def test_pure_validator_accepts_only_matching_real_33_candidate_payload() -> Non
         non_real,
         expected_output_sha256=hashlib.sha256(non_real).hexdigest(),
         expected_candidate_array_sha256=_canonical_json_sha256(json.loads(non_real)["candidates"]),
+        expected_candidate_count=33,
     ) == "M1 output is not from real mode"
+
+
+def test_pure_validator_rejects_old_hash_and_malformed_expected_values() -> None:
+    raw_output = _synthetic_m1_json()
+    candidates = json.loads(raw_output)["candidates"]
+
+    assert validate_m1_freeze_input(
+        raw_output,
+        expected_output_sha256="069cd8c94d294c68bb051898d4e262f324b7e1f20eff10eabcf22d9bc435d178",
+        expected_candidate_array_sha256=_canonical_json_sha256(candidates),
+        expected_candidate_count=33,
+    ) == "M1 first-round output SHA-256 does not match accepted evidence"
+    assert validate_m1_freeze_input(
+        raw_output,
+        expected_output_sha256="g" * 64,
+        expected_candidate_array_sha256="h" * 64,
+        expected_candidate_count=33,
+    ) == "accepted M1 evidence contains an invalid SHA-256 value"
 
 
 def test_missing_m1_source_emits_structured_block_and_writes_no_output(tmp_path: Path) -> None:

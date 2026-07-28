@@ -21,8 +21,9 @@ from app.models.embedding import (
 from scripts.freeze_m2_candidates import (
     FROZEN_INPUT_MISSING,
     _canonical_json_sha256,
+    _render_json_bytes,
     freeze_candidates,
-    validate_frozen_snapshot_payload,
+    validate_frozen_snapshot_bytes,
 )
 
 
@@ -238,13 +239,21 @@ def test_frozen_snapshot_helper_accepts_a_synthetic_closed_33_candidate_snapshot
         "snapshot_version": "m2-candidates.v1",
     }
     manifest: dict[str, object] = {
-        "snapshot_sha256": _canonical_json_sha256(snapshot),
-        "zero_transport_replay": {"transport_requests": 0},
+        "candidate_count": 33,
+        "candidate_identity_sha256": _canonical_json_sha256(
+            [(item["paper_id"], item["source"], item["source_id"]) for item in candidates]
+        ),
+        "source_identity_set_sha256": _canonical_json_sha256(
+            sorted((item["source"], item["source_id"]) for item in candidates)
+        ),
+        "zero_transport_replay": {"cache_hits": 12, "query_count": 12, "transport_requests": 0},
     }
+    snapshot_bytes = _render_json_bytes(snapshot)
+    manifest["snapshot_sha256"] = hashlib.sha256(snapshot_bytes).hexdigest()
 
-    assert validate_frozen_snapshot_payload(snapshot, manifest) is None
+    assert validate_frozen_snapshot_bytes(snapshot_bytes, manifest) is None
 
     snapshot["count"] = 32
-    assert validate_frozen_snapshot_payload(snapshot, manifest) == (
-        "frozen snapshot must contain exactly 33 candidates"
+    assert validate_frozen_snapshot_bytes(_render_json_bytes(snapshot), manifest) == (
+        "frozen snapshot and manifest candidate counts do not match"
     )

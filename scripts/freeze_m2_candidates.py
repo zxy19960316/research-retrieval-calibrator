@@ -1,8 +1,9 @@
-"""Fail-closed M2-T01 gate for the historical M1 real-source artifacts.
+"""Fail-closed M2-T01 freeze gate for recovered M1 real-source artifacts.
 
-This initial gate deliberately does *not* replay the M1 cache or write an M2
-snapshot.  It gives the missing historical source a stable, machine-readable
-outcome and exposes a pure provenance validator for the later replay step.
+The command stays blocked without the historical M1 output/cache pair.  When
+they are available, it replays the accepted real cache without transport,
+checks canonical M1 metadata, and publishes an exact-byte snapshot/manifest
+pair.  This task creates no historical artifact by itself.
 """
 
 from __future__ import annotations
@@ -10,80 +11,72 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
+import shutil
 import sys
-from collections.abc import Mapping, Sequence
+import tempfile
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, TypeGuard
 
 if TYPE_CHECKING:
     from app.adapters.arxiv import ArxivResponse
+    from app.models.first_round import CandidateOutput
+    from app.models.paper import PaperRecord
 
-M1_OUTPUT_SHA256 = "069cd8c94d294c68bb051898d4e262f324b7e1f20eff10eabcf22d9bc435d178"
-M1_CANDIDATE_ARRAY_SHA256 = "e51eb84d4e772bba324a199478caa5f0983edef0b0dbf4c58fce5f9da5803209"
+M1_COMPLETION_MERGE_COMMIT = "0eb45fc22d10adb72cb66aa45494333057080bc1"
+
 FROZEN_INPUT_MISSING = "M2_T01_FROZEN_INPUT_MISSING"
 FROZEN_INPUT_INVALID = "M2_T01_FROZEN_INPUT_INVALID"
+ZERO_TRANSPORT_REPLAY_FAILED = "M2_T01_ZERO_TRANSPORT_REPLAY_FAILED"
+REAL_CACHE_INCOMPLETE = "M2_T01_REAL_CACHE_INCOMPLETE"
+REAL_CACHE_PROVENANCE_MISMATCH = "M2_T01_REAL_CACHE_PROVENANCE_MISMATCH"
+M1_METADATA_MISMATCH = "M2_T01_M1_METADATA_MISMATCH"
+SNAPSHOT_PUBLICATION_FAILED = "M2_T01_SNAPSHOT_PUBLICATION_FAILED"
+
+FREEZE_GATE_CODES = frozenset(
+    {
+        FROZEN_INPUT_MISSING,
+        FROZEN_INPUT_INVALID,
+        ZERO_TRANSPORT_REPLAY_FAILED,
+        REAL_CACHE_INCOMPLETE,
+        REAL_CACHE_PROVENANCE_MISMATCH,
+        M1_METADATA_MISMATCH,
+        SNAPSHOT_PUBLICATION_FAILED,
+    }
+)
+
+
+class FreezeGateError(RuntimeError):
+    """A stable, explicit M2-T01 freeze-gate classification."""
+
+    def __init__(self, code: str, reason: str) -> None:
+        if code not in FREEZE_GATE_CODES:
+            raise ValueError(f"Unknown M2-T01 freeze gate code: {code}")
+        self.code = code
+        self.reason = reason
+        super().__init__(reason)
 
 
 @dataclass(frozen=True)
 class AcceptedM1Provenance:
-    """The immutable M1 facts accepted by the completed M1 evidence report."""
+    """Immutable provenance accepted by the completed M1 evidence report."""
 
     output_sha256: str
     candidate_array_sha256: str
     candidate_count: int
     source_id_coverage: float
     url_coverage: float
-    source_merge_commit: str
-
-
-def load_accepted_m1_provenance(report_path: Path) -> AcceptedM1Provenance:
-    """Load only the accepted real M1 output provenance from an evidence report."""
-
-    try:
-        payload = json.loads(report_path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
-        raise ValueError("M1 evidence report is unavailable or invalid") from error
-    if not isinstance(payload, Mapping):
-        raise TypeError("M1 evidence report must be an object")
-    real = payload.get("real_external")
-    if not isinstance(real, Mapping) or real.get("classification") != "real_external":
-        raise ValueError("M1 evidence report must contain accepted real_external provenance")
-    hashes = real.get("output_hashes")
-    output_sha256 = hashes.get("first-round.json") if isinstance(hashes, Mapping) else None
-    candidate_array_sha256 = real.get("candidate_array_sha256")
-    candidate_count = real.get("deduplicated_candidate_count")
-    source_id_coverage = real.get("source_id_coverage")
-    url_coverage = real.get("url_coverage")
-    source_merge_commit = payload.get("baseline_commit")
-    if (
-        not isinstance(output_sha256, str)
-        or len(output_sha256) != 64
-        or not isinstance(candidate_array_sha256, str)
-        or len(candidate_array_sha256) != 64
-        or not isinstance(candidate_count, int)
-        or isinstance(candidate_count, bool)
-        or not isinstance(source_id_coverage, float)
-        or not isinstance(url_coverage, float)
-        or not isinstance(source_merge_commit, str)
-        or len(source_merge_commit) != 40
-    ):
-        raise ValueError("M1 evidence report lacks complete accepted output provenance")
-    if candidate_count != 33 or source_id_coverage != 1.0 or url_coverage != 1.0:
-        raise ValueError("M1 evidence report does not satisfy accepted 33-candidate coverage")
-    return AcceptedM1Provenance(
-        output_sha256=output_sha256,
-        candidate_array_sha256=candidate_array_sha256,
-        candidate_count=candidate_count,
-        source_id_coverage=source_id_coverage,
-        url_coverage=url_coverage,
-        source_merge_commit=source_merge_commit,
-    )
+    m1_completion_merge_commit: str
+    m1_evidence_baseline_commit: str
+    validated_implementation_commit: str
+    implementation_ancestry: tuple[str, ...]
 
 
 @dataclass(frozen=True)
 class FreezeResult:
-    """Structured result for the no-write precondition gate."""
+    """Structured result for the freeze gate and its paired publication."""
 
     status: str
     error_code: str | None = None
@@ -106,8 +99,88 @@ class FreezeResult:
         return {key: value for key, value in result.items() if value is not None}
 
 
+def _is_hex_sha(value: object, *, length: int) -> TypeGuard[str]:
+    if not isinstance(value, str) or len(value) != length:
+        return False
+    try:
+        int(value, 16)
+    except ValueError:
+        return False
+    return True
+
+
+def load_accepted_m1_provenance(
+    report_path: Path, *, required_candidate_count: int = 33
+) -> AcceptedM1Provenance:
+    """Load accepted evidence facts without treating its baseline as M1 completion."""
+
+    if required_candidate_count < 1:
+        raise ValueError("required candidate count must be positive")
+    try:
+        payload = json.loads(report_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ValueError("M1 evidence report is unavailable or invalid") from error
+    if not isinstance(payload, Mapping):
+        raise TypeError("M1 evidence report must be an object")
+    real = payload.get("real_external")
+    if not isinstance(real, Mapping) or real.get("classification") != "real_external":
+        raise ValueError("M1 evidence report must contain accepted real_external provenance")
+    hashes = real.get("output_hashes")
+    output_sha256 = hashes.get("first-round.json") if isinstance(hashes, Mapping) else None
+    candidate_array_sha256 = real.get("candidate_array_sha256")
+    candidate_count = real.get("deduplicated_candidate_count")
+    source_id_coverage = real.get("source_id_coverage")
+    url_coverage = real.get("url_coverage")
+    evidence_baseline = payload.get("baseline_commit")
+    validated_implementation = payload.get("validated_implementation_commit")
+    ancestry = payload.get("implementation_ancestry")
+
+    if not _is_hex_sha(M1_COMPLETION_MERGE_COMMIT, length=40):
+        raise ValueError("configured M1 completion merge commit must be a 40-character SHA")
+    if not _is_hex_sha(output_sha256, length=64) or not _is_hex_sha(
+        candidate_array_sha256, length=64
+    ):
+        raise ValueError("M1 evidence report lacks valid accepted SHA-256 output provenance")
+    if not _is_hex_sha(evidence_baseline, length=40) or not _is_hex_sha(
+        validated_implementation, length=40
+    ):
+        raise ValueError("M1 evidence report lacks valid completion provenance")
+    if (
+        not isinstance(ancestry, list)
+        or not all(_is_hex_sha(commit, length=40) for commit in ancestry)
+        or validated_implementation not in ancestry
+    ):
+        raise ValueError("M1 evidence report lacks validated implementation ancestry")
+    if (
+        not isinstance(candidate_count, int)
+        or isinstance(candidate_count, bool)
+        or not isinstance(source_id_coverage, float)
+        or not isinstance(url_coverage, float)
+    ):
+        raise TypeError("M1 evidence report lacks complete accepted output provenance")
+    if (
+        candidate_count != required_candidate_count
+        or source_id_coverage != 1.0
+        or url_coverage != 1.0
+    ):
+        raise ValueError(
+            f"M1 evidence report does not satisfy accepted {required_candidate_count}-candidate coverage"
+        )
+    return AcceptedM1Provenance(
+        output_sha256=output_sha256,
+        candidate_array_sha256=candidate_array_sha256,
+        candidate_count=candidate_count,
+        source_id_coverage=source_id_coverage,
+        url_coverage=url_coverage,
+        m1_completion_merge_commit=M1_COMPLETION_MERGE_COMMIT,
+        m1_evidence_baseline_commit=evidence_baseline,
+        validated_implementation_commit=validated_implementation,
+        implementation_ancestry=tuple(ancestry),
+    )
+
+
 class NetworkForbiddenTransport:
-    """A replay transport that proves no cache miss can reach the network."""
+    """Transport boundary that turns a cache miss into a stable freeze failure."""
 
     def __init__(self) -> None:
         self.request_count = 0
@@ -117,38 +190,43 @@ class NetworkForbiddenTransport:
     ) -> ArxivResponse:
         del url, headers, timeout_seconds
         self.request_count += 1
-        raise AssertionError("network transport forbidden during M2 freeze replay")
+        raise FreezeGateError(
+            ZERO_TRANSPORT_REPLAY_FAILED,
+            "network transport was invoked during cache-only replay",
+        )
 
 
 def _canonical_json_sha256(value: object) -> str:
-    """Hash the canonical JSON representation used by the M1 evidence."""
+    """Hash semantic JSON only for M1 evidence-derived identity fields."""
 
     encoded = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
 def _render_json_bytes(value: object) -> bytes:
+    """Render the deterministic file representation covered by snapshot SHA-256."""
+
     return (json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8")
 
 
-def _atomic_write(path: Path, contents: bytes) -> None:
-    temporary = path.with_name(f".{path.name}.tmp")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary.write_bytes(contents)
-    temporary.replace(path)
+def _parse_snapshot_bytes(snapshot_bytes: bytes) -> dict[str, object] | None:
+    try:
+        snapshot = json.loads(snapshot_bytes)
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    return snapshot if isinstance(snapshot, dict) else None
 
 
-def validate_frozen_snapshot_payload(
-    snapshot: dict[str, object], manifest: dict[str, object]
+def validate_frozen_snapshot_bytes(
+    snapshot_bytes: bytes, manifest: Mapping[str, object]
 ) -> str | None:
-    """Purely validate a generated snapshot and manifest before any write.
-
-    This compatibility boundary deliberately validates supplied values only;
-    it neither reads the M1 cache nor projects candidates from it.
-    """
+    """Validate the exact file bytes and all closed snapshot/manifest invariants."""
 
     from app.models.embedding import FrozenCandidate
 
+    snapshot = _parse_snapshot_bytes(snapshot_bytes)
+    if snapshot is None:
+        return "frozen snapshot file is not a JSON object"
     candidates = snapshot.get("candidates")
     if snapshot.get("snapshot_version") != "m2-candidates.v1" or not isinstance(
         candidates, list
@@ -158,8 +236,8 @@ def validate_frozen_snapshot_payload(
         frozen = [FrozenCandidate.model_validate(candidate) for candidate in candidates]
     except (TypeError, ValueError):
         return "frozen snapshot contains an invalid source-backed candidate"
-    if len(frozen) != 33 or snapshot.get("count") != 33:
-        return "frozen snapshot must contain exactly 33 candidates"
+    if snapshot.get("count") != len(frozen) or manifest.get("candidate_count") != len(frozen):
+        return "frozen snapshot and manifest candidate counts do not match"
     paper_ids = [candidate.paper_id for candidate in frozen]
     if paper_ids != sorted(paper_ids):
         return "frozen snapshot candidates must be ordered by paper_id"
@@ -168,16 +246,101 @@ def validate_frozen_snapshot_payload(
     source_identities = [(candidate.source, candidate.source_id) for candidate in frozen]
     if len(source_identities) != len(set(source_identities)):
         return "frozen snapshot has duplicate source identities"
-    snapshot_hashes = {
-        _canonical_json_sha256(snapshot),
-        hashlib.sha256(_render_json_bytes(snapshot)).hexdigest(),
-    }
-    if manifest.get("snapshot_sha256") not in snapshot_hashes:
-        return "frozen snapshot manifest SHA-256 does not match snapshot"
+    if manifest.get("snapshot_sha256") != hashlib.sha256(snapshot_bytes).hexdigest():
+        return "frozen snapshot manifest SHA-256 does not match exact snapshot bytes"
     replay = manifest.get("zero_transport_replay")
-    if not isinstance(replay, dict) or replay.get("transport_requests") != 0:
-        return "frozen snapshot manifest lacks a zero-transport replay audit"
+    if (
+        not isinstance(replay, Mapping)
+        or replay.get("transport_requests") != 0
+        or replay.get("cache_hits") != replay.get("query_count")
+    ):
+        return "frozen snapshot manifest lacks a complete zero-transport replay audit"
+    identities = [(item.source, item.source_id) for item in frozen]
+    expected_source_identity = _canonical_json_sha256(sorted(identities))
+    expected_candidate_identity = _canonical_json_sha256(
+        [(item.paper_id, item.source, item.source_id) for item in frozen]
+    )
+    if manifest.get("source_identity_set_sha256") != expected_source_identity:
+        return "frozen snapshot manifest source identity hash does not match candidates"
+    if manifest.get("candidate_identity_sha256") != expected_candidate_identity:
+        return "frozen snapshot manifest candidate identity hash does not match candidates"
     return None
+
+
+def _validate_cache_entries(
+    adapter: Any, run: Any, m1_cache_dir: Path
+) -> None:
+    """Classify every expected persistent-cache entry before invoking the adapter."""
+
+    from app.models.paper import PaperRecord
+
+    for query in run.query_plan.queries:
+        path = adapter._persistent_cache_path(query.query_text, run.config.max_results_per_query)
+        if path is None or not path.is_file():
+            raise FreezeGateError(
+                REAL_CACHE_INCOMPLETE, f"cache entry missing for query {query.query_id}"
+            )
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise FreezeGateError(
+                REAL_CACHE_PROVENANCE_MISMATCH,
+                f"cache entry is unreadable for query {query.query_id}",
+            ) from error
+        if not isinstance(payload, Mapping) or payload.get("manifest") != adapter._cache_manifest(
+            query.query_text, run.config.max_results_per_query
+        ):
+            raise FreezeGateError(
+                REAL_CACHE_PROVENANCE_MISMATCH,
+                f"cache manifest provenance mismatch for query {query.query_id}",
+            )
+        records = payload.get("records")
+        if not isinstance(records, list):
+            raise FreezeGateError(
+                REAL_CACHE_PROVENANCE_MISMATCH,
+                f"cache records are invalid for query {query.query_id}",
+            )
+        try:
+            [PaperRecord.model_validate(record) for record in records]
+        except (TypeError, ValueError) as error:
+            raise FreezeGateError(
+                REAL_CACHE_PROVENANCE_MISMATCH,
+                f"cache record provenance mismatch for query {query.query_id}",
+            ) from error
+        if not records:
+            raise FreezeGateError(
+                REAL_CACHE_INCOMPLETE, f"cache entry has no records for query {query.query_id}"
+            )
+
+
+def _metadata_mismatch_field(candidate: CandidateOutput, cluster: Any) -> str | None:
+    """Return the first failed legacy M1 metadata projection field, if any."""
+
+    record: PaperRecord = cluster.canonical_record
+    expected: dict[str, object] = {
+        "paper_id": record.paper_id,
+        "source": record.source,
+        "source_id": record.source_id,
+        "title": record.title,
+        "authors": record.authors,
+        "year": record.year,
+        "doi": record.doi,
+        "url": record.url,
+        "retrieval_paths": cluster.retrieval_paths,
+        "cluster_id": cluster.cluster_id,
+        "member_source_identities": cluster.source_identities,
+        "merge_reasons": cluster.merge_reasons,
+    }
+    for field_name, expected_value in expected.items():
+        if getattr(candidate, field_name) != expected_value:
+            return field_name
+    return None
+
+
+def _project_abstract(abstract: str | None) -> str | None:
+    """Copy canonical source abstract without placeholders, translation, or summary."""
+
+    return abstract if abstract is not None and abstract.strip() else None
 
 
 def _replay_and_project(
@@ -187,27 +350,36 @@ def _replay_and_project(
     provenance: AcceptedM1Provenance,
     evidence_report_sha256: str,
 ) -> tuple[dict[str, object], dict[str, object]]:
-    """Replay all stored M1 queries through the existing cache and deduplicator."""
+    """Replay twelve real-cache queries and project only canonical source fields."""
 
     root = Path(__file__).resolve().parents[1]
     if str(root) not in sys.path:
         sys.path.insert(0, str(root))
-    from app.adapters.arxiv import ArxivAdapter, ArxivAdapterConfig
+    from app.adapters.arxiv import ArxivAdapter, ArxivAdapterConfig, ArxivAdapterError
     from app.core.paper_dedup import deduplicate_papers
     from app.models.embedding import FrozenCandidate
     from app.models.first_round import FirstRoundRun, FirstRoundStatus
 
-    run = FirstRoundRun.model_validate(json.loads(raw_output))
+    try:
+        run = FirstRoundRun.model_validate(json.loads(raw_output))
+    except (TypeError, ValueError, json.JSONDecodeError) as error:
+        raise FreezeGateError(FROZEN_INPUT_INVALID, "M1 output is not a valid first-round run") from error
     if run.status is not FirstRoundStatus.SUCCESS or run.config.mode != "real":
-        raise ValueError("M1 output is not a successful real run")
+        raise FreezeGateError(FROZEN_INPUT_INVALID, "M1 output is not a successful real run")
     if run.query_plan is None or len(run.query_plan.queries) != 12:
-        raise ValueError("M1 output must contain exactly 12 planned queries")
-    if run.config.cache_namespace != "first-round:real":
-        raise ValueError("M1 output must use the first-round:real cache namespace")
+        raise FreezeGateError(FROZEN_INPUT_INVALID, "M1 output must contain exactly 12 planned queries")
+    if (
+        run.config.cache_namespace != "first-round:real"
+        or run.config.adapter_schema_version != "m1-t04.v2"
+    ):
+        raise FreezeGateError(
+            REAL_CACHE_PROVENANCE_MISMATCH,
+            "M1 output cache namespace or adapter schema does not match accepted real cache",
+        )
     transport = NetworkForbiddenTransport()
     adapter = ArxivAdapter(
         ArxivAdapterConfig(
-            user_agent="research-retrieval-calibrator/0.1 (M2-T01R1 freeze replay)",
+            user_agent="research-retrieval-calibrator/0.1 (M2-T01R2 freeze replay)",
             timeout_seconds=run.config.timeout_seconds,
             page_size=run.config.max_results_per_query,
             min_request_interval_seconds=run.config.min_request_interval_seconds,
@@ -222,48 +394,70 @@ def _replay_and_project(
         transport=transport,
         sleeper=lambda _: None,
     )
+    _validate_cache_entries(adapter, run, m1_cache_dir)
     records = []
     cache_hits = 0
-    for query in run.query_plan.queries:
-        records.extend(adapter.search(query, max_results=run.config.max_results_per_query))
-        cache_hits += int(adapter.last_observation.cache_hit)
+    try:
+        for query in run.query_plan.queries:
+            records.extend(adapter.search(query, max_results=run.config.max_results_per_query))
+            cache_hits += int(adapter.last_observation.cache_hit)
+    except FreezeGateError:
+        raise
+    except ArxivAdapterError as error:
+        code = (
+            ZERO_TRANSPORT_REPLAY_FAILED
+            if transport.request_count > 0
+            else REAL_CACHE_PROVENANCE_MISMATCH
+        )
+        raise FreezeGateError(code, f"cache-only replay failed: {error.code}") from error
     if transport.request_count != 0:
-        raise ValueError("M2_T01_ZERO_TRANSPORT_REPLAY_FAILED")
-    if cache_hits != 12:
-        raise ValueError("M2_T01_REAL_CACHE_INCOMPLETE")
-    deduplicated = deduplicate_papers(records)
-    if len(records) != run.raw_candidate_count or len(deduplicated.clusters) != provenance.candidate_count:
-        raise ValueError("M2_T01_REAL_CACHE_INCOMPLETE")
-    historical = {(candidate.paper_id, candidate.source, candidate.source_id): candidate for candidate in run.candidates}
+        raise FreezeGateError(
+            ZERO_TRANSPORT_REPLAY_FAILED,
+            "network transport was invoked during cache-only replay",
+        )
+    if cache_hits != len(run.query_plan.queries):
+        raise FreezeGateError(
+            REAL_CACHE_INCOMPLETE,
+            f"cache replay produced {cache_hits} hits for {len(run.query_plan.queries)} queries",
+        )
+    try:
+        deduplicated = deduplicate_papers(records)
+    except ValueError as error:
+        raise FreezeGateError(
+            REAL_CACHE_PROVENANCE_MISMATCH, "cached records cannot be deduplicated safely"
+        ) from error
+    if len(records) != run.raw_candidate_count:
+        raise FreezeGateError(
+            REAL_CACHE_INCOMPLETE,
+            f"cached raw count {len(records)} does not match M1 output {run.raw_candidate_count}",
+        )
+    if len(deduplicated.clusters) != provenance.candidate_count:
+        raise FreezeGateError(
+            REAL_CACHE_INCOMPLETE,
+            "cached deduplicated count does not match accepted M1 evidence",
+        )
+    historical = {
+        (candidate.paper_id, candidate.source, candidate.source_id): candidate
+        for candidate in run.candidates
+    }
     frozen: list[FrozenCandidate] = []
-    mismatch_count = abs(len(historical) - len(deduplicated.clusters))
     for cluster in deduplicated.clusters:
         record = cluster.canonical_record
         key = (record.paper_id, record.source, record.source_id)
         candidate = historical.get(key)
-        if candidate is None or any(
-            (
-                candidate.title != record.title,
-                candidate.authors != record.authors,
-                candidate.year != record.year,
-                candidate.doi != record.doi,
-                candidate.url != record.url,
-                candidate.retrieval_paths != cluster.retrieval_paths,
-                candidate.cluster_id != cluster.cluster_id,
-                candidate.member_source_identities != cluster.source_identities,
-                candidate.merge_reasons != cluster.merge_reasons,
+        mismatch = None if candidate is None else _metadata_mismatch_field(candidate, cluster)
+        if candidate is None or mismatch is not None:
+            field = "candidate identity" if candidate is None else mismatch
+            raise FreezeGateError(
+                M1_METADATA_MISMATCH, f"M1 metadata mismatch for {field} on {record.paper_id}"
             )
-        ):
-            mismatch_count += 1
-            continue
-        abstract = record.abstract if record.abstract is not None and record.abstract.strip() else None
         frozen.append(
             FrozenCandidate(
                 paper_id=record.paper_id,
                 source=record.source,
                 source_id=record.source_id,
                 title=record.title,
-                abstract=abstract,
+                abstract=_project_abstract(record.abstract),
                 authors=record.authors,
                 year=record.year,
                 doi=record.doi,
@@ -275,13 +469,17 @@ def _replay_and_project(
                 member_source_identities=cluster.source_identities,
             )
         )
-    if mismatch_count:
-        raise ValueError("M2_T01_M1_METADATA_MISMATCH")
-    candidates = [candidate.model_dump(mode="json") for candidate in sorted(frozen, key=lambda item: item.paper_id)]
+    if len(historical) != len(frozen):
+        raise FreezeGateError(M1_METADATA_MISMATCH, "M1 candidate identities do not match replay")
+    candidates = [
+        candidate.model_dump(mode="json") for candidate in sorted(frozen, key=lambda item: item.paper_id)
+    ]
     snapshot = {
         "snapshot_version": "m2-candidates.v1",
         "source_phase": "M1",
-        "source_merge_commit": provenance.source_merge_commit,
+        "source_merge_commit": provenance.m1_completion_merge_commit,
+        "source_evidence_baseline_commit": provenance.m1_evidence_baseline_commit,
+        "validated_implementation_commit": provenance.validated_implementation_commit,
         "source_evidence_report": "evaluation/reports/m1-validation.json",
         "source_evidence_report_sha256": evidence_report_sha256,
         "source_output_sha256": provenance.output_sha256,
@@ -290,18 +488,29 @@ def _replay_and_project(
         "count": len(candidates),
         "candidates": candidates,
     }
-    audit = {"transport_requests": transport.request_count, "cache_hits": cache_hits, "query_count": 12}
     manifest = {
         "candidate_count": len(candidates),
         "source_id_coverage": provenance.source_id_coverage,
         "url_coverage": provenance.url_coverage,
+        "m1_completion_merge_commit": provenance.m1_completion_merge_commit,
+        "m1_evidence_baseline_commit": provenance.m1_evidence_baseline_commit,
+        "validated_implementation_commit": provenance.validated_implementation_commit,
+        "implementation_ancestry": list(provenance.implementation_ancestry),
         "paper_id_order": [candidate["paper_id"] for candidate in candidates],
-        "source_identity_set_sha256": _canonical_json_sha256(sorted((item["source"], item["source_id"]) for item in candidates)),
-        "candidate_identity_sha256": _canonical_json_sha256([(item["paper_id"], item["source"], item["source_id"]) for item in candidates]),
+        "source_identity_set_sha256": _canonical_json_sha256(
+            sorted((item["source"], item["source_id"]) for item in candidates)
+        ),
+        "candidate_identity_sha256": _canonical_json_sha256(
+            [(item["paper_id"], item["source"], item["source_id"]) for item in candidates]
+        ),
         "abstract_present_count": sum(item["abstract"] is not None for item in candidates),
         "abstract_missing_count": sum(item["abstract"] is None for item in candidates),
-        "metadata_mismatch_count": mismatch_count,
-        "zero_transport_replay": audit,
+        "metadata_mismatch_count": 0,
+        "zero_transport_replay": {
+            "transport_requests": transport.request_count,
+            "cache_hits": cache_hits,
+            "query_count": len(run.query_plan.queries),
+        },
         "artifact_recovery_classification": "EXACT_HISTORICAL_ARTIFACTS_RECOVERED",
     }
     return snapshot, manifest
@@ -310,16 +519,19 @@ def _replay_and_project(
 def validate_m1_freeze_input(
     raw_output: bytes,
     *,
-    expected_output_sha256: str = M1_OUTPUT_SHA256,
-    expected_candidate_array_sha256: str = M1_CANDIDATE_ARRAY_SHA256,
+    expected_output_sha256: str,
+    expected_candidate_array_sha256: str,
+    expected_candidate_count: int,
 ) -> str | None:
-    """Return a stable reason unless a supplied M1 JSON has freeze provenance.
+    """Validate explicit evidence-derived M1 hashes and count without any I/O."""
 
-    The function is pure: it reads neither paths nor caches and performs no
-    network or output operation.  The explicit expected hashes let contract
-    tests use a synthetic M1 JSON without weakening production defaults.
-    """
-
+    if (
+        not _is_hex_sha(expected_output_sha256, length=64)
+        or not _is_hex_sha(expected_candidate_array_sha256, length=64)
+    ):
+        return "accepted M1 evidence contains an invalid SHA-256 value"
+    if expected_candidate_count < 1:
+        return "accepted M1 evidence contains an invalid candidate count"
     if hashlib.sha256(raw_output).hexdigest() != expected_output_sha256:
         return "M1 first-round output SHA-256 does not match accepted evidence"
     try:
@@ -332,11 +544,87 @@ def validate_m1_freeze_input(
     candidates = payload.get("candidates")
     if not isinstance(config, dict) or config.get("mode") != "real":
         return "M1 output is not from real mode"
-    if not isinstance(candidates, list) or len(candidates) != 33:
-        return "M1 output must contain exactly 33 candidates"
+    if not isinstance(candidates, list) or len(candidates) != expected_candidate_count:
+        return f"M1 output must contain exactly {expected_candidate_count} candidates"
     if _canonical_json_sha256(candidates) != expected_candidate_array_sha256:
         return "M1 candidate-array SHA-256 does not match accepted evidence"
     return None
+
+
+def _read_existing_bytes(path: Path) -> bytes | None:
+    try:
+        return path.read_bytes() if path.exists() else None
+    except OSError as error:
+        raise FreezeGateError(
+            SNAPSHOT_PUBLICATION_FAILED, f"cannot read existing publication target {path.name}"
+        ) from error
+
+
+def _publish_snapshot_pair(
+    *,
+    snapshot_path: Path,
+    snapshot_bytes: bytes,
+    manifest_path: Path,
+    manifest_bytes: bytes,
+    replace: Callable[[Path, Path], None] = os.replace,
+) -> None:
+    """Publish verified snapshot/manifest bytes together or restore caller-visible state."""
+
+    if snapshot_path == manifest_path:
+        raise FreezeGateError(SNAPSHOT_PUBLICATION_FAILED, "snapshot and manifest paths must differ")
+    snapshot_existing = _read_existing_bytes(snapshot_path)
+    manifest_existing = _read_existing_bytes(manifest_path)
+    if snapshot_existing not in {None, snapshot_bytes}:
+        raise FreezeGateError(SNAPSHOT_PUBLICATION_FAILED, "snapshot target already has different bytes")
+    if manifest_existing not in {None, manifest_bytes}:
+        raise FreezeGateError(SNAPSHOT_PUBLICATION_FAILED, "manifest target already has different bytes")
+    try:
+        snapshot_path.parent.mkdir(parents=True, exist_ok=True)
+        stage = Path(tempfile.mkdtemp(prefix=".m2-freeze-", dir=snapshot_path.parent))
+    except OSError as error:
+        raise FreezeGateError(SNAPSHOT_PUBLICATION_FAILED, "cannot create publication staging") from error
+    staged_snapshot = stage / snapshot_path.name
+    staged_manifest = stage / manifest_path.name
+    created_snapshot = False
+    created_manifest = False
+    try:
+        staged_snapshot.write_bytes(snapshot_bytes)
+        staged_manifest.write_bytes(manifest_bytes)
+        staged_manifest_payload = json.loads(staged_manifest.read_text(encoding="utf-8"))
+        if not isinstance(staged_manifest_payload, Mapping):
+            raise FreezeGateError(SNAPSHOT_PUBLICATION_FAILED, "staged manifest is not an object")
+        validation_error = validate_frozen_snapshot_bytes(
+            staged_snapshot.read_bytes(), staged_manifest_payload
+        )
+        if validation_error is not None:
+            raise FreezeGateError(SNAPSHOT_PUBLICATION_FAILED, validation_error)
+        if snapshot_existing is None:
+            replace(staged_snapshot, snapshot_path)
+            created_snapshot = True
+        if manifest_existing is None:
+            replace(staged_manifest, manifest_path)
+            created_manifest = True
+    except FreezeGateError:
+        raise
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise FreezeGateError(SNAPSHOT_PUBLICATION_FAILED, "paired snapshot publication failed") from error
+    finally:
+        if created_manifest is False and manifest_existing is None:
+            try:
+                manifest_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+        if created_snapshot is False and snapshot_existing is None:
+            try:
+                snapshot_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+        if created_snapshot and not created_manifest:
+            try:
+                snapshot_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+        shutil.rmtree(stage, ignore_errors=True)
 
 
 def freeze_candidates(
@@ -345,23 +633,17 @@ def freeze_candidates(
     m1_cache_dir: Path,
     output_dir: Path,
     m1_evidence_report: Path = Path("evaluation/reports/m1-validation.json"),
-    expected_output_sha256: str | None = None,
-    expected_candidate_array_sha256: str | None = None,
+    expected_candidate_count: int | None = None,
 ) -> FreezeResult:
-    """Check only the historical M1 prerequisites and never write snapshots.
+    """Freeze only an accepted, cache-replayable M1 source; otherwise fail closed."""
 
-    ``output_dir`` is intentionally unused until the later cache-replay and
-    source-projection work is authorized and implemented.
-    """
-
+    required_count = 33 if expected_candidate_count is None else expected_candidate_count
     try:
-        provenance = load_accepted_m1_provenance(m1_evidence_report)
-    except (TypeError, ValueError) as provenance_error:
-        return FreezeResult(
-            status="blocked", error_code=FROZEN_INPUT_INVALID, reason=str(provenance_error)
+        provenance = load_accepted_m1_provenance(
+            m1_evidence_report, required_candidate_count=required_count
         )
-    output_sha256 = expected_output_sha256 or provenance.output_sha256
-    candidate_array_sha256 = expected_candidate_array_sha256 or provenance.candidate_array_sha256
+    except (TypeError, ValueError) as error:
+        return FreezeResult(status="blocked", error_code=FROZEN_INPUT_INVALID, reason=str(error))
     if not m1_output.is_file() or not m1_cache_dir.is_dir():
         return FreezeResult(
             status="blocked",
@@ -378,13 +660,12 @@ def freeze_candidates(
         )
     validation_error = validate_m1_freeze_input(
         raw_output,
-        expected_output_sha256=output_sha256,
-        expected_candidate_array_sha256=candidate_array_sha256,
+        expected_output_sha256=provenance.output_sha256,
+        expected_candidate_array_sha256=provenance.candidate_array_sha256,
+        expected_candidate_count=provenance.candidate_count,
     )
     if validation_error is not None:
-        return FreezeResult(
-            status="blocked", error_code=FROZEN_INPUT_INVALID, reason=validation_error
-        )
+        return FreezeResult(status="blocked", error_code=FROZEN_INPUT_INVALID, reason=validation_error)
     try:
         snapshot, manifest = _replay_and_project(
             raw_output,
@@ -392,28 +673,24 @@ def freeze_candidates(
             provenance=provenance,
             evidence_report_sha256=hashlib.sha256(m1_evidence_report.read_bytes()).hexdigest(),
         )
-    except (AssertionError, OSError, ValueError) as replay_error:
-        reason = str(replay_error)
-        error_code = (
-            reason
-            if reason in {
-                "M2_T01_ZERO_TRANSPORT_REPLAY_FAILED",
-                "M2_T01_REAL_CACHE_INCOMPLETE",
-                "M2_T01_M1_METADATA_MISMATCH",
-            }
-            else FROZEN_INPUT_INVALID
+        snapshot_bytes = _render_json_bytes(snapshot)
+        snapshot_sha256 = hashlib.sha256(snapshot_bytes).hexdigest()
+        manifest["snapshot_sha256"] = snapshot_sha256
+        manifest_bytes = _render_json_bytes(manifest)
+        snapshot_path = output_dir / "m1-candidates.v1.json"
+        manifest_path = output_dir / "m1-candidates.v1.manifest.json"
+        _publish_snapshot_pair(
+            snapshot_path=snapshot_path,
+            snapshot_bytes=snapshot_bytes,
+            manifest_path=manifest_path,
+            manifest_bytes=manifest_bytes,
         )
-        return FreezeResult(status="blocked", error_code=error_code, reason=reason)
-    snapshot_path = output_dir / "m1-candidates.v1.json"
-    manifest_path = output_dir / "m1-candidates.v1.manifest.json"
-    snapshot_bytes = _render_json_bytes(snapshot)
-    snapshot_sha256 = hashlib.sha256(snapshot_bytes).hexdigest()
-    manifest["snapshot_sha256"] = snapshot_sha256
-    try:
-        _atomic_write(snapshot_path, snapshot_bytes)
-        _atomic_write(manifest_path, _render_json_bytes(manifest))
+    except FreezeGateError as error:
+        return FreezeResult(status="blocked", error_code=error.code, reason=error.reason)
     except OSError as error:
-        return FreezeResult(status="blocked", error_code=FROZEN_INPUT_INVALID, reason=str(error))
+        return FreezeResult(
+            status="blocked", error_code=SNAPSHOT_PUBLICATION_FAILED, reason=str(error)
+        )
     return FreezeResult(
         status="success",
         snapshot_path=snapshot_path.as_posix(),

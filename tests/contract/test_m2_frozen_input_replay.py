@@ -1,43 +1,534 @@
-"""Contracts for evidence-derived M1 frozen-input replay."""
+"""Contracts for the M2-T01R2 frozen M1 replay and paired publication path."""
 
 from __future__ import annotations
 
+import hashlib
 import json
+import os
+from collections.abc import Mapping
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
-from scripts.freeze_m2_candidates import load_accepted_m1_provenance
+from app.adapters.arxiv import ArxivAdapter, ArxivAdapterConfig, ArxivResponse
+from app.core.first_round import run_first_round
+from app.core.paper_dedup import deduplicate_papers
+from app.models.first_round import FirstRoundConfig
+from app.models.paper import PaperRecord
+from scripts import freeze_m2_candidates as freeze_module
+from scripts.freeze_m2_candidates import (
+    M1_COMPLETION_MERGE_COMMIT,
+    REAL_CACHE_INCOMPLETE,
+    REAL_CACHE_PROVENANCE_MISMATCH,
+    SNAPSHOT_PUBLICATION_FAILED,
+    ZERO_TRANSPORT_REPLAY_FAILED,
+    AcceptedM1Provenance,
+    FreezeGateError,
+    _canonical_json_sha256,
+    _metadata_mismatch_field,
+    _project_abstract,
+    _publish_snapshot_pair,
+    _render_json_bytes,
+    _replay_and_project,
+    freeze_candidates,
+    load_accepted_m1_provenance,
+    validate_frozen_snapshot_bytes,
+)
+
+QUESTION = "How can graph-based retrieval support scientific literature discovery?"
+NOW = datetime(2026, 7, 28, 0, 0, tzinfo=UTC)
 
 
-def test_production_defaults_are_derived_from_the_accepted_m1_evidence() -> None:
+class RecordedTransport:
+    """Test-only cache seeder; the freeze replay itself always uses no transport."""
+
+    def __init__(self, responses: list[ArxivResponse]) -> None:
+        self.responses = list(responses)
+        self.request_count = 0
+
+    def get(
+        self, url: str, *, headers: Mapping[str, str], timeout_seconds: float
+    ) -> ArxivResponse:
+        del url, headers, timeout_seconds
+        self.request_count += 1
+        return self.responses.pop(0)
+
+
+def _atom_response(index: int) -> ArxivResponse:
+    source_id = f"2401.{index:05d}"
+    body = f'''<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom">
+    <entry><id>https://arxiv.org/abs/{source_id}</id>
+    <title>Graph retrieval paper {index:02d}</title>
+    <summary>Canonical abstract {index:02d}.</summary>
+    <published>2024-01-01</published><author><name>Ada Author</name></author></entry>
+    </feed>'''.encode()
+    return ArxivResponse(200, body, {})
+
+
+def _seed_synthetic_real_run(tmp_path: Path) -> tuple[Path, Path, Path]:
+    """Use the real M1 pipeline to create a 12-query synthetic real cache."""
+
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    cache_dir = tmp_path / "m1-cache"
+    config = FirstRoundConfig(
+        cache_dir=cache_dir,
+        mode="real",
+        cache_namespace="first-round:real",
+        adapter_schema_version="m1-t04.v2",
+        max_results_per_query=1,
+        max_total_candidates=60,
+        max_total_attempts=20,
+        timeout_seconds=1.0,
+        min_request_interval_seconds=1.0,
+    )
+    transport = RecordedTransport([_atom_response(index) for index in range(12)])
+    adapter = ArxivAdapter(
+        ArxivAdapterConfig(
+            user_agent="m2-t01r2-synthetic-cache-seed",
+            timeout_seconds=1.0,
+            page_size=1,
+            min_request_interval_seconds=1.0,
+            max_attempts=1,
+            max_total_results=1,
+            max_total_attempts=20,
+            initial_backoff_seconds=0.0,
+            cache_dir=cache_dir,
+            cache_schema_version="m1-t04.v2",
+            cache_namespace="first-round:real",
+        ),
+        transport=transport,
+        monotonic=lambda: 10.0,
+        sleeper=lambda _: None,
+        utc_now=lambda: NOW,
+    )
+    run = run_first_round(
+        QUESTION,
+        config=config,
+        adapter=adapter,
+        now=lambda: NOW,
+        monotonic=lambda: 10.0,
+    )
+    assert run.status.value == "success"
+    assert len(run.query_plan.queries if run.query_plan else []) == 12
+    assert transport.request_count == 12
+    raw_output = _render_json_bytes(run.model_dump(mode="json"))
+    output_path = tmp_path / "first-round.json"
+    output_path.write_bytes(raw_output)
+    report_payload: dict[str, object] = {
+        "baseline_commit": "f0f167766589e3321821b0caf7793b00c8ff7291",
+        "validated_implementation_commit": "7b19d437bd30f29e9ec2debaf022920bc47c3f0d",
+        "implementation_ancestry": ["7b19d437bd30f29e9ec2debaf022920bc47c3f0d"],
+        "real_external": {
+            "classification": "real_external",
+            "deduplicated_candidate_count": 12,
+            "source_id_coverage": 1.0,
+            "url_coverage": 1.0,
+            "candidate_array_sha256": _canonical_json_sha256(run.model_dump(mode="json")["candidates"]),
+            "output_hashes": {"first-round.json": hashlib.sha256(raw_output).hexdigest()},
+        },
+    }
+    report_path = tmp_path / "m1-validation.json"
+    report_path.write_bytes(_render_json_bytes(report_payload))
+    return output_path, cache_dir, report_path
+
+
+@pytest.fixture
+def synthetic_inputs(tmp_path: Path) -> tuple[Path, Path, Path]:
+    return _seed_synthetic_real_run(tmp_path)
+
+
+def _synthetic_provenance(report_path: Path) -> AcceptedM1Provenance:
+    return load_accepted_m1_provenance(report_path, required_candidate_count=12)
+
+
+def _snapshot_pair(
+    output_path: Path, cache_dir: Path, report_path: Path
+) -> tuple[dict[str, object], dict[str, object], bytes, bytes]:
+    provenance = _synthetic_provenance(report_path)
+    snapshot, manifest = _replay_and_project(
+        output_path.read_bytes(),
+        m1_cache_dir=cache_dir,
+        provenance=provenance,
+        evidence_report_sha256=hashlib.sha256(report_path.read_bytes()).hexdigest(),
+    )
+    snapshot_bytes = _render_json_bytes(snapshot)
+    manifest["snapshot_sha256"] = hashlib.sha256(snapshot_bytes).hexdigest()
+    manifest_bytes = _render_json_bytes(manifest)
+    return snapshot, manifest, snapshot_bytes, manifest_bytes
+
+
+def test_production_evidence_provenance_uses_completion_merge_not_evidence_baseline() -> None:
     provenance = load_accepted_m1_provenance(Path("evaluation/reports/m1-validation.json"))
 
     assert provenance.output_sha256 == "069cd8c94d294c68bb051898d4c262f324b7e1f20eff10eabcf22d9bc435d178"
     assert provenance.candidate_array_sha256 == "e51eb84d4e772bba324a199478caa5f0983edef0b0dbf4c58fce5f9da5803209"
-    assert provenance.candidate_count == 33
-    assert provenance.source_id_coverage == provenance.url_coverage == 1.0
+    assert provenance.m1_completion_merge_commit == M1_COMPLETION_MERGE_COMMIT
+    assert provenance.m1_evidence_baseline_commit == "f0f167766589e3321821b0caf7793b00c8ff7291"
+    assert provenance.validated_implementation_commit in provenance.implementation_ancestry
 
 
-def test_provenance_rejects_recorded_or_incomplete_evidence(tmp_path: Path) -> None:
-    report = tmp_path / "m1-validation.json"
-    payload = {
-        "baseline_commit": "a" * 40,
-        "real_external": {
-            "classification": "recorded_external",
-            "deduplicated_candidate_count": 33,
-            "source_id_coverage": 1.0,
-            "url_coverage": 1.0,
-            "candidate_array_sha256": "b" * 64,
-            "output_hashes": {"first-round.json": "c" * 64},
-        },
+@pytest.mark.parametrize(
+    ("field_path", "value"),
+    [
+        (("real_external", "output_hashes", "first-round.json"), None),
+        (("real_external", "candidate_array_sha256"), None),
+        (("real_external", "output_hashes", "first-round.json"), "g" * 64),
+        (("real_external", "deduplicated_candidate_count"), 32),
+        (("real_external", "source_id_coverage"), 0.99),
+    ],
+)
+def test_provenance_rejects_missing_malformed_or_unaccepted_evidence(
+    tmp_path: Path, field_path: tuple[str, ...], value: object
+) -> None:
+    output_hashes: dict[str, object] = {"first-round.json": "c" * 64}
+    real: dict[str, object] = {
+        "classification": "real_external",
+        "deduplicated_candidate_count": 33,
+        "source_id_coverage": 1.0,
+        "url_coverage": 1.0,
+        "candidate_array_sha256": "b" * 64,
+        "output_hashes": output_hashes,
     }
-    report.write_text(json.dumps(payload), encoding="utf-8")
-    with pytest.raises(ValueError, match="real_external"):
+    payload: dict[str, object] = {
+        "baseline_commit": "a" * 40,
+        "validated_implementation_commit": "d" * 40,
+        "implementation_ancestry": ["d" * 40],
+        "real_external": real,
+    }
+    target: dict[str, object] = payload
+    for key in field_path[:-1]:
+        target = target[key]  # type: ignore[assignment,index]
+    if value is None:
+        del target[field_path[-1]]
+    else:
+        target[field_path[-1]] = value
+    report = tmp_path / "m1-validation.json"
+    report.write_bytes(_render_json_bytes(payload))
+
+    with pytest.raises(ValueError):
         load_accepted_m1_provenance(report)
 
-    payload["real_external"]["classification"] = "real_external"
-    del payload["real_external"]["output_hashes"]
-    report.write_text(json.dumps(payload), encoding="utf-8")
-    with pytest.raises(ValueError, match="complete accepted output provenance"):
-        load_accepted_m1_provenance(report)
+
+def test_synthetic_twelve_query_real_cache_replays_without_transport_and_publishes(
+    synthetic_inputs: tuple[Path, Path, Path], tmp_path: Path
+) -> None:
+    output_path, cache_dir, report_path = synthetic_inputs
+    output_dir = tmp_path / "snapshot"
+
+    result = freeze_candidates(
+        m1_output=output_path,
+        m1_cache_dir=cache_dir,
+        output_dir=output_dir,
+        m1_evidence_report=report_path,
+        expected_candidate_count=12,
+    )
+
+    assert result.status == "success"
+    assert result.candidate_count == 12
+    snapshot_bytes = (output_dir / "m1-candidates.v1.json").read_bytes()
+    manifest = json.loads((output_dir / "m1-candidates.v1.manifest.json").read_text(encoding="utf-8"))
+    assert manifest["zero_transport_replay"] == {
+        "cache_hits": 12,
+        "query_count": 12,
+        "transport_requests": 0,
+    }
+    assert manifest["m1_completion_merge_commit"] == M1_COMPLETION_MERGE_COMMIT
+    assert manifest["m1_evidence_baseline_commit"] == "f0f167766589e3321821b0caf7793b00c8ff7291"
+    assert manifest["candidate_count"] == 12
+    assert manifest["source_identity_set_sha256"] is not None
+    assert json.loads(snapshot_bytes)["source_merge_commit"] == M1_COMPLETION_MERGE_COMMIT
+    assert validate_frozen_snapshot_bytes(snapshot_bytes, manifest) is None
+
+
+def test_missing_cache_and_corrupt_or_wrong_manifest_have_stable_codes(
+    synthetic_inputs: tuple[Path, Path, Path], tmp_path: Path
+) -> None:
+    output_path, cache_dir, report_path = synthetic_inputs
+    cache_file = next(cache_dir.rglob("*.json"))
+    cache_file.unlink()
+    missing = freeze_candidates(
+        m1_output=output_path,
+        m1_cache_dir=cache_dir,
+        output_dir=tmp_path / "missing",
+        m1_evidence_report=report_path,
+        expected_candidate_count=12,
+    )
+    assert missing.error_code == REAL_CACHE_INCOMPLETE
+
+    output_path, cache_dir, report_path = _seed_synthetic_real_run(tmp_path / "corrupt")
+    cache_file = next(cache_dir.rglob("*.json"))
+    cache_file.write_text("{not json", encoding="utf-8")
+    corrupt = freeze_candidates(
+        m1_output=output_path,
+        m1_cache_dir=cache_dir,
+        output_dir=tmp_path / "corrupt-out",
+        m1_evidence_report=report_path,
+        expected_candidate_count=12,
+    )
+    assert corrupt.error_code == REAL_CACHE_PROVENANCE_MISMATCH
+
+    for field_name, value in (
+        ("endpoint", "https://wrong.invalid/api/query"),
+        ("cache_namespace", "first-round:recorded"),
+        ("adapter_schema_version", "m1-t04.v1"),
+    ):
+        output_path, cache_dir, report_path = _seed_synthetic_real_run(tmp_path / field_name)
+        cache_file = next(cache_dir.rglob("*.json"))
+        payload = json.loads(cache_file.read_text(encoding="utf-8"))
+        payload["manifest"][field_name] = value
+        cache_file.write_bytes(_render_json_bytes(payload))
+        mismatch = freeze_candidates(
+            m1_output=output_path,
+            m1_cache_dir=cache_dir,
+            output_dir=tmp_path / f"{field_name}-out",
+            m1_evidence_report=report_path,
+            expected_candidate_count=12,
+        )
+        assert mismatch.error_code == REAL_CACHE_PROVENANCE_MISMATCH
+
+
+def test_raw_and_deduplicated_cache_count_mismatches_fail_closed(
+    synthetic_inputs: tuple[Path, Path, Path], tmp_path: Path
+) -> None:
+    output_path, cache_dir, report_path = synthetic_inputs
+    raw_payload = json.loads(output_path.read_text(encoding="utf-8"))
+    raw_payload["raw_candidate_count"] = 13
+    raw_payload["metrics"]["raw_candidate_count"] = 13
+    changed_output = _render_json_bytes(raw_payload)
+    output_path.write_bytes(changed_output)
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    report["real_external"]["output_hashes"]["first-round.json"] = hashlib.sha256(changed_output).hexdigest()
+    report_path.write_bytes(_render_json_bytes(report))
+    raw_mismatch = freeze_candidates(
+        m1_output=output_path,
+        m1_cache_dir=cache_dir,
+        output_dir=tmp_path / "raw-out",
+        m1_evidence_report=report_path,
+        expected_candidate_count=12,
+    )
+    assert raw_mismatch.error_code == REAL_CACHE_INCOMPLETE
+
+    output_path, cache_dir, report_path = _seed_synthetic_real_run(tmp_path / "dedup")
+    cache_files = list(cache_dir.rglob("*.json"))
+    first = json.loads(cache_files[0].read_text(encoding="utf-8"))
+    duplicate = json.loads(cache_files[-1].read_text(encoding="utf-8"))
+    duplicate["records"] = first["records"]
+    cache_files[-1].write_bytes(_render_json_bytes(duplicate))
+    dedup_mismatch = freeze_candidates(
+        m1_output=output_path,
+        m1_cache_dir=cache_dir,
+        output_dir=tmp_path / "dedup-out",
+        m1_evidence_report=report_path,
+        expected_candidate_count=12,
+    )
+    assert dedup_mismatch.error_code == REAL_CACHE_INCOMPLETE
+
+
+def test_transport_invocation_maps_to_zero_transport_code(
+    synthetic_inputs: tuple[Path, Path, Path], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output_path, cache_dir, report_path = synthetic_inputs
+    monkeypatch.setattr(freeze_module, "_validate_cache_entries", lambda *args: None)
+    for cache_file in cache_dir.rglob("*.json"):
+        cache_file.unlink()
+
+    result = freeze_candidates(
+        m1_output=output_path,
+        m1_cache_dir=cache_dir,
+        output_dir=tmp_path / "out",
+        m1_evidence_report=report_path,
+        expected_candidate_count=12,
+    )
+
+    assert result.error_code == ZERO_TRANSPORT_REPLAY_FAILED
+
+
+@pytest.mark.parametrize(
+    "field_name",
+    [
+        "paper_id",
+        "source",
+        "source_id",
+        "title",
+        "authors",
+        "year",
+        "doi",
+        "url",
+        "retrieval_paths",
+        "cluster_id",
+        "member_source_identities",
+        "merge_reasons",
+    ],
+)
+def test_every_legacy_metadata_field_has_a_dedicated_mismatch_detection(
+    field_name: str,
+) -> None:
+    record = PaperRecord(
+        paper_id="arxiv:2401.00001",
+        source="arxiv",
+        source_id="2401.00001",
+        title="Canonical title",
+        abstract="Canonical abstract",
+        authors=["Ada Author"],
+        year=2024,
+        doi=None,
+        url="https://arxiv.org/abs/2401.00001",
+        language="en",
+        retrieval_paths=["Q1"],
+    )
+    cluster = deduplicate_papers([record]).clusters[0]
+    candidate = run_first_round  # preserves a direct reference to the real M1 producer
+    del candidate
+    from app.models.first_round import CandidateOutput
+
+    output = CandidateOutput(
+        paper_id=record.paper_id,
+        source=record.source,
+        source_id=record.source_id,
+        title=record.title,
+        abstract=record.abstract,
+        authors=record.authors,
+        year=record.year,
+        doi=record.doi,
+        url=record.url,
+        retrieval_paths=cluster.retrieval_paths,
+        cluster_id=cluster.cluster_id,
+        member_source_identities=cluster.source_identities,
+        merge_reasons=cluster.merge_reasons,
+    )
+    altered: dict[str, object] = {
+        "paper_id": "arxiv:2401.99999",
+        "source": "other",
+        "source_id": "2401.99999",
+        "title": "Changed title",
+        "authors": ["Grace Author"],
+        "year": 2025,
+        "doi": "10.1000/example",
+        "url": "https://arxiv.org/abs/2401.99999",
+        "retrieval_paths": ["Q2"],
+        "cluster_id": "cluster:changed",
+        "member_source_identities": [],
+        "merge_reasons": [object()],
+    }
+    changed = output.model_copy(update={field_name: altered[field_name]})
+
+    assert _metadata_mismatch_field(changed, cluster) == field_name
+
+
+def test_abstract_projection_is_direct_and_categories_are_empty(
+    synthetic_inputs: tuple[Path, Path, Path]
+) -> None:
+    output_path, cache_dir, report_path = synthetic_inputs
+    snapshot, _, _, _ = _snapshot_pair(output_path, cache_dir, report_path)
+
+    assert _project_abstract(None) is None
+    assert _project_abstract("   ") is None
+    assert _project_abstract("Exact abstract") == "Exact abstract"
+    assert all(candidate["categories"] == [] for candidate in snapshot["candidates"])  # type: ignore[index]
+
+
+def test_exact_byte_snapshot_hash_rejects_alternate_formatting(
+    synthetic_inputs: tuple[Path, Path, Path]
+) -> None:
+    output_path, cache_dir, report_path = synthetic_inputs
+    _, manifest, snapshot_bytes, _ = _snapshot_pair(output_path, cache_dir, report_path)
+
+    assert validate_frozen_snapshot_bytes(snapshot_bytes, manifest) is None
+    assert validate_frozen_snapshot_bytes(snapshot_bytes + b" ", manifest) == (
+        "frozen snapshot manifest SHA-256 does not match exact snapshot bytes"
+    )
+
+
+def test_paired_publication_rolls_back_manifest_failure_and_leaves_no_temp_residue(
+    synthetic_inputs: tuple[Path, Path, Path], tmp_path: Path
+) -> None:
+    output_path, cache_dir, report_path = synthetic_inputs
+    _, _, snapshot_bytes, manifest_bytes = _snapshot_pair(output_path, cache_dir, report_path)
+    snapshot_path = tmp_path / "out" / "m1-candidates.v1.json"
+    manifest_path = tmp_path / "out" / "m1-candidates.v1.manifest.json"
+
+    def fail_manifest_replace(source: Path, target: Path) -> None:
+        if target == manifest_path:
+            raise OSError("injected manifest publication failure")
+        os.replace(source, target)
+
+    with pytest.raises(FreezeGateError, match="paired snapshot publication failed") as failure:
+        _publish_snapshot_pair(
+            snapshot_path=snapshot_path,
+            snapshot_bytes=snapshot_bytes,
+            manifest_path=manifest_path,
+            manifest_bytes=manifest_bytes,
+            replace=fail_manifest_replace,
+        )
+
+    assert failure.value.code == SNAPSHOT_PUBLICATION_FAILED
+    assert not snapshot_path.exists()
+    assert not manifest_path.exists()
+    assert not list(tmp_path.rglob(".m2-freeze-*"))
+
+
+@pytest.mark.parametrize("failing_name", ["m1-candidates.v1.json", "m1-candidates.v1.manifest.json"])
+def test_paired_publication_cleans_staging_when_a_temp_write_fails(
+    synthetic_inputs: tuple[Path, Path, Path],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    failing_name: str,
+) -> None:
+    output_path, cache_dir, report_path = synthetic_inputs
+    _, _, snapshot_bytes, manifest_bytes = _snapshot_pair(output_path, cache_dir, report_path)
+    snapshot_path = tmp_path / "out" / "m1-candidates.v1.json"
+    manifest_path = tmp_path / "out" / "m1-candidates.v1.manifest.json"
+    original_write = Path.write_bytes
+
+    def fail_staged_write(path: Path, contents: bytes) -> int:
+        if path.name == failing_name and path.parent.name.startswith(".m2-freeze-"):
+            raise OSError("injected temporary write failure")
+        return original_write(path, contents)
+
+    monkeypatch.setattr(Path, "write_bytes", fail_staged_write)
+    with pytest.raises(FreezeGateError) as failure:
+        _publish_snapshot_pair(
+            snapshot_path=snapshot_path,
+            snapshot_bytes=snapshot_bytes,
+            manifest_path=manifest_path,
+            manifest_bytes=manifest_bytes,
+        )
+    assert failure.value.code == SNAPSHOT_PUBLICATION_FAILED
+    assert not snapshot_path.exists()
+    assert not manifest_path.exists()
+    assert not list(tmp_path.rglob(".m2-freeze-*"))
+
+
+def test_paired_publication_is_idempotent_rejects_conflicts_and_is_byte_identical(
+    synthetic_inputs: tuple[Path, Path, Path], tmp_path: Path
+) -> None:
+    output_path, cache_dir, report_path = synthetic_inputs
+    _, _, snapshot_bytes, manifest_bytes = _snapshot_pair(output_path, cache_dir, report_path)
+    snapshot_path = tmp_path / "out" / "m1-candidates.v1.json"
+    manifest_path = tmp_path / "out" / "m1-candidates.v1.manifest.json"
+
+    _publish_snapshot_pair(
+        snapshot_path=snapshot_path,
+        snapshot_bytes=snapshot_bytes,
+        manifest_path=manifest_path,
+        manifest_bytes=manifest_bytes,
+    )
+    first = (snapshot_path.read_bytes(), manifest_path.read_bytes())
+    _publish_snapshot_pair(
+        snapshot_path=snapshot_path,
+        snapshot_bytes=snapshot_bytes,
+        manifest_path=manifest_path,
+        manifest_bytes=manifest_bytes,
+    )
+    assert first == (snapshot_path.read_bytes(), manifest_path.read_bytes())
+
+    snapshot_path.write_bytes(b"conflict")
+    with pytest.raises(FreezeGateError) as failure:
+        _publish_snapshot_pair(
+            snapshot_path=snapshot_path,
+            snapshot_bytes=snapshot_bytes,
+            manifest_path=manifest_path,
+            manifest_bytes=manifest_bytes,
+        )
+    assert failure.value.code == SNAPSHOT_PUBLICATION_FAILED

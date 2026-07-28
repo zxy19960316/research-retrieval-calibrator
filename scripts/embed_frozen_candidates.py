@@ -8,6 +8,7 @@ real run remains conditional on the provenance-preserving M1 freeze gate.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import sys
@@ -29,7 +30,7 @@ from app.adapters.embedding import (
 )
 from app.core.embedding import build_embedding_text, build_query_embedding_input, embed_inputs
 from app.models.embedding import EmbeddingTaskError, FrozenCandidate, FrozenCandidateSnapshot
-from scripts.freeze_m2_candidates import _canonical_json_sha256, validate_frozen_snapshot_payload
+from scripts.freeze_m2_candidates import _canonical_json_sha256, validate_frozen_snapshot_bytes
 
 _BGE_VECTOR_SNAPSHOT = "bge-m3-dense-v1.json"
 _BGE_VECTOR_MANIFEST = "bge-m3-dense-v1.manifest.json"
@@ -50,13 +51,14 @@ def load_validated_frozen_inputs(snapshot_path: Path, manifest_path: Path) -> Va
     """Load only a closed, manifest-validated frozen candidate snapshot."""
 
     try:
-        snapshot_payload = json.loads(snapshot_path.read_text(encoding="utf-8"))
+        snapshot_bytes = snapshot_path.read_bytes()
+        snapshot_payload = json.loads(snapshot_bytes)
         manifest_payload = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
         raise EmbeddingTaskError("FROZEN_SNAPSHOT_MISSING") from error
     if not isinstance(snapshot_payload, dict) or not isinstance(manifest_payload, dict):
         raise EmbeddingTaskError("FROZEN_SNAPSHOT_HASH_MISMATCH")
-    if validate_frozen_snapshot_payload(snapshot_payload, manifest_payload) is not None:
+    if validate_frozen_snapshot_bytes(snapshot_bytes, manifest_payload) is not None:
         raise EmbeddingTaskError("FROZEN_SNAPSHOT_HASH_MISMATCH")
     try:
         closed_snapshot = FrozenCandidateSnapshot(
@@ -66,7 +68,7 @@ def load_validated_frozen_inputs(snapshot_path: Path, manifest_path: Path) -> Va
     except (KeyError, TypeError, ValidationError) as error:
         raise EmbeddingTaskError("FROZEN_SNAPSHOT_HASH_MISMATCH") from error
     return ValidatedFrozenInputs(
-        snapshot_sha256=_canonical_json_sha256(snapshot_payload),
+        snapshot_sha256=hashlib.sha256(snapshot_bytes).hexdigest(),
         question=closed_snapshot.question,
         candidates=closed_snapshot.candidates,
     )

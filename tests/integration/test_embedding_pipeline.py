@@ -18,7 +18,7 @@ from app.models.embedding import (
     FrozenCandidate,
 )
 from scripts.embed_frozen_candidates import embed_frozen_candidates, main
-from scripts.freeze_m2_candidates import _canonical_json_sha256
+from scripts.freeze_m2_candidates import _canonical_json_sha256, _render_json_bytes
 
 
 @pytest.fixture
@@ -69,12 +69,20 @@ def _write_validated_snapshot(tmp_path: Path) -> tuple[Path, Path]:
         "snapshot_version": "m2-candidates.v1",
     }
     manifest = {
-        "snapshot_sha256": _canonical_json_sha256(snapshot),
-        "zero_transport_replay": {"transport_requests": 0},
+        "candidate_count": 33,
+        "candidate_identity_sha256": _canonical_json_sha256(
+            [(item["paper_id"], item["source"], item["source_id"]) for item in candidates]
+        ),
+        "source_identity_set_sha256": _canonical_json_sha256(
+            sorted((item["source"], item["source_id"]) for item in candidates)
+        ),
+        "zero_transport_replay": {"cache_hits": 12, "query_count": 12, "transport_requests": 0},
     }
     snapshot_path = tmp_path / "m1-candidates.v1.json"
     manifest_path = tmp_path / "m1-candidates.v1.manifest.json"
-    snapshot_path.write_text(json.dumps(snapshot), encoding="utf-8")
+    snapshot_bytes = _render_json_bytes(snapshot)
+    manifest["snapshot_sha256"] = hashlib.sha256(snapshot_bytes).hexdigest()
+    snapshot_path.write_bytes(snapshot_bytes)
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
     return snapshot_path, manifest_path
 
