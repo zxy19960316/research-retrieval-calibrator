@@ -84,6 +84,7 @@ class CandidateOutput(BaseModel):
     source: str = Field(min_length=1)
     source_id: str = Field(min_length=1)
     title: str = Field(min_length=1)
+    abstract: str | None = None
     authors: list[str]
     year: int | None = Field(default=None, ge=1900, le=2100)
     doi: str | None = None

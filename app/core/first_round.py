@@ -274,6 +274,7 @@ def _candidate_from_cluster(cluster: DedupCluster) -> CandidateOutput:
         source=record.source,
         source_id=record.source_id,
         title=record.title,
+        abstract=record.abstract,
         authors=record.authors,
         year=record.year,
         doi=record.doi,
