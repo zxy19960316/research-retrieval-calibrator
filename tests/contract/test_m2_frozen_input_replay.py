@@ -30,6 +30,8 @@ from scripts.freeze_m2_candidates import (
     FreezeResult,
     _canonical_json_sha256,
     _metadata_mismatch_field,
+    _normalize_evidence_report_label,
+    _normalize_repository_relative_label,
     _project_abstract,
     _publish_snapshot_pair,
     _render_json_bytes,
@@ -770,6 +772,126 @@ def test_evidence_report_labels_are_posix_and_external_production_paths_are_reje
     assert _repository_relative_posix_path(Path("evaluation\\reports\\m1-validation.json")) == "evaluation/reports/m1-validation.json"
     with pytest.raises(FreezeGateError):
         _repository_relative_posix_path(tmp_path / "external-m1-validation.json")
+
+
+@pytest.mark.parametrize(
+    ("input_value", "expected"),
+    [
+        ("evaluation/reports/m1-validation.json", "evaluation/reports/m1-validation.json"),
+        (r"evaluation\reports\m1-validation.json", "evaluation/reports/m1-validation.json"),
+        (
+            r"evaluation\reports\m1-rebaseline-2026-07-28.json",
+            "evaluation/reports/m1-rebaseline-2026-07-28.json",
+        ),
+    ],
+)
+def test_evidence_report_labels_normalize_consistently_across_interfaces(
+    input_value: str, expected: str
+) -> None:
+    assert _normalize_repository_relative_label(input_value) == expected
+    assert _normalize_evidence_report_label(input_value) == expected
+    assert _repository_relative_posix_path(Path(input_value)) == expected
+
+
+@pytest.mark.parametrize(
+    "input_value",
+    [
+        r"C:\outside\report.json",
+        "C:/outside/report.json",
+        r"\\server\share\report.json",
+        "//server/share/report.json",
+        "/tmp/report.json",
+        "../report.json",
+        "evaluation/../report.json",
+        ".",
+        "",
+        "docs/report.json",
+        "evaluation/report.json",
+        "evaluation/reports",
+        "evaluation/reports/report.txt",
+    ],
+)
+def test_evidence_report_label_contract_rejects_external_or_nonreport_paths(input_value: str) -> None:
+    with pytest.raises(FreezeGateError):
+        _normalize_repository_relative_label(input_value)
+    with pytest.raises(FreezeGateError):
+        _normalize_evidence_report_label(input_value)
+    with pytest.raises(FreezeGateError):
+        _repository_relative_posix_path(Path(input_value))
+
+
+def test_snapshot_validator_rejects_noncanonical_evidence_report_label(
+    synthetic_inputs: tuple[Path, Path, Path],
+) -> None:
+    output_path, cache_dir, report_path = synthetic_inputs
+    snapshot, manifest, _, _ = _snapshot_pair(output_path, cache_dir, report_path)
+    snapshot["source_evidence_report"] = r"evaluation\reports\synthetic-m1-validation.json"
+    manifest["source_evidence_report"] = snapshot["source_evidence_report"]
+    snapshot_bytes = _render_json_bytes(snapshot)
+    manifest["snapshot_sha256"] = hashlib.sha256(snapshot_bytes).hexdigest()
+    assert validate_frozen_snapshot_bytes(snapshot_bytes, manifest, expected_candidate_count=12) == (
+        "frozen snapshot evidence report path is invalid"
+    )
+
+
+@pytest.mark.parametrize(
+    "invalid_label",
+    [
+        r"C:\outside\report.json",
+        "C:/outside/report.json",
+        r"\\server\share\report.json",
+        "//server/share/report.json",
+        "/tmp/report.json",
+        "../report.json",
+        "evaluation/../report.json",
+        ".",
+        "",
+        "docs/report.json",
+        "evaluation/report.json",
+        "evaluation/reports",
+        "evaluation/reports/report.txt",
+    ],
+)
+def test_snapshot_validator_reuses_the_evidence_report_label_contract(
+    synthetic_inputs: tuple[Path, Path, Path], invalid_label: str
+) -> None:
+    output_path, cache_dir, report_path = synthetic_inputs
+    snapshot, manifest, _, _ = _snapshot_pair(output_path, cache_dir, report_path)
+    snapshot["source_evidence_report"] = invalid_label
+    manifest["source_evidence_report"] = invalid_label
+    snapshot_bytes = _render_json_bytes(snapshot)
+    manifest["snapshot_sha256"] = hashlib.sha256(snapshot_bytes).hexdigest()
+    assert validate_frozen_snapshot_bytes(snapshot_bytes, manifest, expected_candidate_count=12) == (
+        "frozen snapshot evidence report path is invalid"
+    )
+
+
+def test_fully_idempotent_publication_skips_staging_and_preserves_mtimes(
+    synthetic_inputs: tuple[Path, Path, Path], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output_path, cache_dir, report_path = synthetic_inputs
+    _, _, snapshot_bytes, manifest_bytes = _snapshot_pair(output_path, cache_dir, report_path)
+    output_dir = tmp_path / "out"
+    output_dir.mkdir()
+    snapshot_path = output_dir / "m1-candidates.v1.json"
+    manifest_path = output_dir / "m1-candidates.v1.manifest.json"
+    snapshot_path.write_bytes(snapshot_bytes)
+    manifest_path.write_bytes(manifest_bytes)
+    mtimes = (snapshot_path.stat().st_mtime_ns, manifest_path.stat().st_mtime_ns)
+
+    def fail_stage(*_: object, **__: object) -> str:
+        raise AssertionError("fully idempotent publication must not stage")
+
+    monkeypatch.setattr(freeze_module.tempfile, "mkdtemp", fail_stage)
+    _publish_synthetic_pair(
+        snapshot_path=snapshot_path,
+        snapshot_bytes=snapshot_bytes,
+        manifest_path=manifest_path,
+        manifest_bytes=manifest_bytes,
+    )
+    assert (snapshot_path.read_bytes(), manifest_path.read_bytes()) == (snapshot_bytes, manifest_bytes)
+    assert (snapshot_path.stat().st_mtime_ns, manifest_path.stat().st_mtime_ns) == mtimes
+    assert not list(output_dir.glob(".m2-freeze-*"))
 
 
 def test_paired_publication_rejects_staging_creation_and_readback_validation_failures(

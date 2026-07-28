@@ -17,7 +17,7 @@ import sys
 import tempfile
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from pathlib import Path, PurePosixPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import TYPE_CHECKING, Any, TypeGuard
 
 if TYPE_CHECKING:
@@ -287,15 +287,14 @@ def validate_frozen_snapshot_bytes(
             return f"frozen snapshot and manifest {snapshot_key} provenance do not match"
     source_report = snapshot.get("source_evidence_report")
     manifest_report = manifest.get("source_evidence_report")
-    if (
-        not isinstance(source_report, str)
-        or not source_report
-        or "\\" in source_report
-        or PurePosixPath(source_report).is_absolute()
-        or ".." in PurePosixPath(source_report).parts
-        or source_report != manifest_report
-    ):
-        return "frozen snapshot and manifest evidence report path do not match"
+    if not isinstance(source_report, str):
+        return "frozen snapshot evidence report path is invalid"
+    try:
+        normalized_report = _normalize_repository_relative_label(source_report)
+    except FreezeGateError:
+        return "frozen snapshot evidence report path is invalid"
+    if source_report != normalized_report or manifest_report != normalized_report:
+        return "frozen snapshot evidence report path is invalid"
     source_hashes = (
         "source_evidence_report_sha256",
         "source_output_sha256",
@@ -679,6 +678,29 @@ def _publish_snapshot_pair(
         snapshot_path, snapshot_bytes, manifest_path, manifest_bytes
     )
     try:
+        manifest_payload = json.loads(manifest_bytes)
+    except (TypeError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise FreezeGateError(SNAPSHOT_PUBLICATION_FAILED, "manifest is not an object") from error
+    if not isinstance(manifest_payload, Mapping):
+        raise FreezeGateError(SNAPSHOT_PUBLICATION_FAILED, "manifest is not an object")
+    validation_error = validate_frozen_snapshot_bytes(
+        snapshot_bytes,
+        manifest_payload,
+        expected_candidate_count=expected_candidate_count,
+    )
+    if validation_error is not None:
+        raise FreezeGateError(SNAPSHOT_PUBLICATION_FAILED, validation_error)
+    if not state.snapshot_needs_publish and not state.manifest_needs_publish:
+        try:
+            if snapshot_path.read_bytes() != snapshot_bytes or manifest_path.read_bytes() != manifest_bytes:
+                raise FreezeGateError(
+                    SNAPSHOT_PUBLICATION_FAILED,
+                    "published snapshot pair does not match staged bytes",
+                )
+        except OSError as error:
+            raise FreezeGateError(SNAPSHOT_PUBLICATION_FAILED, "paired snapshot publication failed") from error
+        return
+    try:
         snapshot_path.parent.mkdir(parents=True, exist_ok=True)
         stage = Path(tempfile.mkdtemp(prefix=".m2-freeze-", dir=snapshot_path.parent))
     except OSError as error:
@@ -691,16 +713,6 @@ def _publish_snapshot_pair(
     try:
         staged_snapshot.write_bytes(snapshot_bytes)
         staged_manifest.write_bytes(manifest_bytes)
-        staged_manifest_payload = json.loads(staged_manifest.read_text(encoding="utf-8"))
-        if not isinstance(staged_manifest_payload, Mapping):
-            raise FreezeGateError(SNAPSHOT_PUBLICATION_FAILED, "staged manifest is not an object")
-        validation_error = validate_frozen_snapshot_bytes(
-            staged_snapshot.read_bytes(),
-            staged_manifest_payload,
-            expected_candidate_count=expected_candidate_count,
-        )
-        if validation_error is not None:
-            raise FreezeGateError(SNAPSHOT_PUBLICATION_FAILED, validation_error)
         if state.snapshot_needs_publish:
             replace(staged_snapshot, snapshot_path)
             snapshot_published_this_run = True
@@ -734,21 +746,55 @@ def _publish_snapshot_pair(
 def _repository_relative_posix_path(path: Path) -> str:
     """Return a repository-relative POSIX evidence path or reject external input."""
 
+    raw = os.fspath(path)
+    if os.name != "nt" and PureWindowsPath(raw).is_absolute():
+        raise FreezeGateError(
+            FROZEN_INPUT_INVALID,
+            "M1 evidence report must be inside the repository",
+        )
+    candidate = Path(raw.replace("\\", "/"))
+    if not candidate.is_absolute():
+        candidate = ROOT / candidate
     try:
-        return path.resolve().relative_to(ROOT.resolve()).as_posix()
+        relative = candidate.resolve().relative_to(ROOT.resolve())
     except ValueError as error:
         raise FreezeGateError(
             FROZEN_INPUT_INVALID,
             "M1 evidence report must be inside the repository",
         ) from error
+    return _normalize_repository_relative_label(relative.as_posix())
+
+
+def _normalize_repository_relative_label(value: str) -> str:
+    """Return a canonical repository evidence-report label or fail closed."""
+
+    if not isinstance(value, str):
+        raise FreezeGateError(FROZEN_INPUT_INVALID, "M1 evidence report label is invalid")
+    raw = value.strip()
+    if not raw:
+        raise FreezeGateError(FROZEN_INPUT_INVALID, "M1 evidence report label is invalid")
+    posix_path = PurePosixPath(raw.replace("\\", "/"))
+    windows_path = PureWindowsPath(raw)
+    if (
+        posix_path.is_absolute()
+        or windows_path.is_absolute()
+        or windows_path.drive != ""
+        or windows_path.anchor != ""
+        or ".." in posix_path.parts
+    ):
+        raise FreezeGateError(FROZEN_INPUT_INVALID, "M1 evidence report label is invalid")
+    normalized = posix_path.as_posix()
+    if (
+        normalized == "."
+        or not normalized.startswith("evaluation/reports/")
+        or PurePosixPath(normalized).suffix != ".json"
+    ):
+        raise FreezeGateError(FROZEN_INPUT_INVALID, "M1 evidence report label is invalid")
+    return normalized
 
 
 def _normalize_evidence_report_label(label: str) -> str:
-    normalized = label.replace("\\", "/")
-    path = PurePosixPath(normalized)
-    if not normalized or path.is_absolute() or ".." in path.parts:
-        raise FreezeGateError(FROZEN_INPUT_INVALID, "M1 evidence report label must be relative")
-    return path.as_posix()
+    return _normalize_repository_relative_label(label)
 
 
 def freeze_candidates(
