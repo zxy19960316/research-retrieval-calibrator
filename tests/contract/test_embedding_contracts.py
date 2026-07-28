@@ -10,6 +10,8 @@ from pydantic import ValidationError
 
 from app.models.dedup import SourceIdentity
 from app.models.embedding import (
+    BGE_M3_MODEL_ID,
+    BGE_M3_MODEL_REVISION,
     EmbeddingCacheEntry,
     EmbeddingInput,
     EmbeddingModelDescriptor,
@@ -138,14 +140,44 @@ def test_snapshot_rejects_duplicate_paper_and_source_identities(
 def test_real_descriptors_require_immutable_revisions_and_distinct_namespaces(
     fake_descriptor: EmbeddingModelDescriptor,
 ) -> None:
-    real = {**fake_descriptor.model_dump(), "provider_name": "bge_m3", "model_id": "BAAI/bge-m3"}
+    real = {
+        **fake_descriptor.model_dump(),
+        "provider_name": "bge_m3",
+        "model_id": BGE_M3_MODEL_ID,
+        "model_revision": BGE_M3_MODEL_REVISION,
+        "provider_library": "FlagEmbedding",
+        "provider_library_version": "1.3.5",
+        "dimension": 1024,
+        "cache_namespace": "embedding:bge-m3",
+    }
     for revision in ("", "main", "latest"):
-        with pytest.raises(ValidationError, match="immutable"):
+        with pytest.raises(ValidationError, match="40-character"):
             EmbeddingModelDescriptor.model_validate({**real, "model_revision": revision})
     with pytest.raises(ValidationError, match="namespace"):
-        EmbeddingModelDescriptor.model_validate({**real, "model_revision": "0123456789abcdef", "cache_namespace": "embedding:fake"})
+        EmbeddingModelDescriptor.model_validate({**real, "cache_namespace": "embedding:fake"})
     with pytest.raises(ValidationError, match="fake"):
         EmbeddingModelDescriptor.model_validate({**fake_descriptor.model_dump(), "cache_namespace": "embedding:real"})
+
+
+def test_bge_m3_descriptor_requires_the_fixed_full_commit_identity(
+    fake_descriptor: EmbeddingModelDescriptor,
+) -> None:
+    real = {
+        **fake_descriptor.model_dump(),
+        "provider_name": "bge_m3",
+        "model_id": BGE_M3_MODEL_ID,
+        "model_revision": BGE_M3_MODEL_REVISION,
+        "provider_library": "FlagEmbedding",
+        "provider_library_version": "1.3.5",
+        "dimension": 1024,
+        "cache_namespace": "embedding:bge-m3",
+    }
+    assert EmbeddingModelDescriptor.model_validate(real).model_revision == BGE_M3_MODEL_REVISION
+    for invalid in ("main", "5617a9f", BGE_M3_MODEL_REVISION.upper(), "f" * 40):
+        with pytest.raises(ValidationError, match="40-character|fixed BGE-M3"):
+            EmbeddingModelDescriptor.model_validate({**real, "model_revision": invalid})
+    with pytest.raises(ValidationError, match="provider library version"):
+        EmbeddingModelDescriptor.model_validate({**real, "provider_library_version": "optional"})
 
 
 def test_embedding_input_vector_and_cache_require_matching_finite_dimensions(

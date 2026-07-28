@@ -40,6 +40,10 @@ M1_REBASELINE_SOURCE_BUNDLE = "evaluation/source-artifacts/m1-rebaseline-2026-07
 M1_REBASELINE_CANDIDATE_ARRAY_SHA256 = "e51eb84d4e772bba324a199478caa5f0983edef0b0dbf4c58fce5f9da5803209"
 SHA1 = re.compile(r"[0-9a-f]{40}")
 SHA256 = re.compile(r"[0-9a-f]{64}")
+HF_COMMIT = re.compile(r"[0-9a-f]{40}")
+BGE_M3_MODEL_ID = "BAAI/bge-m3"
+BGE_M3_MODEL_REVISION = "5617a9f61b028005a4858fdac845db406aefb181"
+FORBIDDEN_PROVIDER_VERSIONS = frozenset({"optional", "unknown", "latest", "unavailable"})
 STATUS_ROW = re.compile(
     r"^\|\s*(M\d+)\b[^|]*\|\s*([A-Z0-9_]+)\s*\|\s*(\d+)/(\d+)\s*\|",
     re.MULTILINE,
@@ -383,6 +387,54 @@ def _validate_vector_snapshot(
         errors.append("vector snapshot must have one query and one positive uniform dimension")
     if manifest.get("candidate_count") != 33 or manifest.get("query_count") != 1:
         errors.append("vector manifest must record 33 candidate vectors and one query vector")
+    if manifest.get("evidence_type") == "real":
+        _validate_real_provider_contract(manifest.get("provider"), manifest.get("runtime"), errors)
+
+
+def _validate_real_provider_contract(
+    provider: object, runtime: object, errors: list[str]
+) -> None:
+    """Reject unverifiable BGE-M3 descriptors and fabricated runtime metadata."""
+
+    if not isinstance(provider, dict):
+        errors.append("real model evidence must include its provider descriptor")
+        return
+    if provider.get("provider_name") != "bge_m3" or provider.get("model_id") != BGE_M3_MODEL_ID:
+        errors.append("real model evidence must identify BAAI/bge-m3, never fake")
+    revision = provider.get("model_revision")
+    if not isinstance(revision, str) or HF_COMMIT.fullmatch(revision) is None or revision != BGE_M3_MODEL_REVISION:
+        errors.append("real model evidence requires the fixed full 40-character model revision")
+    library_version = provider.get("provider_library_version")
+    if (
+        provider.get("provider_library") != "FlagEmbedding"
+        or not isinstance(library_version, str)
+        or not library_version.strip()
+        or library_version.casefold() in FORBIDDEN_PROVIDER_VERSIONS
+    ):
+        errors.append("real model evidence requires a resolved FlagEmbedding provider version")
+    if provider.get("embedding_mode") != "dense" or provider.get("dimension") != 1024 or provider.get("normalized") is not True:
+        errors.append("real model evidence must record normalized 1024-dimensional dense vectors")
+    namespace = provider.get("cache_namespace")
+    if not isinstance(namespace, str) or not namespace.strip() or namespace == "embedding:fake":
+        errors.append("fake and real cache namespaces must differ")
+    if not isinstance(runtime, dict):
+        errors.append("real model evidence must include complete runtime metadata")
+        return
+    for field in (
+        "python_version",
+        "flagembedding_version",
+        "torch_version",
+        "transformers_version",
+        "huggingface_hub_version",
+        "numpy_version",
+    ):
+        value = runtime.get(field)
+        if not isinstance(value, str) or not value.strip() or value.casefold() in FORBIDDEN_PROVIDER_VERSIONS:
+            errors.append(f"real runtime has an invalid {field}")
+    if runtime.get("model_revision") != revision:
+        errors.append("real runtime model revision does not match provider")
+    if not isinstance(runtime.get("use_fp16"), bool):
+        errors.append("real runtime use_fp16 must be boolean")
 
 
 def _validate_checks(payload: dict[str, Any], errors: list[str]) -> None:
@@ -423,23 +475,7 @@ def _validate_model_evidence(payload: dict[str, Any], errors: list[str]) -> None
     if not isinstance(real, dict) or real.get("classification") != "real":
         errors.append("real_model_evidence must be explicitly classified real")
         return
-    descriptor = real.get("provider")
-    if not isinstance(descriptor, dict):
-        errors.append("real model evidence must include its provider descriptor")
-        return
-    revision, namespace, dimension = (
-        descriptor.get("model_revision"),
-        descriptor.get("cache_namespace"),
-        descriptor.get("dimension"),
-    )
-    if descriptor.get("provider_name") == "deterministic_fake" or descriptor.get("model_id") != "BAAI/bge-m3":
-        errors.append("real model evidence must identify BAAI/bge-m3, never fake")
-    if not isinstance(revision, str) or not revision.strip() or revision.casefold() in {"main", "latest"}:
-        errors.append("real model evidence requires an immutable model revision")
-    if not isinstance(namespace, str) or not namespace.strip() or namespace == "embedding:fake":
-        errors.append("fake and real cache namespaces must differ")
-    if descriptor.get("embedding_mode") != "dense" or not isinstance(dimension, int) or dimension <= 0:
-        errors.append("real model evidence must record a positive dense dimension")
+    _validate_real_provider_contract(real.get("provider"), real.get("runtime"), errors)
     if real.get("candidate_vector_count") != 33 or real.get("query_vector_count") != 1:
         errors.append("real model evidence must record 33 candidate vectors and one query vector")
     if real.get("non_finite_count") != 0:

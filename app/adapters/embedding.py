@@ -5,10 +5,18 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import sys
 from collections.abc import Sequence
+from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path
 from typing import Any, Protocol
 
-from app.models.embedding import EmbeddingModelDescriptor, EmbeddingTaskError
+from app.models.embedding import (
+    BGE_M3_MODEL_ID,
+    BGE_M3_MODEL_REVISION,
+    EmbeddingModelDescriptor,
+    EmbeddingTaskError,
+)
 
 _FAKE_DESCRIPTOR = EmbeddingModelDescriptor(
     provider_name="deterministic_fake",
@@ -23,7 +31,14 @@ _FAKE_DESCRIPTOR = EmbeddingModelDescriptor(
     cache_namespace="embedding:fake",
 )
 _BGE_M3_DIMENSION = 1024
-_FLOATING_REVISIONS = frozenset({"main", "master", "latest", "head"})
+_RUNTIME_PACKAGES = {
+    "flagembedding_version": "FlagEmbedding",
+    "torch_version": "torch",
+    "transformers_version": "transformers",
+    "huggingface_hub_version": "huggingface-hub",
+    "numpy_version": "numpy",
+}
+_ALLOWED_DEVICES = frozenset({"cpu", "cuda", "cuda:0", "mps"})
 
 
 class EmbeddingProvider(Protocol):
@@ -80,22 +95,38 @@ class BgeM3DenseProvider:
         model_id: str,
         model_revision: str,
         cache_namespace: str,
+        model_cache_dir: Path | str,
         device: str | None = None,
-        provider_library_version: str = "optional",
     ) -> None:
-        if not model_revision.strip() or model_revision.casefold() in _FLOATING_REVISIONS:
+        if model_revision != BGE_M3_MODEL_REVISION:
             raise EmbeddingTaskError("MODEL_REVISION_UNPINNED")
-        if not model_id.strip() or not cache_namespace.strip() or not provider_library_version.strip():
+        if model_id != BGE_M3_MODEL_ID:
             raise EmbeddingTaskError("INVALID_EMBEDDING_INPUT")
+        if not cache_namespace.strip() or cache_namespace == "embedding:fake":
+            raise EmbeddingTaskError("INVALID_EMBEDDING_INPUT")
+        if device is not None and device not in _ALLOWED_DEVICES:
+            raise EmbeddingTaskError("INVALID_EMBEDDING_INPUT")
+        try:
+            runtime_versions = {field: version(package) for field, package in _RUNTIME_PACKAGES.items()}
+        except PackageNotFoundError as error:
+            raise EmbeddingTaskError("EMBEDDING_PROVIDER_UNAVAILABLE") from error
         self._model_id = model_id
         self._model_revision = model_revision
         self._device = device
+        self._model_cache_dir = Path(model_cache_dir)
+        self._runtime = {
+            "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.x",
+            **runtime_versions,
+            "device_request": device,
+            "use_fp16": False,
+            "model_revision": model_revision,
+        }
         self._descriptor = EmbeddingModelDescriptor(
             provider_name="bge_m3",
             model_id=model_id,
             model_revision=model_revision,
             provider_library="FlagEmbedding",
-            provider_library_version=provider_library_version,
+            provider_library_version=runtime_versions["flagembedding_version"],
             embedding_mode="dense",
             input_format_version="m2-title-abstract-v1",
             normalized=True,
@@ -109,6 +140,12 @@ class BgeM3DenseProvider:
     def descriptor(self) -> EmbeddingModelDescriptor:
         return self._descriptor
 
+    @property
+    def runtime(self) -> dict[str, object]:
+        """Return the environment facts that must accompany real vector output."""
+
+        return dict(self._runtime)
+
     def embed(self, texts: Sequence[str], *, batch_size: int) -> list[list[float]]:
         _validate_embed_request(texts, batch_size)
         if not texts:
@@ -119,9 +156,6 @@ class BgeM3DenseProvider:
         try:
             model: Any = self._model
             torch: Any = self._torch
-            eval_method = model.eval
-            if callable(eval_method):
-                eval_method()
             with torch.inference_mode():
                 encoded = model.encode(
                     list(texts),
@@ -130,16 +164,20 @@ class BgeM3DenseProvider:
                     return_sparse=False,
                     return_colbert_vecs=False,
                 )
+            if not isinstance(encoded, dict) or "dense_vecs" not in encoded:
+                raise EmbeddingTaskError("EMBEDDING_PROVIDER_FAILED")
             dense_vectors = encoded["dense_vecs"]
             vectors = [[float(value) for value in vector] for vector in dense_vectors]
+        except EmbeddingTaskError:
+            raise
         except Exception as error:
             raise EmbeddingTaskError("EMBEDDING_PROVIDER_FAILED") from error
-        if len(vectors) != len(texts) or any(
-            len(vector) != self._descriptor.dimension
-            or not all(math.isfinite(value) for value in vector)
-            for vector in vectors
-        ):
-            raise EmbeddingTaskError("EMBEDDING_PROVIDER_FAILED")
+        if len(vectors) != len(texts):
+            raise EmbeddingTaskError("EMBEDDING_COUNT_MISMATCH")
+        if any(len(vector) != self._descriptor.dimension for vector in vectors):
+            raise EmbeddingTaskError("EMBEDDING_DIMENSION_MISMATCH")
+        if any(not all(math.isfinite(value) for value in vector) for vector in vectors):
+            raise EmbeddingTaskError("EMBEDDING_NON_FINITE")
         return vectors
 
     def _load_model_if_needed(self) -> None:
@@ -148,15 +186,24 @@ class BgeM3DenseProvider:
         try:
             import torch  # type: ignore[import-not-found]
             from FlagEmbedding import BGEM3FlagModel  # type: ignore[import-not-found]
+            from huggingface_hub import snapshot_download  # type: ignore[import-not-found]
         except (ImportError, OSError) as error:
             raise EmbeddingTaskError("EMBEDDING_PROVIDER_UNAVAILABLE") from error
         try:
-            model_kwargs: dict[str, object] = {"use_fp16": False}
-            if self._device is not None:
-                model_kwargs["device"] = self._device
-            self._model = BGEM3FlagModel(
-                self._model_id,
+            snapshot_path = snapshot_download(
+                repo_id=self._model_id,
                 revision=self._model_revision,
+                cache_dir=str(self._model_cache_dir),
+            )
+            model_kwargs: dict[str, object] = {
+                "normalize_embeddings": True,
+                "use_fp16": False,
+                "cache_dir": str(self._model_cache_dir),
+            }
+            if self._device is not None:
+                model_kwargs["devices"] = self._device
+            self._model = BGEM3FlagModel(
+                snapshot_path,
                 **model_kwargs,
             )
             self._torch = torch

@@ -201,3 +201,40 @@ def test_candidate_snapshot_rejects_invalid_exact_hash_or_provenance(
 
 def test_vector_snapshot_retains_canonical_hash_contract(monkeypatch: pytest.MonkeyPatch) -> None:
     assert _vector_validation(monkeypatch) == []
+
+
+def test_final_evidence_rejects_forged_real_provider_runtime_identity() -> None:
+    provider = {
+        "provider_name": "bge_m3",
+        "model_id": "BAAI/bge-m3",
+        "model_revision": "5617a9f61b028005a4858fdac845db406aefb181",
+        "provider_library": "FlagEmbedding",
+        "provider_library_version": "1.3.5",
+        "embedding_mode": "dense",
+        "normalized": True,
+        "dimension": 1024,
+        "cache_namespace": "embedding:bge-m3",
+    }
+    runtime = {
+        "python_version": "3.12.x",
+        "flagembedding_version": "1.3.5",
+        "torch_version": "2.4.1",
+        "transformers_version": "4.45.2",
+        "huggingface_hub_version": "0.25.2",
+        "numpy_version": "2.1.1",
+        "device_request": "cpu",
+        "use_fp16": False,
+        "model_revision": provider["model_revision"],
+    }
+    errors: list[str] = []
+    evidence._validate_real_provider_contract(provider, runtime, errors)
+    assert errors == []
+    for field, value in (("provider_library_version", "optional"), ("model_revision", "main"), ("dimension", 16), ("normalized", False), ("model_id", "wrong"), ("cache_namespace", "embedding:fake")):
+        invalid = deepcopy(provider)
+        invalid[field] = value
+        errors = []
+        evidence._validate_real_provider_contract(invalid, runtime, errors)
+        assert errors
+    errors = []
+    evidence._validate_real_provider_contract(provider, {**runtime, "use_fp16": "false"}, errors)
+    assert errors

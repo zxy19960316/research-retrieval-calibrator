@@ -42,8 +42,11 @@ EMBEDDING_ERROR_CODES: tuple[EmbeddingErrorCode, ...] = (
 )
 
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
-_COMMIT_RE = re.compile(r"^[0-9a-f]{40,64}$")
+_HF_COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 _PLACEHOLDER_ABSTRACTS = frozenset({"no abstract", "not provided", "no abstract available"})
+BGE_M3_MODEL_ID = "BAAI/bge-m3"
+BGE_M3_MODEL_REVISION = "5617a9f61b028005a4858fdac845db406aefb181"
+_FORBIDDEN_PROVIDER_VERSIONS = frozenset({"optional", "unknown", "latest", "unavailable"})
 
 
 class EmbeddingTaskError(ValueError):
@@ -103,7 +106,20 @@ class EmbeddingModelDescriptor(BaseModel):
                 raise ValueError("deterministic fake descriptors must use the fixed fake identity")
             return self
 
-        if not self.model_revision.strip() or self.model_revision.casefold() in {"main", "latest"}:
+        if self.provider_name == "bge_m3":
+            if self.model_id != BGE_M3_MODEL_ID:
+                raise ValueError("BGE-M3 descriptors must use the fixed BGE-M3 model ID")
+            if not _HF_COMMIT_RE.fullmatch(self.model_revision):
+                raise ValueError("BGE-M3 descriptors require a lowercase 40-character HF commit revision")
+            if self.model_revision != BGE_M3_MODEL_REVISION:
+                raise ValueError("BGE-M3 descriptors must use the fixed BGE-M3 model revision")
+            if self.provider_library != "FlagEmbedding":
+                raise ValueError("BGE-M3 descriptors must identify FlagEmbedding")
+            if self.provider_library_version.casefold() in _FORBIDDEN_PROVIDER_VERSIONS:
+                raise ValueError("BGE-M3 descriptors require a resolved provider library version")
+            if self.embedding_mode != "dense" or self.dimension != 1024 or self.normalized is not True:
+                raise ValueError("BGE-M3 descriptors must describe normalized 1024-dimensional dense vectors")
+        elif not self.model_revision.strip() or not _HF_COMMIT_RE.fullmatch(self.model_revision):
             raise ValueError("real embedding descriptors require an immutable model revision")
         if self.cache_namespace == "embedding:fake":
             raise ValueError("real embedding descriptors must use a namespace distinct from fake")

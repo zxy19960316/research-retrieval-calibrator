@@ -135,6 +135,11 @@ def embed_frozen_candidates(
         "stats": stats.model_dump(mode="json"),
         "vector_snapshot_sha256": vector_sha256,
     }
+    if provider_mode == "bge-m3":
+        runtime = getattr(provider, "runtime", None)
+        if not isinstance(runtime, dict):
+            raise EmbeddingTaskError("EMBEDDING_PROVIDER_FAILED")
+        result_manifest["runtime"] = runtime
     _write_json(output_dir / vector_name, payload)
     _write_json(output_dir / manifest_name, result_manifest)
     return {
@@ -183,25 +188,49 @@ def _parse_arguments(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--batch-size", type=int, required=True)
     parser.add_argument("--model-revision", "--revision", dest="model_revision")
     parser.add_argument("--cache-namespace")
+    parser.add_argument("--model-cache-dir", type=Path)
     parser.add_argument("--device")
     return parser.parse_args(argv)
 
 
 def _provider_for_arguments(arguments: argparse.Namespace) -> EmbeddingProvider:
     if arguments.provider == "fake":
-        if arguments.model_revision is not None or arguments.cache_namespace is not None:
+        if (
+            arguments.model_revision is not None
+            or arguments.cache_namespace is not None
+            or arguments.model_cache_dir is not None
+            or arguments.device is not None
+        ):
             raise EmbeddingTaskError("INVALID_EMBEDDING_INPUT")
         return DeterministicFakeEmbeddingProvider()
-    if not arguments.model_revision or not arguments.cache_namespace:
+    if not arguments.model_revision:
         raise EmbeddingTaskError("MODEL_REVISION_UNPINNED")
-    if arguments.cache_namespace == "embedding:fake":
+    if not arguments.cache_namespace or arguments.model_cache_dir is None:
         raise EmbeddingTaskError("INVALID_EMBEDDING_INPUT")
+    model_cache_dir = _validated_model_cache_dir(arguments.model_cache_dir)
     return BgeM3DenseProvider(
         model_id="BAAI/bge-m3",
         model_revision=arguments.model_revision,
         cache_namespace=arguments.cache_namespace,
+        model_cache_dir=model_cache_dir,
         device=arguments.device,
     )
+
+
+def _validated_model_cache_dir(path: Path) -> Path:
+    """Allow only a dedicated runtime cache outside tracked evaluation artifacts."""
+
+    resolved = path.resolve()
+    runtime_root = (ROOT / ".runtime").resolve()
+    try:
+        resolved.relative_to(ROOT.resolve())
+    except ValueError:
+        return resolved
+    try:
+        resolved.relative_to(runtime_root)
+    except ValueError as error:
+        raise EmbeddingTaskError("INVALID_EMBEDDING_INPUT") from error
+    return resolved
 
 
 def main(argv: Sequence[str] | None = None) -> int:

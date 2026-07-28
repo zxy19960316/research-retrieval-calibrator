@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from app.adapters import embedding as embedding_adapter
 from app.adapters.embedding import BgeM3DenseProvider, DeterministicFakeEmbeddingProvider
 from app.core.embedding import embed_inputs
 from app.models.dedup import SourceIdentity
@@ -166,11 +167,80 @@ def test_bge_cli_requires_an_immutable_revision_and_distinct_namespace(tmp_path:
     assert main(base_arguments) == 2
     assert json.loads(capsys.readouterr().out)["error_code"] == "MODEL_REVISION_UNPINNED"
 
-    assert main(base_arguments + ["--model-revision", "main", "--cache-namespace", "embedding:real"]) == 2
+    assert main(base_arguments + ["--model-revision", "main", "--cache-namespace", "embedding:real", "--model-cache-dir", str(tmp_path / "model")]) == 2
     assert json.loads(capsys.readouterr().out)["error_code"] == "MODEL_REVISION_UNPINNED"
 
-    assert main(base_arguments + ["--model-revision", "0123456789abcdef", "--cache-namespace", "embedding:fake"]) == 2
+    assert main(base_arguments + ["--model-revision", "0123456789abcdef", "--cache-namespace", "embedding:fake", "--model-cache-dir", str(tmp_path / "model")]) == 2
+    assert json.loads(capsys.readouterr().out)["error_code"] == "MODEL_REVISION_UNPINNED"
+
+
+def test_cli_separates_model_cache_from_vector_cache_and_validates_devices(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    snapshot_path, manifest_path = _write_validated_snapshot(tmp_path)
+    base = [
+        "--snapshot", str(snapshot_path), "--manifest", str(manifest_path),
+        "--cache-dir", str(tmp_path / "vectors"), "--output-dir", str(tmp_path / "outputs"), "--batch-size", "1",
+    ]
+    assert main(["--provider", "fake", *base, "--model-cache-dir", str(tmp_path / "model")]) == 2
     assert json.loads(capsys.readouterr().out)["error_code"] == "INVALID_EMBEDDING_INPUT"
+
+    assert main(["--provider", "bge-m3", *base, "--model-revision", "5617a9f61b028005a4858fdac845db406aefb181", "--cache-namespace", "embedding:bge-m3"]) == 2
+    assert json.loads(capsys.readouterr().out)["error_code"] == "INVALID_EMBEDDING_INPUT"
+
+    assert main(["--provider", "bge-m3", *base, "--model-revision", "5617a9f61b028005a4858fdac845db406aefb181", "--cache-namespace", "embedding:bge-m3", "--model-cache-dir", str(tmp_path / "model"), "--device", "cuda:1"]) == 2
+    assert json.loads(capsys.readouterr().out)["error_code"] == "INVALID_EMBEDDING_INPUT"
+
+    assert main(["--provider", "bge-m3", *base, "--model-revision", "5617a9f61b028005a4858fdac845db406aefb181", "--cache-namespace", "embedding:bge-m3", "--model-cache-dir", "evaluation/snapshots/m2/model-cache"]) == 2
+    assert json.loads(capsys.readouterr().out)["error_code"] == "INVALID_EMBEDDING_INPUT"
+
+
+def test_bge_manifest_records_complete_runtime_identity_with_a_stubbed_wrapper(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    snapshot_path, manifest_path = _write_validated_snapshot(tmp_path)
+    versions = {
+        "FlagEmbedding": "1.3.5",
+        "torch": "2.4.1",
+        "transformers": "4.45.2",
+        "huggingface-hub": "0.25.2",
+        "numpy": "2.1.1",
+    }
+    monkeypatch.setattr(embedding_adapter, "version", versions.__getitem__)
+    provider = BgeM3DenseProvider(
+        model_id="BAAI/bge-m3",
+        model_revision="5617a9f61b028005a4858fdac845db406aefb181",
+        cache_namespace="embedding:bge-m3",
+        model_cache_dir=tmp_path / "model-cache",
+    )
+    provider._model = type(
+        "Wrapper",
+        (),
+        {"encode": lambda _self, texts, **_kwargs: {"dense_vecs": [[1.0 / 32] * 1024 for _ in texts]}},
+    )()
+    provider._torch = type("Torch", (), {"inference_mode": lambda _self: _NoOpContext()})()
+
+    result = embed_frozen_candidates(
+        provider=provider,
+        snapshot_path=snapshot_path,
+        manifest_path=manifest_path,
+        cache_dir=tmp_path / "vector-cache",
+        output_dir=tmp_path / "outputs",
+        batch_size=8,
+        provider_mode="bge-m3",
+    )
+
+    manifest = json.loads(Path(str(result["manifest_path"])).read_text(encoding="utf-8"))
+    assert manifest["evidence_type"] == "real"
+    assert manifest["runtime"] == provider.runtime
+
+
+class _NoOpContext:
+    def __enter__(self) -> None:
+        return None
+
+    def __exit__(self, *_: object) -> None:
+        return None
 
 
 def test_bge_cli_reports_a_lazy_optional_provider_failure_without_writing_a_snapshot(
@@ -182,11 +252,21 @@ def test_bge_cli_reports_a_lazy_optional_provider_failure_without_writing_a_snap
         raise EmbeddingTaskError("EMBEDDING_PROVIDER_UNAVAILABLE")
 
     monkeypatch.setattr(BgeM3DenseProvider, "_load_model_if_needed", unavailable)
+    monkeypatch.setattr(
+        "app.adapters.embedding.version",
+        lambda package: {
+            "FlagEmbedding": "1.3.5",
+            "torch": "2.4.1",
+            "transformers": "4.45.2",
+            "huggingface-hub": "0.25.2",
+            "numpy": "2.1.1",
+        }[package],
+    )
     output_dir = tmp_path / "outputs"
     assert main([
         "--provider", "bge-m3", "--snapshot", str(snapshot_path), "--manifest", str(manifest_path),
         "--cache-dir", str(tmp_path / "cache"), "--output-dir", str(output_dir), "--batch-size", "1",
-        "--model-revision", "0123456789abcdef", "--cache-namespace", "embedding:real",
+        "--model-revision", "5617a9f61b028005a4858fdac845db406aefb181", "--cache-namespace", "embedding:real", "--model-cache-dir", str(tmp_path / "model"),
     ]) == 2
     assert json.loads(capsys.readouterr().out)["error_code"] == "EMBEDDING_PROVIDER_UNAVAILABLE"
     assert not (output_dir / "bge-m3-dense-v1.json").exists()
