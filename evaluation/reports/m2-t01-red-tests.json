@@ -1,0 +1,24 @@
+{
+  "task_id": "M2-T01",
+  "phase": "M2",
+  "evidence_type": "automated_red_test",
+  "red_light": {
+    "name": "embedding_contracts_before_implementation",
+    "executed_at_utc": "2026-07-28T02:38:44.626Z",
+    "command": "py -3.12 -m pytest tests/contract/test_embedding_contracts.py tests/unit/test_embedding_text.py tests/unit/test_embedding_cache.py tests/unit/test_embedding_provider.py tests/integration/test_embedding_pipeline.py tests/contract/test_m2_t01_evidence_validation.py -q",
+    "exit_code": 2,
+    "summary": "Collection failed first: ModuleNotFoundError: No module named 'app.models.embedding'. Remaining collection failures were the expected absent core, provider, and M2 evidence-validator modules.",
+    "test_file_sha256": {
+      "tests/contract/test_embedding_contracts.py": "db9f38ec0ba39a3e328abcd2d37f7b6c40caca66373eff04a3d3638da8941a41",
+      "tests/unit/test_embedding_text.py": "e162e98f8868c3a5bcaa72c125601955a2be6e116dc8fffb8f389904f74b3393",
+      "tests/unit/test_embedding_cache.py": "dfa0337820a019b8b5a43edd58fa04d5a97fa1442b31ed29630779fdc2b745ad",
+      "tests/unit/test_embedding_provider.py": "5bb4941c45b63c27da13ff0398193571072f2ac0ef568437b91fb0818ea2faf5",
+      "tests/integration/test_embedding_pipeline.py": "a60c3a8d174d23d29abcc4fc4473190f2ca9d059ab2cf8ec32c83837d237000d",
+      "tests/contract/test_m2_t01_evidence_validation.py": "2865fe5e11265702be8df4dd86a967a943f2958d8c4d5001d7eeebcbb421f567"
+    },
+    "environment": {
+      "python": "3.12.10"
+    },
+    "classification": "automated"
+  }
+}

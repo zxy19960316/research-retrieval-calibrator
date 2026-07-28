@@ -1,0 +1,161 @@
+"""Red-first fake-only integration expectations for M2 embedding orchestration."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from pathlib import Path
+
+import pytest
+
+from app.adapters.embedding import BgeM3DenseProvider, DeterministicFakeEmbeddingProvider
+from app.core.embedding import embed_inputs
+from app.models.dedup import SourceIdentity
+from app.models.embedding import (
+    EmbeddingInput,
+    EmbeddingModelDescriptor,
+    EmbeddingTaskError,
+    FrozenCandidate,
+)
+from scripts.embed_frozen_candidates import embed_frozen_candidates, main
+from scripts.freeze_m2_candidates import _canonical_json_sha256
+
+
+@pytest.fixture
+def fake_descriptor() -> EmbeddingModelDescriptor:
+    return EmbeddingModelDescriptor(provider_name="deterministic_fake", model_id="sha256-vector", model_revision="fake-v1", provider_library="stdlib", provider_library_version="3.12", embedding_mode="dense", input_format_version="m2-title-abstract-v1", normalized=True, dimension=16, cache_namespace="embedding:fake")
+
+
+@pytest.fixture
+def mixed_inputs() -> list[EmbeddingInput]:
+    texts = ["title:\nQuery input", "title:\nSource-backed paper", "title:\nTitle-only paper"]
+    return [EmbeddingInput(input_id=f"input-{index}", input_kind="query" if index == 0 else "paper", paper_id=None if index == 0 else f"arxiv:2401.0000{index}", query_id="Q1" if index == 0 else None, input_format_version="m2-title-abstract-v1", text=text, text_sha256=hashlib.sha256(text.encode("utf-8")).hexdigest(), source_snapshot_sha256="a" * 64) for index, text in enumerate(texts)]
+
+
+@pytest.mark.parametrize("batch_size", [1, 2, 3, 10])
+def test_mixed_cache_hit_miss_restores_input_order(tmp_path: Path, fake_descriptor: EmbeddingModelDescriptor, mixed_inputs: list[EmbeddingInput], batch_size: int) -> None:
+    provider = DeterministicFakeEmbeddingProvider(fake_descriptor)
+    _, _ = embed_inputs(mixed_inputs[:2], provider, tmp_path, batch_size=batch_size)
+    vectors, stats = embed_inputs(mixed_inputs, provider, tmp_path, batch_size=batch_size)
+    assert [vector.input_id for vector in vectors] == [item.input_id for item in mixed_inputs]
+    assert stats.cache_hits == 2 and stats.cache_misses == 1 and stats.provider_call_count == 1
+
+
+def _write_validated_snapshot(tmp_path: Path) -> tuple[Path, Path]:
+    candidates: list[dict[str, object]] = []
+    for index in range(33):
+        source_id = f"2401.{index:05d}"
+        candidate = FrozenCandidate(
+            paper_id=f"arxiv:{source_id}",
+            source="arxiv",
+            source_id=source_id,
+            title=f"Source-backed candidate {index}",
+            abstract=None if index == 0 else f"Source-backed abstract {index}",
+            authors=["A. Author"],
+            year=2024,
+            doi=None,
+            url=f"https://arxiv.org/abs/{source_id}",
+            language="en",
+            categories=[],
+            retrieval_paths=["Q1"],
+            cluster_id=f"cluster:{source_id}",
+            member_source_identities=[SourceIdentity(source="arxiv", source_id=source_id, url=f"https://arxiv.org/abs/{source_id}")],
+        )
+        candidates.append(candidate.model_dump(mode="json"))
+    snapshot: dict[str, object] = {
+        "candidates": candidates,
+        "count": 33,
+        "question": "How can graph-based retrieval support scientific literature discovery?",
+        "snapshot_version": "m2-candidates.v1",
+    }
+    manifest = {
+        "snapshot_sha256": _canonical_json_sha256(snapshot),
+        "zero_transport_replay": {"transport_requests": 0},
+    }
+    snapshot_path = tmp_path / "m1-candidates.v1.json"
+    manifest_path = tmp_path / "m1-candidates.v1.manifest.json"
+    snapshot_path.write_text(json.dumps(snapshot), encoding="utf-8")
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    return snapshot_path, manifest_path
+
+
+def test_fake_cli_live_then_replay_has_required_cache_stats_and_never_writes_bge_artifacts(
+    tmp_path: Path,
+) -> None:
+    snapshot_path, manifest_path = _write_validated_snapshot(tmp_path)
+    cache_dir = tmp_path / "cache"
+    output_dir = tmp_path / "outputs"
+    provider = DeterministicFakeEmbeddingProvider()
+
+    live = embed_frozen_candidates(
+        provider=provider,
+        snapshot_path=snapshot_path,
+        manifest_path=manifest_path,
+        cache_dir=cache_dir,
+        output_dir=output_dir,
+        batch_size=3,
+        provider_mode="fake",
+    )
+    replay = embed_frozen_candidates(
+        provider=provider,
+        snapshot_path=snapshot_path,
+        manifest_path=manifest_path,
+        cache_dir=cache_dir,
+        output_dir=output_dir,
+        batch_size=1,
+        provider_mode="fake",
+    )
+
+    assert live["stats"] == {
+        "cache_corrupt_count": 0,
+        "cache_hits": 0,
+        "cache_misses": 34,
+        "provider_call_count": 12,
+        "provider_input_count": 34,
+    }
+    assert replay["stats"] == {
+        "cache_corrupt_count": 0,
+        "cache_hits": 34,
+        "cache_misses": 0,
+        "provider_call_count": 0,
+        "provider_input_count": 0,
+    }
+    assert live["vector_snapshot_sha256"] == replay["vector_snapshot_sha256"]
+    assert (output_dir / "deterministic-fake-dense-v1.json").is_file()
+    assert not (output_dir / "bge-m3-dense-v1.json").exists()
+    assert not (output_dir / "bge-m3-dense-v1.manifest.json").exists()
+
+
+def test_bge_cli_requires_an_immutable_revision_and_distinct_namespace(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    snapshot_path, manifest_path = _write_validated_snapshot(tmp_path)
+    base_arguments = [
+        "--provider", "bge-m3", "--snapshot", str(snapshot_path), "--manifest", str(manifest_path),
+        "--cache-dir", str(tmp_path / "cache"), "--output-dir", str(tmp_path / "outputs"), "--batch-size", "1",
+    ]
+    assert main(base_arguments) == 2
+    assert json.loads(capsys.readouterr().out)["error_code"] == "MODEL_REVISION_UNPINNED"
+
+    assert main(base_arguments + ["--model-revision", "main", "--cache-namespace", "embedding:real"]) == 2
+    assert json.loads(capsys.readouterr().out)["error_code"] == "MODEL_REVISION_UNPINNED"
+
+    assert main(base_arguments + ["--model-revision", "0123456789abcdef", "--cache-namespace", "embedding:fake"]) == 2
+    assert json.loads(capsys.readouterr().out)["error_code"] == "INVALID_EMBEDDING_INPUT"
+
+
+def test_bge_cli_reports_a_lazy_optional_provider_failure_without_writing_a_snapshot(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    snapshot_path, manifest_path = _write_validated_snapshot(tmp_path)
+
+    def unavailable(_: BgeM3DenseProvider) -> None:
+        raise EmbeddingTaskError("EMBEDDING_PROVIDER_UNAVAILABLE")
+
+    monkeypatch.setattr(BgeM3DenseProvider, "_load_model_if_needed", unavailable)
+    output_dir = tmp_path / "outputs"
+    assert main([
+        "--provider", "bge-m3", "--snapshot", str(snapshot_path), "--manifest", str(manifest_path),
+        "--cache-dir", str(tmp_path / "cache"), "--output-dir", str(output_dir), "--batch-size", "1",
+        "--model-revision", "0123456789abcdef", "--cache-namespace", "embedding:real",
+    ]) == 2
+    assert json.loads(capsys.readouterr().out)["error_code"] == "EMBEDDING_PROVIDER_UNAVAILABLE"
+    assert not (output_dir / "bge-m3-dense-v1.json").exists()

@@ -1,0 +1,213 @@
+"""Embed one validated M2 candidate snapshot without ranking or retrieval.
+
+The command deliberately keeps deterministic fake vectors separate from the
+real BGE-M3 evidence path.  It is useful for local integration tests, while a
+real run remains conditional on the provenance-preserving M1 freeze gate.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sys
+from collections.abc import Sequence
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+from pydantic import ValidationError
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from app.adapters.embedding import (
+    BgeM3DenseProvider,
+    DeterministicFakeEmbeddingProvider,
+    EmbeddingProvider,
+)
+from app.core.embedding import build_embedding_text, build_query_embedding_input, embed_inputs
+from app.models.embedding import EmbeddingTaskError, FrozenCandidate, FrozenCandidateSnapshot
+from scripts.freeze_m2_candidates import _canonical_json_sha256, validate_frozen_snapshot_payload
+
+_BGE_VECTOR_SNAPSHOT = "bge-m3-dense-v1.json"
+_BGE_VECTOR_MANIFEST = "bge-m3-dense-v1.manifest.json"
+_FAKE_VECTOR_SNAPSHOT = "deterministic-fake-dense-v1.json"
+_FAKE_VECTOR_MANIFEST = "deterministic-fake-dense-v1.manifest.json"
+
+
+@dataclass(frozen=True)
+class ValidatedFrozenInputs:
+    """Snapshot material accepted by the M1 freeze contract."""
+
+    snapshot_sha256: str
+    question: str
+    candidates: list[FrozenCandidate]
+
+
+def load_validated_frozen_inputs(snapshot_path: Path, manifest_path: Path) -> ValidatedFrozenInputs:
+    """Load only a closed, manifest-validated frozen candidate snapshot."""
+
+    try:
+        snapshot_payload = json.loads(snapshot_path.read_text(encoding="utf-8"))
+        manifest_payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise EmbeddingTaskError("FROZEN_SNAPSHOT_MISSING") from error
+    if not isinstance(snapshot_payload, dict) or not isinstance(manifest_payload, dict):
+        raise EmbeddingTaskError("FROZEN_SNAPSHOT_HASH_MISMATCH")
+    if validate_frozen_snapshot_payload(snapshot_payload, manifest_payload) is not None:
+        raise EmbeddingTaskError("FROZEN_SNAPSHOT_HASH_MISMATCH")
+    try:
+        closed_snapshot = FrozenCandidateSnapshot(
+            question=str(snapshot_payload["question"]),
+            candidates=[FrozenCandidate.model_validate(value) for value in snapshot_payload["candidates"]],
+        )
+    except (KeyError, TypeError, ValidationError) as error:
+        raise EmbeddingTaskError("FROZEN_SNAPSHOT_HASH_MISMATCH") from error
+    return ValidatedFrozenInputs(
+        snapshot_sha256=_canonical_json_sha256(snapshot_payload),
+        question=closed_snapshot.question,
+        candidates=closed_snapshot.candidates,
+    )
+
+
+def embed_frozen_candidates(
+    *,
+    provider: EmbeddingProvider,
+    snapshot_path: Path,
+    manifest_path: Path,
+    cache_dir: Path,
+    output_dir: Path,
+    batch_size: int,
+    provider_mode: str,
+) -> dict[str, Any]:
+    """Embed the original question plus every frozen candidate and write JSON.
+
+    This function is intentionally free of provider construction so integration
+    tests can exercise the live/replay cache gates entirely with the standard
+    library fake implementation.
+    """
+
+    if provider_mode not in {"fake", "bge-m3"} or batch_size < 1:
+        raise EmbeddingTaskError("INVALID_EMBEDDING_INPUT")
+    vector_name, manifest_name = _artifact_names(provider_mode)
+    if provider_mode == "fake" and (vector_name == _BGE_VECTOR_SNAPSHOT or manifest_name == _BGE_VECTOR_MANIFEST):
+        raise EmbeddingTaskError("INVALID_EMBEDDING_INPUT")
+
+    frozen = load_validated_frozen_inputs(snapshot_path, manifest_path)
+    inputs = [build_query_embedding_input(frozen.question, frozen.snapshot_sha256)]
+    inputs.extend(build_embedding_text(candidate, frozen.snapshot_sha256) for candidate in frozen.candidates)
+    records, stats = embed_inputs(inputs, provider, cache_dir, batch_size=batch_size)
+
+    expected_count = len(frozen.candidates) + 1
+    if len(records) != expected_count or stats.cache_misses + stats.cache_hits != expected_count:
+        raise EmbeddingTaskError("EMBEDDING_COUNT_MISMATCH")
+    payload = {
+        "candidate_snapshot_sha256": frozen.snapshot_sha256,
+        "input_format_version": provider.descriptor.input_format_version,
+        "provider": provider.descriptor.model_dump(mode="json"),
+        "records": [record.model_dump(mode="json") for record in records],
+        "snapshot_version": "m2-embedding-v1",
+    }
+    vector_sha256 = _canonical_json_sha256(payload)
+    result_manifest = {
+        "candidate_count": len(frozen.candidates),
+        "candidate_snapshot_sha256": frozen.snapshot_sha256,
+        "evidence_type": "deterministic_fake" if provider_mode == "fake" else "real",
+        "input_format_version": provider.descriptor.input_format_version,
+        "provider": provider.descriptor.model_dump(mode="json"),
+        "query_count": 1,
+        "stats": stats.model_dump(mode="json"),
+        "vector_snapshot_sha256": vector_sha256,
+    }
+    _write_json(output_dir / vector_name, payload)
+    _write_json(output_dir / manifest_name, result_manifest)
+    return {
+        "manifest_path": str(output_dir / manifest_name),
+        "provider": provider_mode,
+        "stats": stats.model_dump(mode="json"),
+        "status": "success",
+        "vector_path": str(output_dir / vector_name),
+        "vector_snapshot_sha256": vector_sha256,
+    }
+
+
+def _artifact_names(provider_mode: str) -> tuple[str, str]:
+    if provider_mode == "fake":
+        return _FAKE_VECTOR_SNAPSHOT, _FAKE_VECTOR_MANIFEST
+    if provider_mode == "bge-m3":
+        return _BGE_VECTOR_SNAPSHOT, _BGE_VECTOR_MANIFEST
+    raise EmbeddingTaskError("INVALID_EMBEDDING_INPUT")
+
+
+def _write_json(path: Path, value: object) -> None:
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with temporary.open("w", encoding="utf-8", newline="\n") as handle:
+            json.dump(value, handle, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    except (OSError, TypeError, ValueError) as error:
+        try:
+            temporary.unlink(missing_ok=True)
+        except OSError:
+            pass
+        raise EmbeddingTaskError("EMBEDDING_OUTPUT_WRITE_FAILED") from error
+
+
+def _parse_arguments(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--provider", choices=("fake", "bge-m3"), required=True)
+    parser.add_argument("--snapshot", type=Path, required=True)
+    parser.add_argument("--manifest", type=Path, required=True)
+    parser.add_argument("--cache-dir", type=Path, required=True)
+    parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--batch-size", type=int, required=True)
+    parser.add_argument("--model-revision", "--revision", dest="model_revision")
+    parser.add_argument("--cache-namespace")
+    parser.add_argument("--device")
+    return parser.parse_args(argv)
+
+
+def _provider_for_arguments(arguments: argparse.Namespace) -> EmbeddingProvider:
+    if arguments.provider == "fake":
+        if arguments.model_revision is not None or arguments.cache_namespace is not None:
+            raise EmbeddingTaskError("INVALID_EMBEDDING_INPUT")
+        return DeterministicFakeEmbeddingProvider()
+    if not arguments.model_revision or not arguments.cache_namespace:
+        raise EmbeddingTaskError("MODEL_REVISION_UNPINNED")
+    if arguments.cache_namespace == "embedding:fake":
+        raise EmbeddingTaskError("INVALID_EMBEDDING_INPUT")
+    return BgeM3DenseProvider(
+        model_id="BAAI/bge-m3",
+        model_revision=arguments.model_revision,
+        cache_namespace=arguments.cache_namespace,
+        device=arguments.device,
+    )
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    arguments = _parse_arguments(argv)
+    try:
+        provider = _provider_for_arguments(arguments)
+        result = embed_frozen_candidates(
+            provider=provider,
+            snapshot_path=arguments.snapshot,
+            manifest_path=arguments.manifest,
+            cache_dir=arguments.cache_dir,
+            output_dir=arguments.output_dir,
+            batch_size=arguments.batch_size,
+            provider_mode=arguments.provider,
+        )
+    except EmbeddingTaskError as error:
+        result = {"error_code": error.code, "status": "failed"}
+    print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+    return 0 if result["status"] == "success" else 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -40,3 +40,5 @@ jobs:
         run: python scripts/validate_phase.py M0
       - name: Validate completed M1 evidence
         run: python scripts/validate_m1_evidence.py
+      - name: Validate completed M2-T01 evidence
+        run: python scripts/validate_m2_t01_evidence.py
