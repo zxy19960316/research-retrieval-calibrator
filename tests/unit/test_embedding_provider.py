@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import pytest
-from app.adapters.embedding import BgeM3DenseProvider, DeterministicFakeEmbeddingProvider
 
+from app.adapters.embedding import BgeM3DenseProvider, DeterministicFakeEmbeddingProvider
 from app.models.embedding import EmbeddingModelDescriptor, EmbeddingTaskError
 
 

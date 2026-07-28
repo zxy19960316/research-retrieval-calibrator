@@ -5,7 +5,6 @@ from __future__ import annotations
 import hashlib
 
 from app.core.embedding import build_embedding_text, build_query_embedding_input
-
 from app.models.dedup import SourceIdentity
 from app.models.embedding import EmbeddingModelDescriptor, FrozenCandidate
 

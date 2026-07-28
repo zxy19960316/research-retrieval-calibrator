@@ -6,9 +6,9 @@ import hashlib
 from pathlib import Path
 
 import pytest
+
 from app.adapters.embedding import DeterministicFakeEmbeddingProvider
 from app.core.embedding import embed_inputs
-
 from app.models.embedding import EmbeddingInput, EmbeddingModelDescriptor, EmbeddingTaskError
 
 
