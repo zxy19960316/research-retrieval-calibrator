@@ -47,7 +47,12 @@ class ValidatedFrozenInputs:
     candidates: list[FrozenCandidate]
 
 
-def load_validated_frozen_inputs(snapshot_path: Path, manifest_path: Path) -> ValidatedFrozenInputs:
+def load_validated_frozen_inputs(
+    snapshot_path: Path,
+    manifest_path: Path,
+    *,
+    expected_candidate_count: int = 33,
+) -> ValidatedFrozenInputs:
     """Load only a closed, manifest-validated frozen candidate snapshot."""
 
     try:
@@ -58,7 +63,14 @@ def load_validated_frozen_inputs(snapshot_path: Path, manifest_path: Path) -> Va
         raise EmbeddingTaskError("FROZEN_SNAPSHOT_MISSING") from error
     if not isinstance(snapshot_payload, dict) or not isinstance(manifest_payload, dict):
         raise EmbeddingTaskError("FROZEN_SNAPSHOT_HASH_MISMATCH")
-    if validate_frozen_snapshot_bytes(snapshot_bytes, manifest_payload) is not None:
+    if (
+        validate_frozen_snapshot_bytes(
+            snapshot_bytes,
+            manifest_payload,
+            expected_candidate_count=expected_candidate_count,
+        )
+        is not None
+    ):
         raise EmbeddingTaskError("FROZEN_SNAPSHOT_HASH_MISMATCH")
     try:
         closed_snapshot = FrozenCandidateSnapshot(

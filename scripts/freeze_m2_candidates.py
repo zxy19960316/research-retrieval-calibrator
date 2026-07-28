@@ -17,7 +17,7 @@ import sys
 import tempfile
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Any, TypeGuard
 
 if TYPE_CHECKING:
@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     from app.models.paper import PaperRecord
 
 M1_COMPLETION_MERGE_COMMIT = "0eb45fc22d10adb72cb66aa45494333057080bc1"
+ROOT = Path(__file__).resolve().parents[1]
 
 FROZEN_INPUT_MISSING = "M2_T01_FROZEN_INPUT_MISSING"
 FROZEN_INPUT_INVALID = "M2_T01_FROZEN_INPUT_INVALID"
@@ -97,6 +98,16 @@ class FreezeResult:
             "status": self.status,
         }
         return {key: value for key, value in result.items() if value is not None}
+
+
+@dataclass(frozen=True)
+class ExistingPublicationState:
+    """Existing publication bytes and the exact targets this call may create."""
+
+    snapshot_bytes: bytes | None
+    manifest_bytes: bytes | None
+    snapshot_needs_publish: bool
+    manifest_needs_publish: bool
 
 
 def _is_hex_sha(value: object, *, length: int) -> TypeGuard[str]:
@@ -218,12 +229,17 @@ def _parse_snapshot_bytes(snapshot_bytes: bytes) -> dict[str, object] | None:
 
 
 def validate_frozen_snapshot_bytes(
-    snapshot_bytes: bytes, manifest: Mapping[str, object]
+    snapshot_bytes: bytes,
+    manifest: Mapping[str, object],
+    *,
+    expected_candidate_count: int,
 ) -> str | None:
     """Validate the exact file bytes and all closed snapshot/manifest invariants."""
 
     from app.models.embedding import FrozenCandidate
 
+    if expected_candidate_count < 1:
+        return "expected candidate count must be positive"
     snapshot = _parse_snapshot_bytes(snapshot_bytes)
     if snapshot is None:
         return "frozen snapshot file is not a JSON object"
@@ -236,8 +252,12 @@ def validate_frozen_snapshot_bytes(
         frozen = [FrozenCandidate.model_validate(candidate) for candidate in candidates]
     except (TypeError, ValueError):
         return "frozen snapshot contains an invalid source-backed candidate"
-    if snapshot.get("count") != len(frozen) or manifest.get("candidate_count") != len(frozen):
-        return "frozen snapshot and manifest candidate counts do not match"
+    if (
+        len(frozen) != expected_candidate_count
+        or snapshot.get("count") != expected_candidate_count
+        or manifest.get("candidate_count") != expected_candidate_count
+    ):
+        return f"frozen snapshot must contain exactly {expected_candidate_count} candidates"
     paper_ids = [candidate.paper_id for candidate in frozen]
     if paper_ids != sorted(paper_ids):
         return "frozen snapshot candidates must be ordered by paper_id"
@@ -246,13 +266,63 @@ def validate_frozen_snapshot_bytes(
     source_identities = [(candidate.source, candidate.source_id) for candidate in frozen]
     if len(source_identities) != len(set(source_identities)):
         return "frozen snapshot has duplicate source identities"
+    if not _is_hex_sha(manifest.get("snapshot_sha256"), length=64):
+        return "frozen snapshot manifest has an invalid snapshot SHA-256"
     if manifest.get("snapshot_sha256") != hashlib.sha256(snapshot_bytes).hexdigest():
         return "frozen snapshot manifest SHA-256 does not match exact snapshot bytes"
+    provenance_fields = (
+        ("source_merge_commit", "m1_completion_merge_commit", 40),
+        ("source_evidence_baseline_commit", "m1_evidence_baseline_commit", 40),
+        ("validated_implementation_commit", "validated_implementation_commit", 40),
+        ("source_evidence_report_sha256", "source_evidence_report_sha256", 64),
+    )
+    for snapshot_key, manifest_key, length in provenance_fields:
+        snapshot_value = snapshot.get(snapshot_key)
+        manifest_value = manifest.get(manifest_key)
+        if not _is_hex_sha(snapshot_value, length=length) or not _is_hex_sha(
+            manifest_value, length=length
+        ):
+            return f"frozen snapshot has invalid {snapshot_key} provenance"
+        if snapshot_value != manifest_value:
+            return f"frozen snapshot and manifest {snapshot_key} provenance do not match"
+    source_report = snapshot.get("source_evidence_report")
+    manifest_report = manifest.get("source_evidence_report")
+    if (
+        not isinstance(source_report, str)
+        or not source_report
+        or "\\" in source_report
+        or PurePosixPath(source_report).is_absolute()
+        or ".." in PurePosixPath(source_report).parts
+        or source_report != manifest_report
+    ):
+        return "frozen snapshot and manifest evidence report path do not match"
+    source_hashes = (
+        "source_evidence_report_sha256",
+        "source_output_sha256",
+        "source_candidate_array_sha256",
+    )
+    if not all(_is_hex_sha(snapshot.get(field), length=64) for field in source_hashes):
+        return "frozen snapshot has invalid source SHA-256 provenance"
+    ancestry = manifest.get("implementation_ancestry")
+    if (
+        not isinstance(ancestry, list)
+        or not ancestry
+        or not all(_is_hex_sha(commit, length=40) for commit in ancestry)
+        or manifest.get("validated_implementation_commit") not in ancestry
+    ):
+        return "frozen snapshot manifest has invalid implementation ancestry"
+    if (
+        manifest.get("source_id_coverage") != 1.0
+        or manifest.get("url_coverage") != 1.0
+        or manifest.get("metadata_mismatch_count") != 0
+    ):
+        return "frozen snapshot manifest has invalid coverage or metadata audit"
     replay = manifest.get("zero_transport_replay")
     if (
         not isinstance(replay, Mapping)
         or replay.get("transport_requests") != 0
         or replay.get("cache_hits") != replay.get("query_count")
+        or replay.get("query_count") != 12
     ):
         return "frozen snapshot manifest lacks a complete zero-transport replay audit"
     identities = [(item.source, item.source_id) for item in frozen]
@@ -260,8 +330,12 @@ def validate_frozen_snapshot_bytes(
     expected_candidate_identity = _canonical_json_sha256(
         [(item.paper_id, item.source, item.source_id) for item in frozen]
     )
+    if not _is_hex_sha(manifest.get("source_identity_set_sha256"), length=64):
+        return "frozen snapshot manifest has an invalid source identity SHA-256"
     if manifest.get("source_identity_set_sha256") != expected_source_identity:
         return "frozen snapshot manifest source identity hash does not match candidates"
+    if not _is_hex_sha(manifest.get("candidate_identity_sha256"), length=64):
+        return "frozen snapshot manifest has an invalid candidate identity SHA-256"
     if manifest.get("candidate_identity_sha256") != expected_candidate_identity:
         return "frozen snapshot manifest candidate identity hash does not match candidates"
     return None
@@ -349,6 +423,7 @@ def _replay_and_project(
     m1_cache_dir: Path,
     provenance: AcceptedM1Provenance,
     evidence_report_sha256: str,
+    source_evidence_report: str,
 ) -> tuple[dict[str, object], dict[str, object]]:
     """Replay twelve real-cache queries and project only canonical source fields."""
 
@@ -480,7 +555,7 @@ def _replay_and_project(
         "source_merge_commit": provenance.m1_completion_merge_commit,
         "source_evidence_baseline_commit": provenance.m1_evidence_baseline_commit,
         "validated_implementation_commit": provenance.validated_implementation_commit,
-        "source_evidence_report": "evaluation/reports/m1-validation.json",
+        "source_evidence_report": source_evidence_report,
         "source_evidence_report_sha256": evidence_report_sha256,
         "source_output_sha256": provenance.output_sha256,
         "source_candidate_array_sha256": provenance.candidate_array_sha256,
@@ -492,6 +567,8 @@ def _replay_and_project(
         "candidate_count": len(candidates),
         "source_id_coverage": provenance.source_id_coverage,
         "url_coverage": provenance.url_coverage,
+        "source_evidence_report": source_evidence_report,
+        "source_evidence_report_sha256": evidence_report_sha256,
         "m1_completion_merge_commit": provenance.m1_completion_merge_commit,
         "m1_evidence_baseline_commit": provenance.m1_evidence_baseline_commit,
         "validated_implementation_commit": provenance.validated_implementation_commit,
@@ -560,24 +637,47 @@ def _read_existing_bytes(path: Path) -> bytes | None:
         ) from error
 
 
-def _publish_snapshot_pair(
-    *,
+def _existing_publication_state(
     snapshot_path: Path,
     snapshot_bytes: bytes,
     manifest_path: Path,
     manifest_bytes: bytes,
-    replace: Callable[[Path, Path], None] = os.replace,
-) -> None:
-    """Publish verified snapshot/manifest bytes together or restore caller-visible state."""
-
-    if snapshot_path == manifest_path:
-        raise FreezeGateError(SNAPSHOT_PUBLICATION_FAILED, "snapshot and manifest paths must differ")
+) -> ExistingPublicationState:
     snapshot_existing = _read_existing_bytes(snapshot_path)
     manifest_existing = _read_existing_bytes(manifest_path)
     if snapshot_existing not in {None, snapshot_bytes}:
         raise FreezeGateError(SNAPSHOT_PUBLICATION_FAILED, "snapshot target already has different bytes")
     if manifest_existing not in {None, manifest_bytes}:
         raise FreezeGateError(SNAPSHOT_PUBLICATION_FAILED, "manifest target already has different bytes")
+    return ExistingPublicationState(
+        snapshot_bytes=snapshot_existing,
+        manifest_bytes=manifest_existing,
+        snapshot_needs_publish=snapshot_existing is None,
+        manifest_needs_publish=manifest_existing is None,
+    )
+
+
+def _publish_snapshot_pair(
+    *,
+    snapshot_path: Path,
+    snapshot_bytes: bytes,
+    manifest_path: Path,
+    manifest_bytes: bytes,
+    expected_candidate_count: int,
+    replace: Callable[[Path, Path], None] = os.replace,
+) -> None:
+    """Publish verified snapshot/manifest bytes together or restore caller-visible state."""
+
+    if snapshot_path.resolve() == manifest_path.resolve():
+        raise FreezeGateError(SNAPSHOT_PUBLICATION_FAILED, "snapshot and manifest paths must differ")
+    if snapshot_path.parent.resolve() != manifest_path.parent.resolve():
+        raise FreezeGateError(
+            SNAPSHOT_PUBLICATION_FAILED,
+            "snapshot and manifest must share one publication directory",
+        )
+    state = _existing_publication_state(
+        snapshot_path, snapshot_bytes, manifest_path, manifest_bytes
+    )
     try:
         snapshot_path.parent.mkdir(parents=True, exist_ok=True)
         stage = Path(tempfile.mkdtemp(prefix=".m2-freeze-", dir=snapshot_path.parent))
@@ -585,8 +685,9 @@ def _publish_snapshot_pair(
         raise FreezeGateError(SNAPSHOT_PUBLICATION_FAILED, "cannot create publication staging") from error
     staged_snapshot = stage / snapshot_path.name
     staged_manifest = stage / manifest_path.name
-    created_snapshot = False
-    created_manifest = False
+    snapshot_published_this_run = False
+    manifest_published_this_run = False
+    completed = False
     try:
         staged_snapshot.write_bytes(snapshot_bytes)
         staged_manifest.write_bytes(manifest_bytes)
@@ -594,37 +695,60 @@ def _publish_snapshot_pair(
         if not isinstance(staged_manifest_payload, Mapping):
             raise FreezeGateError(SNAPSHOT_PUBLICATION_FAILED, "staged manifest is not an object")
         validation_error = validate_frozen_snapshot_bytes(
-            staged_snapshot.read_bytes(), staged_manifest_payload
+            staged_snapshot.read_bytes(),
+            staged_manifest_payload,
+            expected_candidate_count=expected_candidate_count,
         )
         if validation_error is not None:
             raise FreezeGateError(SNAPSHOT_PUBLICATION_FAILED, validation_error)
-        if snapshot_existing is None:
+        if state.snapshot_needs_publish:
             replace(staged_snapshot, snapshot_path)
-            created_snapshot = True
-        if manifest_existing is None:
+            snapshot_published_this_run = True
+        if state.manifest_needs_publish:
             replace(staged_manifest, manifest_path)
-            created_manifest = True
+            manifest_published_this_run = True
+        if snapshot_path.read_bytes() != snapshot_bytes or manifest_path.read_bytes() != manifest_bytes:
+            raise FreezeGateError(
+                SNAPSHOT_PUBLICATION_FAILED,
+                "published snapshot pair does not match staged bytes",
+            )
+        completed = True
     except FreezeGateError:
         raise
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
         raise FreezeGateError(SNAPSHOT_PUBLICATION_FAILED, "paired snapshot publication failed") from error
     finally:
-        if created_manifest is False and manifest_existing is None:
+        if not completed and manifest_published_this_run:
             try:
                 manifest_path.unlink(missing_ok=True)
             except OSError:
                 pass
-        if created_snapshot is False and snapshot_existing is None:
-            try:
-                snapshot_path.unlink(missing_ok=True)
-            except OSError:
-                pass
-        if created_snapshot and not created_manifest:
+        if not completed and snapshot_published_this_run:
             try:
                 snapshot_path.unlink(missing_ok=True)
             except OSError:
                 pass
         shutil.rmtree(stage, ignore_errors=True)
+
+
+def _repository_relative_posix_path(path: Path) -> str:
+    """Return a repository-relative POSIX evidence path or reject external input."""
+
+    try:
+        return path.resolve().relative_to(ROOT.resolve()).as_posix()
+    except ValueError as error:
+        raise FreezeGateError(
+            FROZEN_INPUT_INVALID,
+            "M1 evidence report must be inside the repository",
+        ) from error
+
+
+def _normalize_evidence_report_label(label: str) -> str:
+    normalized = label.replace("\\", "/")
+    path = PurePosixPath(normalized)
+    if not normalized or path.is_absolute() or ".." in path.parts:
+        raise FreezeGateError(FROZEN_INPUT_INVALID, "M1 evidence report label must be relative")
+    return path.as_posix()
 
 
 def freeze_candidates(
@@ -634,6 +758,7 @@ def freeze_candidates(
     output_dir: Path,
     m1_evidence_report: Path = Path("evaluation/reports/m1-validation.json"),
     expected_candidate_count: int | None = None,
+    source_evidence_report_label: str | None = None,
 ) -> FreezeResult:
     """Freeze only an accepted, cache-replayable M1 source; otherwise fail closed."""
 
@@ -667,11 +792,17 @@ def freeze_candidates(
     if validation_error is not None:
         return FreezeResult(status="blocked", error_code=FROZEN_INPUT_INVALID, reason=validation_error)
     try:
+        source_evidence_report = (
+            _repository_relative_posix_path(m1_evidence_report)
+            if source_evidence_report_label is None
+            else _normalize_evidence_report_label(source_evidence_report_label)
+        )
         snapshot, manifest = _replay_and_project(
             raw_output,
             m1_cache_dir=m1_cache_dir,
             provenance=provenance,
             evidence_report_sha256=hashlib.sha256(m1_evidence_report.read_bytes()).hexdigest(),
+            source_evidence_report=source_evidence_report,
         )
         snapshot_bytes = _render_json_bytes(snapshot)
         snapshot_sha256 = hashlib.sha256(snapshot_bytes).hexdigest()
@@ -684,6 +815,7 @@ def freeze_candidates(
             snapshot_bytes=snapshot_bytes,
             manifest_path=manifest_path,
             manifest_bytes=manifest_bytes,
+            expected_candidate_count=provenance.candidate_count,
         )
     except FreezeGateError as error:
         return FreezeResult(status="blocked", error_code=error.code, reason=error.reason)

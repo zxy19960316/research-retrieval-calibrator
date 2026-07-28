@@ -14,9 +14,11 @@ import pytest
 from app.adapters.arxiv import ArxivAdapter, ArxivAdapterConfig, ArxivResponse
 from app.core.first_round import run_first_round
 from app.core.paper_dedup import deduplicate_papers
+from app.models.embedding import EmbeddingTaskError
 from app.models.first_round import FirstRoundConfig
 from app.models.paper import PaperRecord
 from scripts import freeze_m2_candidates as freeze_module
+from scripts.embed_frozen_candidates import load_validated_frozen_inputs
 from scripts.freeze_m2_candidates import (
     M1_COMPLETION_MERGE_COMMIT,
     REAL_CACHE_INCOMPLETE,
@@ -25,12 +27,14 @@ from scripts.freeze_m2_candidates import (
     ZERO_TRANSPORT_REPLAY_FAILED,
     AcceptedM1Provenance,
     FreezeGateError,
+    FreezeResult,
     _canonical_json_sha256,
     _metadata_mismatch_field,
     _project_abstract,
     _publish_snapshot_pair,
     _render_json_bytes,
     _replay_and_project,
+    _repository_relative_posix_path,
     freeze_candidates,
     load_accepted_m1_provenance,
     validate_frozen_snapshot_bytes,
@@ -38,6 +42,7 @@ from scripts.freeze_m2_candidates import (
 
 QUESTION = "How can graph-based retrieval support scientific literature discovery?"
 NOW = datetime(2026, 7, 28, 0, 0, tzinfo=UTC)
+SYNTHETIC_REPORT_LABEL = "evaluation/reports/synthetic-m1-validation.json"
 
 
 class RecordedTransport:
@@ -151,11 +156,23 @@ def _snapshot_pair(
         m1_cache_dir=cache_dir,
         provenance=provenance,
         evidence_report_sha256=hashlib.sha256(report_path.read_bytes()).hexdigest(),
+        source_evidence_report=SYNTHETIC_REPORT_LABEL,
     )
     snapshot_bytes = _render_json_bytes(snapshot)
     manifest["snapshot_sha256"] = hashlib.sha256(snapshot_bytes).hexdigest()
     manifest_bytes = _render_json_bytes(manifest)
     return snapshot, manifest, snapshot_bytes, manifest_bytes
+
+
+def _freeze_synthetic(**kwargs: object) -> FreezeResult:
+    return freeze_candidates(
+        source_evidence_report_label=SYNTHETIC_REPORT_LABEL,
+        **kwargs,
+    )
+
+
+def _publish_synthetic_pair(**kwargs: object) -> None:
+    _publish_snapshot_pair(expected_candidate_count=12, **kwargs)
 
 
 def test_production_evidence_provenance_uses_completion_merge_not_evidence_baseline() -> None:
@@ -216,7 +233,7 @@ def test_synthetic_twelve_query_real_cache_replays_without_transport_and_publish
     output_path, cache_dir, report_path = synthetic_inputs
     output_dir = tmp_path / "snapshot"
 
-    result = freeze_candidates(
+    result = _freeze_synthetic(
         m1_output=output_path,
         m1_cache_dir=cache_dir,
         output_dir=output_dir,
@@ -238,7 +255,9 @@ def test_synthetic_twelve_query_real_cache_replays_without_transport_and_publish
     assert manifest["candidate_count"] == 12
     assert manifest["source_identity_set_sha256"] is not None
     assert json.loads(snapshot_bytes)["source_merge_commit"] == M1_COMPLETION_MERGE_COMMIT
-    assert validate_frozen_snapshot_bytes(snapshot_bytes, manifest) is None
+    assert validate_frozen_snapshot_bytes(
+        snapshot_bytes, manifest, expected_candidate_count=12
+    ) is None
 
 
 def test_missing_cache_and_corrupt_or_wrong_manifest_have_stable_codes(
@@ -247,7 +266,7 @@ def test_missing_cache_and_corrupt_or_wrong_manifest_have_stable_codes(
     output_path, cache_dir, report_path = synthetic_inputs
     cache_file = next(cache_dir.rglob("*.json"))
     cache_file.unlink()
-    missing = freeze_candidates(
+    missing = _freeze_synthetic(
         m1_output=output_path,
         m1_cache_dir=cache_dir,
         output_dir=tmp_path / "missing",
@@ -259,7 +278,7 @@ def test_missing_cache_and_corrupt_or_wrong_manifest_have_stable_codes(
     output_path, cache_dir, report_path = _seed_synthetic_real_run(tmp_path / "corrupt")
     cache_file = next(cache_dir.rglob("*.json"))
     cache_file.write_text("{not json", encoding="utf-8")
-    corrupt = freeze_candidates(
+    corrupt = _freeze_synthetic(
         m1_output=output_path,
         m1_cache_dir=cache_dir,
         output_dir=tmp_path / "corrupt-out",
@@ -278,7 +297,7 @@ def test_missing_cache_and_corrupt_or_wrong_manifest_have_stable_codes(
         payload = json.loads(cache_file.read_text(encoding="utf-8"))
         payload["manifest"][field_name] = value
         cache_file.write_bytes(_render_json_bytes(payload))
-        mismatch = freeze_candidates(
+        mismatch = _freeze_synthetic(
             m1_output=output_path,
             m1_cache_dir=cache_dir,
             output_dir=tmp_path / f"{field_name}-out",
@@ -300,7 +319,7 @@ def test_raw_and_deduplicated_cache_count_mismatches_fail_closed(
     report = json.loads(report_path.read_text(encoding="utf-8"))
     report["real_external"]["output_hashes"]["first-round.json"] = hashlib.sha256(changed_output).hexdigest()
     report_path.write_bytes(_render_json_bytes(report))
-    raw_mismatch = freeze_candidates(
+    raw_mismatch = _freeze_synthetic(
         m1_output=output_path,
         m1_cache_dir=cache_dir,
         output_dir=tmp_path / "raw-out",
@@ -315,7 +334,7 @@ def test_raw_and_deduplicated_cache_count_mismatches_fail_closed(
     duplicate = json.loads(cache_files[-1].read_text(encoding="utf-8"))
     duplicate["records"] = first["records"]
     cache_files[-1].write_bytes(_render_json_bytes(duplicate))
-    dedup_mismatch = freeze_candidates(
+    dedup_mismatch = _freeze_synthetic(
         m1_output=output_path,
         m1_cache_dir=cache_dir,
         output_dir=tmp_path / "dedup-out",
@@ -333,7 +352,7 @@ def test_transport_invocation_maps_to_zero_transport_code(
     for cache_file in cache_dir.rglob("*.json"):
         cache_file.unlink()
 
-    result = freeze_candidates(
+    result = _freeze_synthetic(
         m1_output=output_path,
         m1_cache_dir=cache_dir,
         output_dir=tmp_path / "out",
@@ -434,8 +453,12 @@ def test_exact_byte_snapshot_hash_rejects_alternate_formatting(
     output_path, cache_dir, report_path = synthetic_inputs
     _, manifest, snapshot_bytes, _ = _snapshot_pair(output_path, cache_dir, report_path)
 
-    assert validate_frozen_snapshot_bytes(snapshot_bytes, manifest) is None
-    assert validate_frozen_snapshot_bytes(snapshot_bytes + b" ", manifest) == (
+    assert validate_frozen_snapshot_bytes(
+        snapshot_bytes, manifest, expected_candidate_count=12
+    ) is None
+    assert validate_frozen_snapshot_bytes(
+        snapshot_bytes + b" ", manifest, expected_candidate_count=12
+    ) == (
         "frozen snapshot manifest SHA-256 does not match exact snapshot bytes"
     )
 
@@ -454,7 +477,7 @@ def test_paired_publication_rolls_back_manifest_failure_and_leaves_no_temp_resid
         os.replace(source, target)
 
     with pytest.raises(FreezeGateError, match="paired snapshot publication failed") as failure:
-        _publish_snapshot_pair(
+        _publish_synthetic_pair(
             snapshot_path=snapshot_path,
             snapshot_bytes=snapshot_bytes,
             manifest_path=manifest_path,
@@ -488,7 +511,7 @@ def test_paired_publication_cleans_staging_when_a_temp_write_fails(
 
     monkeypatch.setattr(Path, "write_bytes", fail_staged_write)
     with pytest.raises(FreezeGateError) as failure:
-        _publish_snapshot_pair(
+        _publish_synthetic_pair(
             snapshot_path=snapshot_path,
             snapshot_bytes=snapshot_bytes,
             manifest_path=manifest_path,
@@ -508,14 +531,14 @@ def test_paired_publication_is_idempotent_rejects_conflicts_and_is_byte_identica
     snapshot_path = tmp_path / "out" / "m1-candidates.v1.json"
     manifest_path = tmp_path / "out" / "m1-candidates.v1.manifest.json"
 
-    _publish_snapshot_pair(
+    _publish_synthetic_pair(
         snapshot_path=snapshot_path,
         snapshot_bytes=snapshot_bytes,
         manifest_path=manifest_path,
         manifest_bytes=manifest_bytes,
     )
     first = (snapshot_path.read_bytes(), manifest_path.read_bytes())
-    _publish_snapshot_pair(
+    _publish_synthetic_pair(
         snapshot_path=snapshot_path,
         snapshot_bytes=snapshot_bytes,
         manifest_path=manifest_path,
@@ -525,10 +548,266 @@ def test_paired_publication_is_idempotent_rejects_conflicts_and_is_byte_identica
 
     snapshot_path.write_bytes(b"conflict")
     with pytest.raises(FreezeGateError) as failure:
-        _publish_snapshot_pair(
+        _publish_synthetic_pair(
             snapshot_path=snapshot_path,
             snapshot_bytes=snapshot_bytes,
             manifest_path=manifest_path,
             manifest_bytes=manifest_bytes,
         )
+    assert failure.value.code == SNAPSHOT_PUBLICATION_FAILED
+
+
+def test_paired_publication_creates_missing_snapshot_when_manifest_already_matches(
+    synthetic_inputs: tuple[Path, Path, Path], tmp_path: Path
+) -> None:
+    output_path, cache_dir, report_path = synthetic_inputs
+    _, _, snapshot_bytes, manifest_bytes = _snapshot_pair(output_path, cache_dir, report_path)
+    snapshot_path = tmp_path / "out" / "m1-candidates.v1.json"
+    manifest_path = tmp_path / "out" / "m1-candidates.v1.manifest.json"
+    manifest_path.parent.mkdir()
+    manifest_path.write_bytes(manifest_bytes)
+
+    _publish_synthetic_pair(
+        snapshot_path=snapshot_path,
+        snapshot_bytes=snapshot_bytes,
+        manifest_path=manifest_path,
+        manifest_bytes=manifest_bytes,
+    )
+
+    assert snapshot_path.read_bytes() == snapshot_bytes
+    assert manifest_path.read_bytes() == manifest_bytes
+
+
+def test_paired_publication_rejects_cross_directory_targets(
+    synthetic_inputs: tuple[Path, Path, Path], tmp_path: Path
+) -> None:
+    output_path, cache_dir, report_path = synthetic_inputs
+    _, _, snapshot_bytes, manifest_bytes = _snapshot_pair(output_path, cache_dir, report_path)
+
+    with pytest.raises(FreezeGateError) as failure:
+        _publish_synthetic_pair(
+            snapshot_path=tmp_path / "snapshot" / "m1-candidates.v1.json",
+            snapshot_bytes=snapshot_bytes,
+            manifest_path=tmp_path / "manifest" / "m1-candidates.v1.manifest.json",
+            manifest_bytes=manifest_bytes,
+        )
+    assert failure.value.code == SNAPSHOT_PUBLICATION_FAILED
+
+
+def test_snapshot_validator_requires_an_explicit_synthetic_or_production_count(
+    synthetic_inputs: tuple[Path, Path, Path]
+) -> None:
+    output_path, cache_dir, report_path = synthetic_inputs
+    _, manifest, snapshot_bytes, _ = _snapshot_pair(output_path, cache_dir, report_path)
+
+    assert validate_frozen_snapshot_bytes(
+        snapshot_bytes, manifest, expected_candidate_count=12
+    ) is None
+    assert validate_frozen_snapshot_bytes(
+        snapshot_bytes, manifest, expected_candidate_count=33
+    ) == "frozen snapshot must contain exactly 33 candidates"
+    assert validate_frozen_snapshot_bytes(
+        snapshot_bytes, manifest, expected_candidate_count=0
+    ) == "expected candidate count must be positive"
+
+
+def test_synthetic_freeze_records_the_explicit_evidence_report_label(
+    synthetic_inputs: tuple[Path, Path, Path], tmp_path: Path
+) -> None:
+    output_path, cache_dir, report_path = synthetic_inputs
+    output_dir = tmp_path / "snapshot"
+
+    result = freeze_candidates(
+        m1_output=output_path,
+        m1_cache_dir=cache_dir,
+        output_dir=output_dir,
+        m1_evidence_report=report_path,
+        expected_candidate_count=12,
+        source_evidence_report_label="evaluation/reports/synthetic-m1-validation.json",
+    )
+
+    assert result.status == "success"
+    snapshot = json.loads((output_dir / "m1-candidates.v1.json").read_text(encoding="utf-8"))
+    manifest = json.loads((output_dir / "m1-candidates.v1.manifest.json").read_text(encoding="utf-8"))
+    assert snapshot["source_evidence_report"] == "evaluation/reports/synthetic-m1-validation.json"
+    assert manifest["source_evidence_report"] == snapshot["source_evidence_report"]
+
+@pytest.mark.parametrize(
+    ("snapshot_exists", "manifest_exists"),
+    [(False, False), (True, False), (False, True), (True, True)],
+)
+def test_paired_publication_handles_every_legal_initial_state(
+    synthetic_inputs: tuple[Path, Path, Path],
+    tmp_path: Path,
+    snapshot_exists: bool,
+    manifest_exists: bool,
+) -> None:
+    output_path, cache_dir, report_path = synthetic_inputs
+    _, _, snapshot_bytes, manifest_bytes = _snapshot_pair(output_path, cache_dir, report_path)
+    output_dir = tmp_path / "out"
+    output_dir.mkdir()
+    snapshot_path = output_dir / "m1-candidates.v1.json"
+    manifest_path = output_dir / "m1-candidates.v1.manifest.json"
+    if snapshot_exists:
+        snapshot_path.write_bytes(snapshot_bytes)
+    if manifest_exists:
+        manifest_path.write_bytes(manifest_bytes)
+    _publish_synthetic_pair(snapshot_path=snapshot_path, snapshot_bytes=snapshot_bytes, manifest_path=manifest_path, manifest_bytes=manifest_bytes)
+    assert snapshot_path.read_bytes() == snapshot_bytes
+    assert manifest_path.read_bytes() == manifest_bytes
+    assert not list(output_dir.glob(".m2-freeze-*"))
+
+
+def test_paired_publication_rejects_conflicting_manifest_without_touching_snapshot(
+    synthetic_inputs: tuple[Path, Path, Path], tmp_path: Path
+) -> None:
+    output_path, cache_dir, report_path = synthetic_inputs
+    _, _, snapshot_bytes, manifest_bytes = _snapshot_pair(output_path, cache_dir, report_path)
+    output_dir = tmp_path / "out"
+    output_dir.mkdir()
+    snapshot_path = output_dir / "m1-candidates.v1.json"
+    manifest_path = output_dir / "m1-candidates.v1.manifest.json"
+    snapshot_path.write_bytes(snapshot_bytes)
+    manifest_path.write_bytes(b"conflict")
+    with pytest.raises(FreezeGateError) as failure:
+        _publish_synthetic_pair(snapshot_path=snapshot_path, snapshot_bytes=snapshot_bytes, manifest_path=manifest_path, manifest_bytes=manifest_bytes)
+    assert failure.value.code == SNAPSHOT_PUBLICATION_FAILED
+    assert snapshot_path.read_bytes() == snapshot_bytes
+    assert manifest_path.read_bytes() == b"conflict"
+
+
+def test_publication_failure_preserves_preexisting_side_and_removes_only_new_side(
+    synthetic_inputs: tuple[Path, Path, Path], tmp_path: Path
+) -> None:
+    output_path, cache_dir, report_path = synthetic_inputs
+    _, _, snapshot_bytes, manifest_bytes = _snapshot_pair(output_path, cache_dir, report_path)
+    output_dir = tmp_path / "snapshot-existing"
+    output_dir.mkdir()
+    snapshot_path = output_dir / "m1-candidates.v1.json"
+    manifest_path = output_dir / "m1-candidates.v1.manifest.json"
+    snapshot_path.write_bytes(snapshot_bytes)
+
+    def fail_manifest(source: Path, target: Path) -> None:
+        if target == manifest_path:
+            raise OSError("injected manifest failure")
+        os.replace(source, target)
+
+    with pytest.raises(FreezeGateError) as failure:
+        _publish_synthetic_pair(snapshot_path=snapshot_path, snapshot_bytes=snapshot_bytes, manifest_path=manifest_path, manifest_bytes=manifest_bytes, replace=fail_manifest)
+    assert failure.value.code == SNAPSHOT_PUBLICATION_FAILED
+    assert snapshot_path.read_bytes() == snapshot_bytes
+    assert not manifest_path.exists()
+
+    output_dir = tmp_path / "manifest-existing"
+    output_dir.mkdir()
+    snapshot_path = output_dir / "m1-candidates.v1.json"
+    manifest_path = output_dir / "m1-candidates.v1.manifest.json"
+    manifest_path.write_bytes(manifest_bytes)
+
+    def fail_snapshot(source: Path, target: Path) -> None:
+        if target == snapshot_path:
+            raise OSError("injected snapshot failure")
+        os.replace(source, target)
+
+    with pytest.raises(FreezeGateError) as failure:
+        _publish_synthetic_pair(snapshot_path=snapshot_path, snapshot_bytes=snapshot_bytes, manifest_path=manifest_path, manifest_bytes=manifest_bytes, replace=fail_snapshot)
+    assert failure.value.code == SNAPSHOT_PUBLICATION_FAILED
+    assert not snapshot_path.exists()
+    assert manifest_path.read_bytes() == manifest_bytes
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        ("source_merge_commit", None, "0" * 40),
+        ("source_evidence_baseline_commit", None, "1" * 40),
+        ("validated_implementation_commit", None, "2" * 40),
+        ("source_evidence_report", None, "evaluation/reports/other.json"),
+        ("source_evidence_report_sha256", None, "3" * 64),
+        ("source_output_sha256", None, "z" * 64),
+        ("source_candidate_array_sha256", None, "g" * 64),
+        (None, "source_identity_set_sha256", "6" * 64),
+        (None, "candidate_identity_sha256", "7" * 64),
+        (None, "source_id_coverage", 0.5),
+        (None, "url_coverage", 0.5),
+        (None, "metadata_mismatch_count", 1),
+        (None, "zero_transport_replay", {"transport_requests": 0, "cache_hits": 11, "query_count": 12}),
+        (None, "implementation_ancestry", []),
+    ],
+)
+def test_snapshot_manifest_provenance_mutations_are_rejected(
+    synthetic_inputs: tuple[Path, Path, Path],
+    mutation: tuple[str | None, str | None, object],
+) -> None:
+    output_path, cache_dir, report_path = synthetic_inputs
+    snapshot, manifest, _, _ = _snapshot_pair(output_path, cache_dir, report_path)
+    snapshot_field, manifest_field, value = mutation
+    if snapshot_field is not None:
+        snapshot[snapshot_field] = value
+    if manifest_field is not None:
+        manifest[manifest_field] = value
+    snapshot_bytes = _render_json_bytes(snapshot)
+    manifest["snapshot_sha256"] = hashlib.sha256(snapshot_bytes).hexdigest()
+    assert validate_frozen_snapshot_bytes(snapshot_bytes, manifest, expected_candidate_count=12) is not None
+
+
+def test_production_embedding_loader_rejects_synthetic_twelve_candidate_snapshot(
+    synthetic_inputs: tuple[Path, Path, Path], tmp_path: Path
+) -> None:
+    output_path, cache_dir, report_path = synthetic_inputs
+    _, _, snapshot_bytes, manifest_bytes = _snapshot_pair(output_path, cache_dir, report_path)
+    snapshot_path = tmp_path / "m1-candidates.v1.json"
+    manifest_path = tmp_path / "m1-candidates.v1.manifest.json"
+    snapshot_path.write_bytes(snapshot_bytes)
+    manifest_path.write_bytes(manifest_bytes)
+    with pytest.raises(EmbeddingTaskError, match="FROZEN_SNAPSHOT_HASH_MISMATCH"):
+        load_validated_frozen_inputs(snapshot_path, manifest_path)
+
+
+def test_evidence_report_labels_are_posix_and_external_production_paths_are_rejected(
+    tmp_path: Path,
+) -> None:
+    assert _repository_relative_posix_path(Path("evaluation\\reports\\m1-validation.json")) == "evaluation/reports/m1-validation.json"
+    with pytest.raises(FreezeGateError):
+        _repository_relative_posix_path(tmp_path / "external-m1-validation.json")
+
+
+def test_paired_publication_rejects_staging_creation_and_readback_validation_failures(
+    synthetic_inputs: tuple[Path, Path, Path], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output_path, cache_dir, report_path = synthetic_inputs
+    _, _, snapshot_bytes, manifest_bytes = _snapshot_pair(output_path, cache_dir, report_path)
+    snapshot_path = tmp_path / "out" / "m1-candidates.v1.json"
+    manifest_path = tmp_path / "out" / "m1-candidates.v1.manifest.json"
+
+    def fail_stage(*_: object, **__: object) -> str:
+        raise OSError("injected staging creation failure")
+
+    monkeypatch.setattr(freeze_module.tempfile, "mkdtemp", fail_stage)
+    with pytest.raises(FreezeGateError) as failure:
+        _publish_synthetic_pair(snapshot_path=snapshot_path, snapshot_bytes=snapshot_bytes, manifest_path=manifest_path, manifest_bytes=manifest_bytes)
+    assert failure.value.code == SNAPSHOT_PUBLICATION_FAILED
+    assert not snapshot_path.exists() and not manifest_path.exists()
+
+    monkeypatch.undo()
+    with pytest.raises(FreezeGateError) as failure:
+        _publish_synthetic_pair(snapshot_path=snapshot_path, snapshot_bytes=snapshot_bytes, manifest_path=manifest_path, manifest_bytes=b"{}")
+    assert failure.value.code == SNAPSHOT_PUBLICATION_FAILED
+    assert not snapshot_path.exists() and not manifest_path.exists()
+    assert not list(tmp_path.rglob(".m2-freeze-*"))
+
+
+def test_paired_publication_rejects_existing_directory_targets(
+    synthetic_inputs: tuple[Path, Path, Path], tmp_path: Path
+) -> None:
+    output_path, cache_dir, report_path = synthetic_inputs
+    _, _, snapshot_bytes, manifest_bytes = _snapshot_pair(output_path, cache_dir, report_path)
+    output_dir = tmp_path / "out"
+    output_dir.mkdir()
+    snapshot_path = output_dir / "m1-candidates.v1.json"
+    snapshot_path.mkdir()
+    manifest_path = output_dir / "m1-candidates.v1.manifest.json"
+
+    with pytest.raises(FreezeGateError) as failure:
+        _publish_synthetic_pair(snapshot_path=snapshot_path, snapshot_bytes=snapshot_bytes, manifest_path=manifest_path, manifest_bytes=manifest_bytes)
     assert failure.value.code == SNAPSHOT_PUBLICATION_FAILED

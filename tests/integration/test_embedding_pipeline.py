@@ -67,9 +67,25 @@ def _write_validated_snapshot(tmp_path: Path) -> tuple[Path, Path]:
         "count": 33,
         "question": "How can graph-based retrieval support scientific literature discovery?",
         "snapshot_version": "m2-candidates.v1",
+        "source_evidence_report": "evaluation/reports/m1-validation.json",
+        "source_evidence_report_sha256": "a" * 64,
+        "source_evidence_baseline_commit": "b" * 40,
+        "source_candidate_array_sha256": "c" * 64,
+        "source_merge_commit": "d" * 40,
+        "source_output_sha256": "e" * 64,
+        "validated_implementation_commit": "f" * 40,
     }
     manifest = {
         "candidate_count": 33,
+        "implementation_ancestry": ["f" * 40],
+        "m1_completion_merge_commit": "d" * 40,
+        "m1_evidence_baseline_commit": "b" * 40,
+        "metadata_mismatch_count": 0,
+        "source_evidence_report": "evaluation/reports/m1-validation.json",
+        "source_evidence_report_sha256": "a" * 64,
+        "source_id_coverage": 1.0,
+        "url_coverage": 1.0,
+        "validated_implementation_commit": "f" * 40,
         "candidate_identity_sha256": _canonical_json_sha256(
             [(item["paper_id"], item["source"], item["source_id"]) for item in candidates]
         ),
