@@ -1,0 +1,1 @@
+{"manifest":{"adapter_schema_version":"m1-t04.v2","cache_namespace":"first-round:real","endpoint":"https://export.arxiv.org/api/query","max_results":5,"query_text":"all:\"scientific literature\" AND all:\"discovery\" AND all:\"graph-based retrieval\" AND all:\"application\""},"records":[]}
