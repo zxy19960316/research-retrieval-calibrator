@@ -27,6 +27,11 @@ if TYPE_CHECKING:
 
 M1_COMPLETION_MERGE_COMMIT = "0eb45fc22d10adb72cb66aa45494333057080bc1"
 ROOT = Path(__file__).resolve().parents[1]
+EXACT_HISTORICAL_ARTIFACTS_RECOVERED = "EXACT_HISTORICAL_ARTIFACTS_RECOVERED"
+M1_REBASELINE_SOURCE_BUNDLE = "M1_REBASELINE_SOURCE_BUNDLE"
+_ARTIFACT_SOURCE_CLASSIFICATIONS = frozenset(
+    {EXACT_HISTORICAL_ARTIFACTS_RECOVERED, M1_REBASELINE_SOURCE_BUNDLE}
+)
 
 FROZEN_INPUT_MISSING = "M2_T01_FROZEN_INPUT_MISSING"
 FROZEN_INPUT_INVALID = "M2_T01_FROZEN_INPUT_INVALID"
@@ -73,6 +78,16 @@ class AcceptedM1Provenance:
     m1_evidence_baseline_commit: str
     validated_implementation_commit: str
     implementation_ancestry: tuple[str, ...]
+    artifact_source_classification: str
+    source_bundle: str | None
+
+
+@dataclass(frozen=True)
+class CacheValidationAudit:
+    """Auditable count of fully validated persistent-cache entries."""
+
+    query_count: int
+    empty_record_entry_count: int
 
 
 @dataclass(frozen=True)
@@ -145,6 +160,7 @@ def load_accepted_m1_provenance(
     evidence_baseline = payload.get("baseline_commit")
     validated_implementation = payload.get("validated_implementation_commit")
     ancestry = payload.get("implementation_ancestry")
+    rebaseline = payload.get("rebaseline")
 
     if not _is_hex_sha(M1_COMPLETION_MERGE_COMMIT, length=40):
         raise ValueError("configured M1 completion merge commit must be a 40-character SHA")
@@ -177,6 +193,24 @@ def load_accepted_m1_provenance(
         raise ValueError(
             f"M1 evidence report does not satisfy accepted {required_candidate_count}-candidate coverage"
         )
+    artifact_source_classification = EXACT_HISTORICAL_ARTIFACTS_RECOVERED
+    source_bundle: str | None = None
+    if rebaseline is not None:
+        if not isinstance(rebaseline, Mapping):
+            raise ValueError("M1 rebaseline provenance must be an object")
+        if rebaseline.get("classification") != "approved_rebaseline":
+            raise ValueError("M1 rebaseline provenance has an invalid classification")
+        if rebaseline.get("source_completion_commit") != M1_COMPLETION_MERGE_COMMIT:
+            raise ValueError("M1 rebaseline provenance has an invalid source completion commit")
+        reason = rebaseline.get("reason")
+        source_bundle_value = rebaseline.get("source_bundle")
+        if not isinstance(reason, str) or not reason.strip() or not isinstance(source_bundle_value, str):
+            raise ValueError("M1 rebaseline provenance is incomplete")
+        try:
+            source_bundle = _normalize_source_bundle_label(source_bundle_value)
+        except FreezeGateError as error:
+            raise ValueError("M1 rebaseline provenance has an invalid source bundle") from error
+        artifact_source_classification = M1_REBASELINE_SOURCE_BUNDLE
     return AcceptedM1Provenance(
         output_sha256=output_sha256,
         candidate_array_sha256=candidate_array_sha256,
@@ -187,6 +221,8 @@ def load_accepted_m1_provenance(
         m1_evidence_baseline_commit=evidence_baseline,
         validated_implementation_commit=validated_implementation,
         implementation_ancestry=tuple(ancestry),
+        artifact_source_classification=artifact_source_classification,
+        source_bundle=source_bundle,
     )
 
 
@@ -317,13 +353,33 @@ def validate_frozen_snapshot_bytes(
     ):
         return "frozen snapshot manifest has invalid coverage or metadata audit"
     replay = manifest.get("zero_transport_replay")
+    empty_cache_entry_count = replay.get("empty_cache_entry_count") if isinstance(replay, Mapping) else None
     if (
         not isinstance(replay, Mapping)
         or replay.get("transport_requests") != 0
         or replay.get("cache_hits") != replay.get("query_count")
         or replay.get("query_count") != 12
+        or not isinstance(empty_cache_entry_count, int)
+        or isinstance(empty_cache_entry_count, bool)
+        or empty_cache_entry_count < 0
+        or empty_cache_entry_count > 12
     ):
         return "frozen snapshot manifest lacks a complete zero-transport replay audit"
+    artifact_source_classification = manifest.get("artifact_source_classification")
+    source_bundle = manifest.get("source_bundle")
+    if artifact_source_classification not in _ARTIFACT_SOURCE_CLASSIFICATIONS:
+        return "frozen snapshot manifest has an invalid artifact source classification"
+    if artifact_source_classification == M1_REBASELINE_SOURCE_BUNDLE:
+        if not isinstance(source_bundle, str):
+            return "frozen snapshot manifest has an invalid rebaseline source bundle"
+        try:
+            normalized_source_bundle = _normalize_source_bundle_label(source_bundle)
+        except FreezeGateError:
+            return "frozen snapshot manifest has an invalid rebaseline source bundle"
+        if source_bundle != normalized_source_bundle:
+            return "frozen snapshot manifest has an invalid rebaseline source bundle"
+    elif source_bundle is not None:
+        return "frozen snapshot manifest has an invalid historical source bundle"
     identities = [(item.source, item.source_id) for item in frozen]
     expected_source_identity = _canonical_json_sha256(sorted(identities))
     expected_candidate_identity = _canonical_json_sha256(
@@ -342,11 +398,12 @@ def validate_frozen_snapshot_bytes(
 
 def _validate_cache_entries(
     adapter: Any, run: Any, m1_cache_dir: Path
-) -> None:
+) -> CacheValidationAudit:
     """Classify every expected persistent-cache entry before invoking the adapter."""
 
     from app.models.paper import PaperRecord
 
+    empty_record_entry_count = 0
     for query in run.query_plan.queries:
         path = adapter._persistent_cache_path(query.query_text, run.config.max_results_per_query)
         if path is None or not path.is_file():
@@ -381,9 +438,11 @@ def _validate_cache_entries(
                 f"cache record provenance mismatch for query {query.query_id}",
             ) from error
         if not records:
-            raise FreezeGateError(
-                REAL_CACHE_INCOMPLETE, f"cache entry has no records for query {query.query_id}"
-            )
+            empty_record_entry_count += 1
+    return CacheValidationAudit(
+        query_count=len(run.query_plan.queries),
+        empty_record_entry_count=empty_record_entry_count,
+    )
 
 
 def _metadata_mismatch_field(candidate: CandidateOutput, cluster: Any) -> str | None:
@@ -468,7 +527,7 @@ def _replay_and_project(
         transport=transport,
         sleeper=lambda _: None,
     )
-    _validate_cache_entries(adapter, run, m1_cache_dir)
+    cache_audit = _validate_cache_entries(adapter, run, m1_cache_dir)
     records = []
     cache_hits = 0
     try:
@@ -585,9 +644,11 @@ def _replay_and_project(
         "zero_transport_replay": {
             "transport_requests": transport.request_count,
             "cache_hits": cache_hits,
-            "query_count": len(run.query_plan.queries),
+            "query_count": cache_audit.query_count,
+            "empty_cache_entry_count": cache_audit.empty_record_entry_count,
         },
-        "artifact_recovery_classification": "EXACT_HISTORICAL_ARTIFACTS_RECOVERED",
+        "artifact_source_classification": provenance.artifact_source_classification,
+        "source_bundle": provenance.source_bundle,
     }
     return snapshot, manifest
 
@@ -795,6 +856,30 @@ def _normalize_repository_relative_label(value: str) -> str:
 
 def _normalize_evidence_report_label(label: str) -> str:
     return _normalize_repository_relative_label(label)
+
+
+def _normalize_source_bundle_label(value: str) -> str:
+    """Return a canonical repository-relative rebaseline source-bundle label."""
+
+    if not isinstance(value, str):
+        raise FreezeGateError(FROZEN_INPUT_INVALID, "M1 rebaseline source bundle is invalid")
+    raw = value.strip()
+    if not raw:
+        raise FreezeGateError(FROZEN_INPUT_INVALID, "M1 rebaseline source bundle is invalid")
+    posix_path = PurePosixPath(raw.replace("\\", "/"))
+    windows_path = PureWindowsPath(raw)
+    if (
+        posix_path.is_absolute()
+        or windows_path.is_absolute()
+        or windows_path.drive != ""
+        or windows_path.anchor != ""
+        or ".." in posix_path.parts
+    ):
+        raise FreezeGateError(FROZEN_INPUT_INVALID, "M1 rebaseline source bundle is invalid")
+    normalized = posix_path.as_posix()
+    if normalized == "." or not normalized.startswith("evaluation/source-artifacts/"):
+        raise FreezeGateError(FROZEN_INPUT_INVALID, "M1 rebaseline source bundle is invalid")
+    return normalized
 
 
 def freeze_candidates(

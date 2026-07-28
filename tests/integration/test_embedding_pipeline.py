@@ -92,7 +92,14 @@ def _write_validated_snapshot(tmp_path: Path) -> tuple[Path, Path]:
         "source_identity_set_sha256": _canonical_json_sha256(
             sorted((item["source"], item["source_id"]) for item in candidates)
         ),
-        "zero_transport_replay": {"cache_hits": 12, "query_count": 12, "transport_requests": 0},
+        "zero_transport_replay": {
+            "cache_hits": 12,
+            "empty_cache_entry_count": 0,
+            "query_count": 12,
+            "transport_requests": 0,
+        },
+        "artifact_source_classification": "EXACT_HISTORICAL_ARTIFACTS_RECOVERED",
+        "source_bundle": None,
     }
     snapshot_path = tmp_path / "m1-candidates.v1.json"
     manifest_path = tmp_path / "m1-candidates.v1.manifest.json"

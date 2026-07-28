@@ -262,7 +262,14 @@ def test_frozen_snapshot_helper_accepts_a_synthetic_closed_33_candidate_snapshot
         "source_identity_set_sha256": _canonical_json_sha256(
             sorted((item["source"], item["source_id"]) for item in candidates)
         ),
-        "zero_transport_replay": {"cache_hits": 12, "query_count": 12, "transport_requests": 0},
+        "zero_transport_replay": {
+            "cache_hits": 12,
+            "empty_cache_entry_count": 0,
+            "query_count": 12,
+            "transport_requests": 0,
+        },
+        "artifact_source_classification": "EXACT_HISTORICAL_ARTIFACTS_RECOVERED",
+        "source_bundle": None,
     }
     snapshot_bytes = _render_json_bytes(snapshot)
     manifest["snapshot_sha256"] = hashlib.sha256(snapshot_bytes).hexdigest()

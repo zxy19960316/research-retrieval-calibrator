@@ -20,12 +20,14 @@ from app.models.paper import PaperRecord
 from scripts import freeze_m2_candidates as freeze_module
 from scripts.embed_frozen_candidates import load_validated_frozen_inputs
 from scripts.freeze_m2_candidates import (
+    FROZEN_INPUT_INVALID,
     M1_COMPLETION_MERGE_COMMIT,
     REAL_CACHE_INCOMPLETE,
     REAL_CACHE_PROVENANCE_MISMATCH,
     SNAPSHOT_PUBLICATION_FAILED,
     ZERO_TRANSPORT_REPLAY_FAILED,
     AcceptedM1Provenance,
+    CacheValidationAudit,
     FreezeGateError,
     FreezeResult,
     _canonical_json_sha256,
@@ -62,14 +64,21 @@ class RecordedTransport:
         return self.responses.pop(0)
 
 
-def _atom_response(index: int) -> ArxivResponse:
-    source_id = f"2401.{index:05d}"
-    body = f'''<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom">
-    <entry><id>https://arxiv.org/abs/{source_id}</id>
-    <title>Graph retrieval paper {index:02d}</title>
-    <summary>Canonical abstract {index:02d}.</summary>
-    <published>2024-01-01</published><author><name>Ada Author</name></author></entry>
-    </feed>'''.encode()
+def _atom_response(index: int, *, record_count: int = 1) -> ArxivResponse:
+    entries = []
+    for offset in range(record_count):
+        source_id = f"2401.{index + offset:05d}"
+        entries.append(
+            f"""<entry><id>https://arxiv.org/abs/{source_id}</id>
+            <title>Graph retrieval paper {index + offset:02d}</title>
+            <summary>Canonical abstract {index + offset:02d}.</summary>
+            <published>2024-01-01</published><author><name>Ada Author</name></author></entry>"""
+        )
+    body = (
+        '<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom">'
+        + "".join(entries)
+        + "</feed>"
+    ).encode()
     return ArxivResponse(200, body, {})
 
 
@@ -140,6 +149,82 @@ def _seed_synthetic_real_run(tmp_path: Path) -> tuple[Path, Path, Path]:
     return output_path, cache_dir, report_path
 
 
+def _seed_thirty_three_candidate_run_with_one_empty_cache(
+    tmp_path: Path,
+) -> tuple[Path, Path, Path]:
+    """Create a real-pipeline 12-query cache with one valid HTTP-200 empty result."""
+
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    cache_dir = tmp_path / "m1-cache"
+    config = FirstRoundConfig(
+        cache_dir=cache_dir,
+        mode="real",
+        cache_namespace="first-round:real",
+        adapter_schema_version="m1-t04.v2",
+        max_results_per_query=3,
+        max_total_candidates=60,
+        max_total_attempts=20,
+        timeout_seconds=1.0,
+        min_request_interval_seconds=1.0,
+    )
+    responses = [_atom_response(index * 3, record_count=3) for index in range(11)]
+    responses.append(_atom_response(99, record_count=0))
+    transport = RecordedTransport(responses)
+    adapter = ArxivAdapter(
+        ArxivAdapterConfig(
+            user_agent="m2-t01r3.2-empty-cache-seed",
+            timeout_seconds=1.0,
+            page_size=3,
+            min_request_interval_seconds=1.0,
+            max_attempts=1,
+            max_total_results=3,
+            max_total_attempts=20,
+            initial_backoff_seconds=0.0,
+            cache_dir=cache_dir,
+            cache_schema_version="m1-t04.v2",
+            cache_namespace="first-round:real",
+        ),
+        transport=transport,
+        monotonic=lambda: 10.0,
+        sleeper=lambda _: None,
+        utc_now=lambda: NOW,
+    )
+    run = run_first_round(
+        QUESTION,
+        config=config,
+        adapter=adapter,
+        now=lambda: NOW,
+        monotonic=lambda: 10.0,
+    )
+    assert run.status.value == "success"
+    assert len(run.candidates) == 33
+    assert transport.request_count == 12
+    raw_output = _render_json_bytes(run.model_dump(mode="json"))
+    output_path = tmp_path / "first-round.json"
+    output_path.write_bytes(raw_output)
+    report_path = tmp_path / "m1-validation.json"
+    report_path.write_bytes(
+        _render_json_bytes(
+            {
+                "baseline_commit": "f0f167766589e3321821b0caf7793b00c8ff7291",
+                "validated_implementation_commit": "7b19d437bd30f29e9ec2debaf022920bc47c3f0d",
+                "implementation_ancestry": ["7b19d437bd30f29e9ec2debaf022920bc47c3f0d"],
+                "real_external": {
+                    "classification": "real_external",
+                    "deduplicated_candidate_count": 33,
+                    "source_id_coverage": 1.0,
+                    "url_coverage": 1.0,
+                    "candidate_array_sha256": _canonical_json_sha256(
+                        run.model_dump(mode="json")["candidates"]
+                    ),
+                    "output_hashes": {"first-round.json": hashlib.sha256(raw_output).hexdigest()},
+                },
+            }
+        )
+    )
+    return output_path, cache_dir, report_path
+
+
 @pytest.fixture
 def synthetic_inputs(tmp_path: Path) -> tuple[Path, Path, Path]:
     return _seed_synthetic_real_run(tmp_path)
@@ -175,6 +260,204 @@ def _freeze_synthetic(**kwargs: object) -> FreezeResult:
 
 def _publish_synthetic_pair(**kwargs: object) -> None:
     _publish_snapshot_pair(expected_candidate_count=12, **kwargs)
+
+
+def test_verified_empty_cache_entry_is_accepted_only_with_complete_replay_gates(
+    tmp_path: Path,
+) -> None:
+    assert CacheValidationAudit(query_count=12, empty_record_entry_count=1).empty_record_entry_count == 1
+    output_path, cache_dir, report_path = _seed_thirty_three_candidate_run_with_one_empty_cache(
+        tmp_path
+    )
+
+    provenance = load_accepted_m1_provenance(report_path)
+    snapshot, manifest = _replay_and_project(
+        output_path.read_bytes(),
+        m1_cache_dir=cache_dir,
+        provenance=provenance,
+        evidence_report_sha256=hashlib.sha256(report_path.read_bytes()).hexdigest(),
+        source_evidence_report="evaluation/reports/m1-validation.json",
+    )
+    snapshot_bytes = _render_json_bytes(snapshot)
+    manifest["snapshot_sha256"] = hashlib.sha256(snapshot_bytes).hexdigest()
+
+    assert len(snapshot["candidates"]) == 33
+    assert manifest["zero_transport_replay"] == {
+        "transport_requests": 0,
+        "cache_hits": 12,
+        "query_count": 12,
+        "empty_cache_entry_count": 1,
+    }
+    assert validate_frozen_snapshot_bytes(snapshot_bytes, manifest, expected_candidate_count=33) is None
+
+
+def test_synthetic_nonempty_cache_records_zero_empty_entry_count(
+    synthetic_inputs: tuple[Path, Path, Path],
+) -> None:
+    output_path, cache_dir, report_path = synthetic_inputs
+    _, manifest, snapshot_bytes, _ = _snapshot_pair(output_path, cache_dir, report_path)
+
+    assert manifest["zero_transport_replay"]["empty_cache_entry_count"] == 0
+    assert validate_frozen_snapshot_bytes(snapshot_bytes, manifest, expected_candidate_count=12) is None
+
+
+@pytest.mark.parametrize(
+    ("mutation", "expected_code"),
+    [
+        ("missing_records", REAL_CACHE_PROVENANCE_MISMATCH),
+        ("null_records", REAL_CACHE_PROVENANCE_MISMATCH),
+        ("mapping_records", REAL_CACHE_PROVENANCE_MISMATCH),
+        ("invalid_record", REAL_CACHE_PROVENANCE_MISMATCH),
+        ("wrong_manifest", REAL_CACHE_PROVENANCE_MISMATCH),
+        ("missing_file", REAL_CACHE_INCOMPLETE),
+    ],
+)
+def test_empty_cache_entry_still_rejects_invalid_cache_provenance(
+    tmp_path: Path, mutation: str, expected_code: str
+) -> None:
+    output_path, cache_dir, report_path = _seed_thirty_three_candidate_run_with_one_empty_cache(
+        tmp_path
+    )
+    provenance = load_accepted_m1_provenance(report_path)
+    empty_path = next(
+        path
+        for path in cache_dir.rglob("*.json")
+        if json.loads(path.read_text(encoding="utf-8"))["records"] == []
+    )
+    if mutation == "missing_file":
+        empty_path.unlink()
+    else:
+        payload = json.loads(empty_path.read_text(encoding="utf-8"))
+        if mutation == "missing_records":
+            del payload["records"]
+        elif mutation == "null_records":
+            payload["records"] = None
+        elif mutation == "mapping_records":
+            payload["records"] = {}
+        elif mutation == "invalid_record":
+            payload["records"] = [{"paper_id": "not-a-paper"}]
+        else:
+            payload["manifest"] = {"query_text": "wrong"}
+        empty_path.write_bytes(_render_json_bytes(payload))
+
+    with pytest.raises(FreezeGateError) as failure:
+        _replay_and_project(
+            output_path.read_bytes(),
+            m1_cache_dir=cache_dir,
+            provenance=provenance,
+            evidence_report_sha256=hashlib.sha256(report_path.read_bytes()).hexdigest(),
+            source_evidence_report="evaluation/reports/m1-validation.json",
+        )
+    assert failure.value.code == expected_code
+
+
+def test_all_empty_verified_cache_entries_still_fail_raw_and_deduplicated_count_gates(
+    tmp_path: Path,
+) -> None:
+    output_path, cache_dir, report_path = _seed_thirty_three_candidate_run_with_one_empty_cache(
+        tmp_path
+    )
+    provenance = load_accepted_m1_provenance(report_path)
+    for cache_path in cache_dir.rglob("*.json"):
+        payload = json.loads(cache_path.read_text(encoding="utf-8"))
+        payload["records"] = []
+        cache_path.write_bytes(_render_json_bytes(payload))
+
+    with pytest.raises(FreezeGateError) as failure:
+        _replay_and_project(
+            output_path.read_bytes(),
+            m1_cache_dir=cache_dir,
+            provenance=provenance,
+            evidence_report_sha256=hashlib.sha256(report_path.read_bytes()).hexdigest(),
+            source_evidence_report="evaluation/reports/m1-validation.json",
+        )
+    assert failure.value.code == REAL_CACHE_INCOMPLETE
+
+
+@pytest.mark.parametrize("empty_cache_entry_count", [-1, 13, True])
+def test_snapshot_validator_rejects_invalid_empty_cache_entry_audit(
+    synthetic_inputs: tuple[Path, Path, Path], empty_cache_entry_count: object
+) -> None:
+    output_path, cache_dir, report_path = synthetic_inputs
+    snapshot, manifest, _, _ = _snapshot_pair(output_path, cache_dir, report_path)
+    manifest["zero_transport_replay"]["empty_cache_entry_count"] = empty_cache_entry_count
+    snapshot_bytes = _render_json_bytes(snapshot)
+    manifest["snapshot_sha256"] = hashlib.sha256(snapshot_bytes).hexdigest()
+    assert validate_frozen_snapshot_bytes(snapshot_bytes, manifest, expected_candidate_count=12) == (
+        "frozen snapshot manifest lacks a complete zero-transport replay audit"
+    )
+
+
+@pytest.mark.parametrize(
+    ("rebaseline_mutation", "expected_code"),
+    [
+        ({"source_completion_commit": "0" * 40}, FROZEN_INPUT_INVALID),
+        ({"classification": "unapproved"}, FROZEN_INPUT_INVALID),
+        ({"source_bundle": "C:/outside/bundle"}, FROZEN_INPUT_INVALID),
+        ({"source_bundle": "evaluation/source-artifacts/../bundle"}, FROZEN_INPUT_INVALID),
+        ({"source_bundle": "evaluation/runs/bundle"}, FROZEN_INPUT_INVALID),
+        ({"reason": ""}, FROZEN_INPUT_INVALID),
+    ],
+)
+def test_rebaseline_provenance_is_explicit_and_invalid_forms_fail_closed(
+    synthetic_inputs: tuple[Path, Path, Path],
+    tmp_path: Path,
+    rebaseline_mutation: dict[str, object],
+    expected_code: str,
+) -> None:
+    output_path, cache_dir, report_path = synthetic_inputs
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    rebaseline = {
+        "classification": "approved_rebaseline",
+        "source_completion_commit": M1_COMPLETION_MERGE_COMMIT,
+        "reason": "Historical M1 runtime artifacts were not recoverable",
+        "source_bundle": "evaluation/source-artifacts/m1-rebaseline-2026-07-28",
+    }
+    rebaseline.update(rebaseline_mutation)
+    report["rebaseline"] = rebaseline
+    rebaseline_report = tmp_path / "rebaseline.json"
+    rebaseline_report.write_bytes(_render_json_bytes(report))
+
+    result = _freeze_synthetic(
+        m1_output=output_path,
+        m1_cache_dir=cache_dir,
+        output_dir=tmp_path / "snapshot",
+        m1_evidence_report=rebaseline_report,
+        expected_candidate_count=12,
+    )
+    assert result.status == "blocked"
+    assert result.error_code == expected_code
+
+
+def test_legacy_and_rebaseline_provenance_produce_distinct_manifest_classifications(
+    synthetic_inputs: tuple[Path, Path, Path], tmp_path: Path
+) -> None:
+    output_path, cache_dir, report_path = synthetic_inputs
+    legacy = load_accepted_m1_provenance(report_path, required_candidate_count=12)
+    assert legacy.artifact_source_classification == "EXACT_HISTORICAL_ARTIFACTS_RECOVERED"
+    assert legacy.source_bundle is None
+
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    report["rebaseline"] = {
+        "classification": "approved_rebaseline",
+        "source_completion_commit": M1_COMPLETION_MERGE_COMMIT,
+        "reason": "Historical M1 runtime artifacts were not recoverable",
+        "source_bundle": "evaluation/source-artifacts/m1-rebaseline-2026-07-28",
+    }
+    rebaseline_report = tmp_path / "rebaseline.json"
+    rebaseline_report.write_bytes(_render_json_bytes(report))
+    rebaseline = load_accepted_m1_provenance(rebaseline_report, required_candidate_count=12)
+    assert rebaseline.artifact_source_classification == "M1_REBASELINE_SOURCE_BUNDLE"
+    assert rebaseline.source_bundle == "evaluation/source-artifacts/m1-rebaseline-2026-07-28"
+    _, manifest = _replay_and_project(
+        output_path.read_bytes(),
+        m1_cache_dir=cache_dir,
+        provenance=rebaseline,
+        evidence_report_sha256=hashlib.sha256(rebaseline_report.read_bytes()).hexdigest(),
+        source_evidence_report="evaluation/reports/m1-validation.json",
+    )
+    assert manifest["artifact_source_classification"] == "M1_REBASELINE_SOURCE_BUNDLE"
+    assert manifest["source_bundle"] == "evaluation/source-artifacts/m1-rebaseline-2026-07-28"
 
 
 def test_production_evidence_provenance_uses_completion_merge_not_evidence_baseline() -> None:
@@ -249,6 +532,7 @@ def test_synthetic_twelve_query_real_cache_replays_without_transport_and_publish
     manifest = json.loads((output_dir / "m1-candidates.v1.manifest.json").read_text(encoding="utf-8"))
     assert manifest["zero_transport_replay"] == {
         "cache_hits": 12,
+        "empty_cache_entry_count": 0,
         "query_count": 12,
         "transport_requests": 0,
     }
@@ -734,6 +1018,7 @@ def test_publication_failure_preserves_preexisting_side_and_removes_only_new_sid
         (None, "url_coverage", 0.5),
         (None, "metadata_mismatch_count", 1),
         (None, "zero_transport_replay", {"transport_requests": 0, "cache_hits": 11, "query_count": 12}),
+        (None, "artifact_source_classification", "UNTRUSTED_SOURCE"),
         (None, "implementation_ancestry", []),
     ],
 )
