@@ -20,10 +20,17 @@
     "candidate_array_sha256": "e51eb84d4e772bba324a199478caa5f0983edef0b0dbf4c58fce5f9da5803209",
     "candidate_arrays_equal": true,
     "classification": "real_cache_replay",
+    "deduplicated_candidate_count": 33,
+    "empty_cache_entry_count": 1,
+    "empty_query_ids": [
+      "Q1-3fb237a1ce9ed2b3"
+    ],
     "output_hashes": {
       "first-round.json": "6caecd1454ff2e0bd945a6a51dac276dfc0ce9fda5716033014e245843d0aab7",
       "first-round.md": "9983fbfd6fa04678f45b5b4dcfa1069a7b88b599a29fa868864e578196f4bece"
     },
+    "query_count": 12,
+    "raw_candidate_count": 51,
     "status": "success",
     "transport_requests": 0
   },
@@ -62,13 +69,23 @@
     "url_coverage": 1.0
   },
   "rebaseline": {
-    "bundle_manifest_sha256": "be1835210718b8bc26799bfa783b8f1f82f6d70e9a2660751cf185121dc3dce5",
+    "bundle_file_count": 17,
+    "bundle_manifest_path": "evaluation/source-artifacts/m1-rebaseline-2026-07-28/bundle-manifest.json",
+    "bundle_manifest_sha256": "5dad9e6070edececceeead3f8bb3e7f43302f7405fee811dcc7ddb34c84f0849",
+    "bundle_total_bytes": 208018,
+    "cache_file_count": 12,
     "classification": "approved_rebaseline",
     "copy_verification": {
       "all_file_bytes_equal": true,
       "source_file_count": 16,
       "target_file_count": 16
     },
+    "empty_cache_entry_count": 1,
+    "empty_query_ids": [
+      "Q1-3fb237a1ce9ed2b3"
+    ],
+    "payload_file_count": 16,
+    "payload_total_bytes": 203237,
     "reason": "Historical M1 runtime artifacts were not recoverable",
     "source_bundle": "evaluation/source-artifacts/m1-rebaseline-2026-07-28",
     "source_completion_commit": "0eb45fc22d10adb72cb66aa45494333057080bc1"

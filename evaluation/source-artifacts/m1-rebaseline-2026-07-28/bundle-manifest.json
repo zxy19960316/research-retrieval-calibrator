@@ -1,5 +1,7 @@
 {
   "adapter_schema_version": "m1-t04.v2",
+  "bundle_file_count": 17,
+  "bundle_total_bytes": 208018,
   "bundle_version": "m1-rebaseline-source-bundle.v1",
   "cache_file_count": 12,
   "cache_namespace": "first-round:real",
@@ -9,6 +11,10 @@
     "source_file_count": 16,
     "target_file_count": 16
   },
+  "empty_cache_entry_count": 1,
+  "empty_query_ids": [
+    "Q1-3fb237a1ce9ed2b3"
+  ],
   "environment": {
     "jsonschema": "4.26.0",
     "pydantic": "2.13.4",
@@ -102,8 +108,12 @@
   ],
   "first_run_candidate_array_sha256": "e51eb84d4e772bba324a199478caa5f0983edef0b0dbf4c58fce5f9da5803209",
   "generated_at_utc": "2026-07-28T07:14:37.788946Z",
+  "payload_file_count": 16,
+  "payload_total_bytes": 203237,
   "query_count": 12,
   "query_plan_sha256": "225ff93f098891d58e6315fefcfdf209478cb0208228a6cf322c6028ccdc68f3",
+  "question": "How can graph-based retrieval support scientific literature discovery?",
   "replay_candidate_array_sha256": "e51eb84d4e772bba324a199478caa5f0983edef0b0dbf4c58fce5f9da5803209",
+  "source_bundle": "evaluation/source-artifacts/m1-rebaseline-2026-07-28",
   "source_implementation_commit": "0eb45fc22d10adb72cb66aa45494333057080bc1"
 }
