@@ -12,8 +12,9 @@ Completed report contract (``m2-t01-embedding.v1``):
 * provenance: ``baseline_commit``, ``implementation_commit_a``,
   ``snapshot_commit_b``, ``validated_commit``, and ``validated_inputs``;
 * ``candidate_snapshot`` and ``vector_snapshot`` objects containing their
-  paths, Git-blob SHA-256 values, manifest paths/blob hashes, and canonical
-  snapshot hashes;
+  paths, Git-blob SHA-256 values, manifest paths/blob hashes, and unambiguous
+  artifact hashes: exact file bytes for candidates and canonical JSON for
+  vectors;
 * green ``automated_checks``, explicit ``fake_evidence`` and
   ``real_model_evidence``, M1 metadata audit, and ``status_after_evidence``.
 """
@@ -34,6 +35,9 @@ ROOT = Path(__file__).resolve().parents[1]
 REPORT_PATH = Path("evaluation/reports/m2-t01-embedding.json")
 REPORT_VERSION = "m2-t01-embedding.v1"
 BASELINE_COMMIT = "0eb45fc22d10adb72cb66aa45494333057080bc1"
+M1_REBASELINE_REPORT = "evaluation/reports/m1-rebaseline-2026-07-28.json"
+M1_REBASELINE_SOURCE_BUNDLE = "evaluation/source-artifacts/m1-rebaseline-2026-07-28"
+M1_REBASELINE_CANDIDATE_ARRAY_SHA256 = "e51eb84d4e772bba324a199478caa5f0983edef0b0dbf4c58fce5f9da5803209"
 SHA1 = re.compile(r"[0-9a-f]{40}")
 SHA256 = re.compile(r"[0-9a-f]{64}")
 STATUS_ROW = re.compile(
@@ -199,7 +203,7 @@ def _validate_inputs(
 
 
 def _snapshot_fields(
-    payload: dict[str, Any], name: str, errors: list[str], repository_root: Path
+    payload: dict[str, Any], name: str, hash_field: str, errors: list[str], repository_root: Path
 ) -> tuple[str, str, str, str, str] | None:
     snapshot = payload.get(name)
     if not isinstance(snapshot, dict):
@@ -209,22 +213,22 @@ def _snapshot_fields(
     blob_sha256 = snapshot.get("blob_sha256")
     manifest_path = snapshot.get("manifest_path")
     manifest_blob_sha256 = snapshot.get("manifest_blob_sha256")
-    canonical_sha256 = snapshot.get("canonical_sha256")
+    artifact_sha256 = snapshot.get(hash_field)
     if (
         not isinstance(path, str)
         or not isinstance(blob_sha256, str)
         or not isinstance(manifest_path, str)
         or not isinstance(manifest_blob_sha256, str)
-        or not isinstance(canonical_sha256, str)
+        or not isinstance(artifact_sha256, str)
         or _safe_path(path, repository_root) is None
         or _safe_path(manifest_path, repository_root) is None
         or SHA256.fullmatch(blob_sha256) is None
         or SHA256.fullmatch(manifest_blob_sha256) is None
-        or SHA256.fullmatch(canonical_sha256) is None
+        or SHA256.fullmatch(artifact_sha256) is None
     ):
         errors.append(f"{name} has unsafe paths or invalid hashes")
         return None
-    return path, blob_sha256, manifest_path, manifest_blob_sha256, canonical_sha256
+    return path, blob_sha256, manifest_path, manifest_blob_sha256, artifact_sha256
 
 
 def _load_snapshot_json(
@@ -233,7 +237,7 @@ def _load_snapshot_json(
     name: str,
     errors: list[str],
     repository_root: Path,
-) -> tuple[dict[str, Any], dict[str, Any]] | None:
+) -> tuple[bytes, bytes, dict[str, Any], dict[str, Any]] | None:
     if commit is None or fields is None:
         return None
     path, expected_blob, manifest_path, expected_manifest_blob, _ = fields
@@ -252,17 +256,17 @@ def _load_snapshot_json(
     if not isinstance(snapshot, dict) or not isinstance(manifest, dict):
         errors.append(f"{name} snapshot and manifest must be JSON objects")
         return None
-    return snapshot, manifest
+    return raw, raw_manifest, snapshot, manifest
 
 
 def _validate_candidate_snapshot(
     payload: dict[str, Any], commit: str | None, errors: list[str], repository_root: Path
 ) -> str | None:
-    fields = _snapshot_fields(payload, "candidate_snapshot", errors, repository_root)
+    fields = _snapshot_fields(payload, "candidate_snapshot", "snapshot_sha256", errors, repository_root)
     loaded = _load_snapshot_json(commit, fields, "candidate snapshot", errors, repository_root)
     if fields is None or loaded is None:
         return None
-    snapshot, manifest = loaded
+    raw_snapshot, _, snapshot, manifest = loaded
     if snapshot.get("snapshot_version") != "m2-candidates.v1" or snapshot.get("count") != 33:
         errors.append("candidate snapshot must be m2-candidates.v1 with count 33")
     if snapshot.get("source_phase") != "M1" or snapshot.get("source_merge_commit") != BASELINE_COMMIT:
@@ -308,25 +312,40 @@ def _validate_candidate_snapshot(
             errors.append("candidate snapshot has duplicate paper IDs")
         if len(source_identities) != len(set(source_identities)):
             errors.append("candidate snapshot has duplicate source identities")
-    canonical = _canonical_sha256(snapshot)
-    if manifest.get("snapshot_sha256") != canonical or fields[4] != canonical:
-        errors.append("candidate snapshot canonical SHA-256 does not match manifest/report")
+    exact_snapshot_sha256 = hashlib.sha256(raw_snapshot).hexdigest()
+    if manifest.get("snapshot_sha256") != exact_snapshot_sha256 or fields[4] != exact_snapshot_sha256:
+        errors.append("candidate snapshot exact SHA-256 does not match manifest/report")
+    if (
+        snapshot.get("source_evidence_report") != M1_REBASELINE_REPORT
+        or snapshot.get("source_candidate_array_sha256") != M1_REBASELINE_CANDIDATE_ARRAY_SHA256
+        or manifest.get("artifact_source_classification") != "M1_REBASELINE_SOURCE_BUNDLE"
+        or manifest.get("source_bundle") != M1_REBASELINE_SOURCE_BUNDLE
+    ):
+        errors.append("candidate snapshot has invalid M1 rebaseline provenance")
     if manifest.get("source_id_coverage") != 1.0 or manifest.get("url_coverage") != 1.0:
         errors.append("candidate snapshot manifest must record 1.0 source-ID and URL coverage")
     replay = manifest.get("zero_transport_replay")
-    if not isinstance(replay, dict) or replay.get("transport_requests") != 0:
-        errors.append("candidate snapshot manifest must record zero-transport replay")
-    return canonical
+    if (
+        manifest.get("candidate_count") != 33
+        or not isinstance(replay, dict)
+        or replay.get("transport_requests") != 0
+        or replay.get("cache_hits") != 12
+        or replay.get("query_count") != 12
+        or replay.get("empty_cache_entry_count") != 1
+        or manifest.get("metadata_mismatch_count") != 0
+    ):
+        errors.append("candidate snapshot manifest has invalid zero-transport replay audit")
+    return exact_snapshot_sha256
 
 
 def _validate_vector_snapshot(
     payload: dict[str, Any], commit: str | None, candidate_sha256: str | None, errors: list[str], repository_root: Path
 ) -> None:
-    fields = _snapshot_fields(payload, "vector_snapshot", errors, repository_root)
+    fields = _snapshot_fields(payload, "vector_snapshot", "canonical_sha256", errors, repository_root)
     loaded = _load_snapshot_json(commit, fields, "vector snapshot", errors, repository_root)
     if fields is None or loaded is None:
         return
-    snapshot, manifest = loaded
+    _, _, snapshot, manifest = loaded
     if snapshot.get("snapshot_version") != "m2-embedding-v1":
         errors.append("vector snapshot must use m2-embedding-v1")
     if candidate_sha256 is None or snapshot.get("candidate_snapshot_sha256") != candidate_sha256:
