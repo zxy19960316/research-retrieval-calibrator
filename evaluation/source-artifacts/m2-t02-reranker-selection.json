@@ -13,16 +13,25 @@
     "trust_remote_code": false,
     "runtime_library": "transformers",
     "raw_score_semantics": "higher_logit_is_more_relevant",
-    "normalization_owner": "app.core.reranking.global_min_max",
-    "repository_size_bytes": 7975340915,
+    "normalization_owner": "app.core.reranking",
+    "normalization_method": "global_min_max",
+    "huggingface_used_storage_bytes": 7975340915,
+    "pinned_source_files_size_bytes": 2293259337,
+    "required_runtime_files_size_bytes": 2293242108,
     "weight_size_bytes": 2271071852,
     "model_parameter_count": 567755777,
     "standard_transformers_compatibility": true,
-    "maximum_supported_input": 512,
+    "tokenizer_model_max_length": 8192,
+    "model_max_position_embeddings": 8194,
     "cpu_feasibility_risk": "requires_B2_cpu_preflight_due_to_568M_parameters_and_2.27GB_float32_weights",
     "offline_replay_complexity": "standard_transformers_pinned_files_required",
     "commercial_use_constraint": "apache-2.0",
-    "official_api_url": "https://huggingface.co/api/models/BAAI/bge-reranker-v2-m3?blobs=true",
+    "official_metadata_source": {
+      "provider": "huggingface_model_api",
+      "model_id": "BAAI/bge-reranker-v2-m3",
+      "resolved_revision": "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e",
+      "blobs": true
+    },
     "official_model_card_url": "https://huggingface.co/BAAI/bge-reranker-v2-m3/blob/953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e/README.md"
   },
   "alternatives": [
@@ -42,8 +51,7 @@
       "maximum_supported_input": 8192,
       "cpu_feasibility_risk": "requires_B2_cpu_preflight",
       "offline_replay_complexity": "custom_code_dependency_requires_additional_pinning",
-      "commercial_use_constraint": "apache-2.0",
-      "official_api_url": "https://huggingface.co/api/models/Alibaba-NLP/gte-multilingual-reranker-base?blobs=true"
+      "commercial_use_constraint": "apache-2.0"
     },
     {
       "model_id": "cross-encoder/ms-marco-MiniLM-L6-v2",
@@ -61,8 +69,7 @@
       "maximum_supported_input": 512,
       "cpu_feasibility_risk": "lower_parameter_count_still_requires_B2_preflight",
       "offline_replay_complexity": "standard_transformers_pinned_files_required",
-      "commercial_use_constraint": "apache-2.0",
-      "official_api_url": "https://huggingface.co/api/models/cross-encoder/ms-marco-MiniLM-L6-v2?blobs=true"
+      "commercial_use_constraint": "apache-2.0"
     },
     {
       "model_id": "jinaai/jina-reranker-v2-base-multilingual",
@@ -80,15 +87,14 @@
       "maximum_supported_input": 1024,
       "cpu_feasibility_risk": "requires_B2_cpu_preflight",
       "offline_replay_complexity": "custom_code_dependency_requires_additional_pinning",
-      "commercial_use_constraint": "noncommercial_CC-BY-NC-4.0",
-      "official_api_url": "https://huggingface.co/api/models/jinaai/jina-reranker-v2-base-multilingual?blobs=true"
+      "commercial_use_constraint": "noncommercial_CC-BY-NC-4.0"
     }
   ],
   "runtime_policy": {
     "device": "cpu_preflight_required",
     "dtype": "float32_initial_preflight",
     "max_length": 512,
-    "truncation": "only_second_or_pair_truncation_explicitly_recorded",
+    "pair_truncation_strategy": "longest_first",
     "batch_size": "to_be_determined_by_preflight",
     "network_after_download": "forbidden"
   },

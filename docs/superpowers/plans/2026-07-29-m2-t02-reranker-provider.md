@@ -231,6 +231,50 @@ Plan complete and saved to `docs/superpowers/plans/2026-07-29-m2-t02-reranker-pr
 - [ ] Keep `weights_downloaded`, `tokenizer_downloaded`, `model_loaded`, `inference_run`, and `real_scores_generated` all false. The contract test must read only the local JSON artifact and reject an unpinned revision, duplicate file paths, invalid digest types, secrets, absolute paths, or invented runtime/benchmark fields.
 - [ ] Run `py -3.12 -m pytest -q tests/contract/test_m2_t02_reranker_selection.py` before and after creating the artifact. Then run the full offline regression and all static/historical validators before committing only these three files.
 
+## B0.1 Metadata semantics and exact immutable contract
+
+**Goal:** Correct and lock the B0 selected-model metadata without downloading a model or tokenizer, loading a model, running inference, or producing a score.
+
+**Files:**
+
+- Modify: `evaluation/source-artifacts/m2-t02-reranker-selection.json`
+- Modify: `tests/contract/test_m2_t02_reranker_selection.py`
+- Modify: `docs/superpowers/plans/2026-07-29-m2-t02-reranker-provider.md`
+
+**Constraints:**
+
+- B0.1 changes metadata and its offline contract only; B1 remains unauthorized.
+- `tokenizer_model_max_length: 8192` is the tokenizer/model capability boundary; `model_max_position_embeddings: 8194` records the model position table; `runtime_policy.max_length: 512` remains the initial runtime truncation policy.
+- B2 disk planning uses `required_runtime_files_size_bytes: 2293242108`, not Hugging Face `usedStorage`.
+- Any B2 download and validation must use revision `953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e` and the seven exact source-file digests.
+
+- [ ] **Step 1: Write the failing exact-schema contract**
+
+Replace subset checks with `assert set(object) == EXPECTED_FIELDS` for `selected_model`, `runtime_policy`, `official_metadata_source`, every source-file entry, every alternative entry, and `execution_state`. Assert the selected BAAI revision, Apache-2.0 license, parameter count `567755777`, `trust_remote_code: false`, and runtime library `transformers`. Assert the three alternative IDs, revisions, licenses, multilingual flags, remote-code flags, and selection statuses exactly.
+
+- [ ] **Step 2: Verify the old artifact is rejected**
+
+Run: `py -3.12 -m pytest -q tests/contract/test_m2_t02_reranker_selection.py`
+
+Expected: FAIL because the old artifact contains `maximum_supported_input`, `repository_size_bytes`, and the revisionless `official_api_url` rather than the B0.1 fields.
+
+- [ ] **Step 3: Apply the metadata correction**
+
+Replace `normalization_owner: app.core.reranking.global_min_max` with `normalization_owner: app.core.reranking` and `normalization_method: global_min_max`. Replace `maximum_supported_input` with `tokenizer_model_max_length: 8192` and `model_max_position_embeddings: 8194`; retain the runtime policy `max_length: 512` and set `pair_truncation_strategy: longest_first`. Replace `repository_size_bytes` with `huggingface_used_storage_bytes: 7975340915`, `pinned_source_files_size_bytes: 2293259337`, and `required_runtime_files_size_bytes: 2293242108`. Replace every `official_api_url` with no field and add the selected model's closed `official_metadata_source` object pinned to `953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e`.
+
+- [ ] **Step 4: Verify exact source, state, and safety invariants**
+
+Make the offline test compare all seven source file objects to the pinned path, size, digest, digest type, storage type, and runtime flag; recompute the two source-size totals and require `weight_size_bytes` to equal `model.safetensors.size_bytes`. Require `git -> git_blob_sha1`, `lfs -> sha256`, five false execution-state values, no absolute local paths, no secrets, no score/runtime/benchmark result fields, and no `main` or `latest` revision value.
+
+- [ ] **Step 5: Run the approved verification suite and commit**
+
+Run the focused contract, full pytest, Ruff, mypy, project-document and historical evidence validators, and `pip check` exactly as specified by the B0.1 task request. Stage only these three B0 files and commit:
+
+```powershell
+git add evaluation/source-artifacts/m2-t02-reranker-selection.json tests/contract/test_m2_t02_reranker_selection.py docs/superpowers/plans/2026-07-29-m2-t02-reranker-provider.md
+git commit -m "fix: harden M2 reranker selection lock"
+```
+
 ## B1 Provider implementation with mocked runtime
 
 B1 may implement a `transformers` adapter using mocked imports and mocked runtime objects only. Unit tests must not access the network, download files, load weights, or create real scores. B1 is not authorized by B0.
