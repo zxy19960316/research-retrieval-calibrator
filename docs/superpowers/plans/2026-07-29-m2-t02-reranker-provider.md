@@ -176,6 +176,42 @@ git commit -m "fix: fail closed on reranker output errors"
 - Placeholder scan: no task relies on an unspecified function name or test command.
 - Type consistency: the provider returns `ProviderRawScore`; core validates it into `RerankRecord`; only `RerankRecord` enters cache and final order.
 
+## A3 Transaction and Adversarial Follow-up
+
+### A3-R: Adversarial tests
+
+**Files:**
+- Modify: `tests/contract/test_reranker_model_contracts.py`
+- Modify: `tests/contract/test_reranker_orchestration.py`
+- Modify: `docs/superpowers/plans/2026-07-29-m2-t02-reranker-provider.md`
+
+**Goal:** Establish red-first contracts for cache publication rollback, temporary-file isolation, direct revalidation, corrupt-cache rejection, and input validation ordering without changing production code.
+
+- [ ] Add a four-miss publication test that fails the third `os.replace` and requires call-level removal of every new JSON entry, no temporary/staging file, and `INVALID_OUTPUT`.
+- [ ] Add byte-for-byte restoration coverage for a pre-existing target replaced before a later publication failure.
+- [ ] Add parameterized failure-point coverage for temporary-file open, `json.dump`, flush, `os.fsync`, and `os.replace`; retain all existing cache bytes and remove temporary files.
+- [ ] Add same-process threaded concurrency coverage using `ThreadPoolExecutor(max_workers=2)` and `threading.Barrier`; require independent temporary/staging identities and identical completed runs.
+- [ ] Add invalid constructed `ProviderRawScore` coverage using `warnings.catch_warnings(record=True)`; reject before serializing and record no serializer warning.
+- [ ] Add corrupt-cache, distinct-paper-ID cache identity, generator-output, descriptor-access ordering, and unhashable input-format characterization gates.
+- [ ] Run focused contracts and Ruff. Preserve the expected red tests for transaction rollback, temporary isolation, warning-free revalidation, input-before-descriptor validation, and unhashable format validation.
+- [ ] Commit only tests and this plan as `test: harden reranker transaction boundaries`.
+
+### A3-F: Transaction and validation hardening
+
+**Files:**
+- Modify: `app/core/reranking.py`
+- Modify: `app/models/reranking.py`
+- Test: `tests/contract/test_reranker_model_contracts.py`
+- Test: `tests/contract/test_reranker_orchestration.py`
+
+**Goal:** Make every A3-R red contract pass without changing reranker ranking semantics or adding a real reranker.
+
+- [ ] Implement call-level rollback for multi-file publication: preserve pre-call target bytes, remove every newly published entry on any write failure, and restore overwritten targets byte-for-byte.
+- [ ] Allocate a unique transaction/staging identity per call and isolate temporary writes for concurrent calls in one Python process. Cross-process locking remains explicitly out of scope.
+- [ ] Revalidate `ProviderRawScore` constructed instances by extracting `paper_id` and `raw_score` directly before any Pydantic serializer invocation, so rejected values emit no serializer warning.
+- [ ] Validate all selected candidate inputs before reading `provider.descriptor`, and convert unhashable descriptor-format values into Pydantic `ValidationError`.
+- [ ] Re-run focused, full, Ruff, mypy, historical validators, and remote Actions before changing any task status.
+
 ## Execution Handoff
 
 Plan complete and saved to `docs/superpowers/plans/2026-07-29-m2-t02-reranker-provider.md`. The present branch stops after the plan and red tests. A later implementation can execute the three tasks inline, one red/green commit boundary at a time.

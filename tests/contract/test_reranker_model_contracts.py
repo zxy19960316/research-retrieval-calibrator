@@ -117,6 +117,11 @@ def test_descriptor_rejects_blank_or_unrecognized_input_format(input_format_vers
         _descriptor(input_format_version=input_format_version)
 
 
+def test_unhashable_input_format_is_a_pydantic_validation_error() -> None:
+    with pytest.raises(ValidationError, match="input format"):
+        _descriptor(input_format_version=[])
+
+
 def test_reranker_input_requires_exact_utf8_text_sha_and_closed_fields() -> None:
     input_record = RerankerInput.model_validate(_input_payload())
     assert input_record.input_sha256 == hashlib.sha256(input_record.text.encode("utf-8")).hexdigest()
