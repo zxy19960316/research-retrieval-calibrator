@@ -11,14 +11,25 @@
 ## Global Constraints
 
 - M2-T02 only; do not modify `STATUS.md`, M2 task counts, M3-M6, M1 artifacts, or M2-T01 evidence.
-- Support configured candidate counts from 50 through 100; `effective_top_k = min(configured_top_k, available_count)`.
+- `configured_top_k` is restricted to `50..100`; available candidate count may be lower; `effective_top_k = min(configured_top_k, available_count)`.
 - The current 33 frozen candidates therefore yield `configured_top_k=100`, `available_count=33`, and `effective_top_k=33`; do not encode 33 into production logic.
 - Inputs are the frozen query plus each source-backed title and optional abstract; a missing abstract means title-only input and must not be synthesized.
-- Cache identity includes query SHA-256, paper-input SHA-256, immutable model revision, and `m2-reranker-title-abstract-v1` format version.
+- Cache identity includes query SHA-256, paper-input SHA-256, the complete `RerankerModelDescriptor`, and therefore immutable model revision, library/version, input format version, and cache namespace.
 - Raw scores remain raw until every selected provider output has passed count, identity, type, and finiteness validation; normalization occurs once over the complete raw-score set.
-- Valid terminal states are `SCORED`, `NOT_RUN`, `PROVIDER_UNAVAILABLE`, and `INVALID_OUTPUT`; non-`SCORED` results contain no numeric rank score.
-- Fixed query, frozen inputs, configuration, descriptor, and provider output must produce the same final order; ties sort by `paper_id` ascending.
+- Success returns `RerankRun(state=SCORED)`; an empty selected set returns `RerankRun(state=NOT_RUN, records=[])` without a provider call or cache write.
+- A provider load or execution failure raises `RerankerTaskError(code="PROVIDER_UNAVAILABLE")`; malformed count, ID, type, or score output raises `RerankerTaskError(code="INVALID_OUTPUT")`.
+- Every `RerankerTaskError` exposes its stable `.code`; failed calls return no partial `RerankRun`, no numeric fallback score, and no new cache entry.
+- Fixed query, frozen inputs, configuration, descriptor, and provider output must produce the same final order: raw score descending, then `paper_id` ascending.
 - No real reranker invocation, model download, model dependency, or real score artifact is part of this task.
+
+## R0.1 Contract Clarifications
+
+- The core, not the provider, selects cache misses and partitions them into ordered chunks. Each `RerankerProvider.score` call receives one chunk whose input count is at most `batch_size`; concatenated chunk paper IDs equal the selected miss set exactly once.
+- A cache entry contains exactly `raw_score`, `paper_id`, `query_sha256`, `input_sha256`, `descriptor`, and `cache_key`. It never stores a normalized score.
+- A cache key is independent of batch size and caller input order, but changes when the query, title, abstract, full descriptor, immutable revision, input format version, or cache namespace changes.
+- The core validates each provider response against the current chunk by `paper_id`, rather than response position. Reordered valid IDs are accepted; missing, extra, duplicate, unknown, prior-chunk, and non-sequence outputs are `INVALID_OUTPUT`.
+- Cache writes are transactional for one call: retain pre-existing valid entries, stage all new raw-score entries only in memory or temporary files, and publish none unless every selected miss succeeds and validates. On any failure, delete temporary files and leave no new JSON cache entry.
+- After all selected raw scores, including cache hits, are available, normalize once using `(raw - min_raw) / (max_raw - min_raw)`. Use `1.0` for a single-item or all-equal raw-score set. Normalized scores never define ordering.
 
 ## File Structure
 
@@ -38,6 +49,8 @@
 - Produces `RerankerProvider.score(query: str, inputs: Sequence[RerankerInput], *, batch_size: int) -> list[ProviderRawScore]`.
 - Produces `RerankerModelDescriptor`, `RerankerInput`, `RerankRecord`, `RerankRun`, and `RerankerTaskError`.
 - `RerankRecord` exposes `paper_id`, `raw_score`, `normalized_score`, `descriptor`, and `input_sha256` only when its state is `SCORED`.
+- `RerankerTaskError.code` is one of `INVALID_INPUT`, `PROVIDER_UNAVAILABLE`, or `INVALID_OUTPUT`; the core uses `INVALID_INPUT` for invalid Top-K/count parameters.
+- `RerankerModelDescriptor.input_format_version` is a non-blank versioned string, not a one-value literal, so a format revision produces a distinct cache identity.
 
 - [ ] **Step 1: Write the failing contract tests**
 
@@ -111,7 +124,7 @@ git commit -m "feat: orchestrate deterministic reranker batches"
 
 **Interfaces:**
 - Consumes complete validated `ProviderRawScore` values.
-- Produces records sorted by `(-normalized_score, -raw_score, paper_id)` after a single all-record normalization pass.
+- Produces records sorted by `(-raw_score, paper_id)` after a single all-record min-max normalization pass.
 
 - [ ] **Step 1: Write the failing ranking-safety tests**
 
@@ -125,7 +138,7 @@ Expected: FAIL until normalization follows full validated raw-score collection.
 
 - [ ] **Step 3: Implement the minimal ranking safety logic**
 
-Normalize once with a documented deterministic rule after complete validation. On provider load/error emit `PROVIDER_UNAVAILABLE`; on malformed count/IDs/scores emit `INVALID_OUTPUT`; both stop the run without a zero-score substitute or partial ranked result.
+Normalize once with `(raw - min_raw) / (max_raw - min_raw)` after complete validation, with `1.0` for one or all-equal records. On provider load/error raise `RerankerTaskError(code="PROVIDER_UNAVAILABLE")`; on malformed count/IDs/scores raise `RerankerTaskError(code="INVALID_OUTPUT")`; both stop the run without a zero-score substitute, partial ranked result, new cache JSON, or leftover temporary file.
 
 - [ ] **Step 4: Run focused and full validation**
 
@@ -146,7 +159,7 @@ git commit -m "fix: fail closed on reranker output errors"
 
 ## Self-Review
 
-- Spec coverage: the three tasks cover replaceability, query/title/abstract inputs, persisted raw provenance, batch invariance, fail-closed states, no zero-score fallback, one-pass normalization, revision-aware caching, title-only empty abstracts, deterministic output, top-k capping, and tie behavior.
+- Spec coverage: the three tasks cover replaceability, query/title/abstract inputs, persisted raw provenance, core-owned batch chunks, batch invariance, fail-closed states, no zero-score fallback, transactional cache publication, one-pass min-max normalization, full-descriptor cache identity, title-only empty abstracts, Top-K bounds, deterministic output, and tie behavior.
 - Placeholder scan: no task relies on an unspecified function name or test command.
 - Type consistency: the provider returns `ProviderRawScore`; core validates it into `RerankRecord`; only `RerankRecord` enters cache and final order.
 
