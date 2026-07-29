@@ -11,7 +11,11 @@ from types import ModuleType
 import pytest
 
 from app.adapters import embedding as adapter
-from app.adapters.embedding import BgeM3DenseProvider, DeterministicFakeEmbeddingProvider
+from app.adapters.embedding import (
+    BGE_M3_REQUIRED_FILES,
+    BgeM3DenseProvider,
+    DeterministicFakeEmbeddingProvider,
+)
 from app.models.embedding import (
     BGE_M3_MODEL_ID,
     BGE_M3_MODEL_REVISION,
@@ -173,10 +177,15 @@ def test_bge_uses_pinned_snapshot_and_supported_wrapper_arguments(
     flag_embedding = ModuleType("FlagEmbedding")
     flag_embedding.BGEM3FlagModel = Wrapper  # type: ignore[attr-defined]
     hub = ModuleType("huggingface_hub")
+    snapshot_path = model_cache_dir / "snapshots" / BGE_M3_MODEL_REVISION
 
     def snapshot_download(**kwargs: object) -> str:
         snapshot_calls.append(kwargs)
-        return str(model_cache_dir / "snapshots" / BGE_M3_MODEL_REVISION)
+        for relative_path in BGE_M3_REQUIRED_FILES:
+            required_file = snapshot_path / relative_path
+            required_file.parent.mkdir(parents=True, exist_ok=True)
+            required_file.write_bytes(b"required model file")
+        return str(snapshot_path)
 
     hub.snapshot_download = snapshot_download  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "torch", torch)
@@ -198,8 +207,13 @@ def test_bge_uses_pinned_snapshot_and_supported_wrapper_arguments(
             "repo_id": BGE_M3_MODEL_ID,
             "revision": BGE_M3_MODEL_REVISION,
             "cache_dir": str(model_cache_dir),
+            "allow_patterns": list(BGE_M3_REQUIRED_FILES),
+            "max_workers": 1,
         }
     ]
+    assert "onnx/model.onnx_data" not in BGE_M3_REQUIRED_FILES
+    assert "long.jpg" not in BGE_M3_REQUIRED_FILES
+    assert not any(path.startswith(("onnx/", "imgs/")) for path in BGE_M3_REQUIRED_FILES)
     assert wrapper_calls == [
         (
             str(model_cache_dir / "snapshots" / BGE_M3_MODEL_REVISION),
@@ -211,6 +225,67 @@ def test_bge_uses_pinned_snapshot_and_supported_wrapper_arguments(
             },
         )
     ]
+
+
+@pytest.mark.parametrize(
+    ("required_path", "file_state"),
+    [
+        ("pytorch_model.bin", "missing"),
+        ("pytorch_model.bin", "empty"),
+        ("tokenizer.json", "missing"),
+        ("config.json", "directory"),
+    ],
+)
+def test_bge_refuses_incomplete_or_non_regular_required_files_before_constructing_wrapper(
+    tmp_path: Path,
+    runtime_versions: None,
+    monkeypatch: pytest.MonkeyPatch,
+    required_path: str,
+    file_state: str,
+) -> None:
+    model_cache_dir = tmp_path / "model-cache"
+    snapshot_path = model_cache_dir / "snapshots" / BGE_M3_MODEL_REVISION
+    wrapper_calls: list[tuple[object, dict[str, object]]] = []
+
+    torch = ModuleType("torch")
+    flag_embedding = ModuleType("FlagEmbedding")
+    hub = ModuleType("huggingface_hub")
+
+    class Wrapper:
+        def __init__(self, model_path: object, **kwargs: object) -> None:
+            wrapper_calls.append((model_path, kwargs))
+
+    def snapshot_download(**_kwargs: object) -> str:
+        for relative_path in BGE_M3_REQUIRED_FILES:
+            required_file = snapshot_path / relative_path
+            required_file.parent.mkdir(parents=True, exist_ok=True)
+            required_file.write_bytes(b"required model file")
+        target = snapshot_path / required_path
+        if file_state == "missing":
+            target.unlink()
+        elif file_state == "empty":
+            target.write_bytes(b"")
+        else:
+            target.unlink()
+            target.mkdir()
+        return str(snapshot_path)
+
+    flag_embedding.BGEM3FlagModel = Wrapper  # type: ignore[attr-defined]
+    hub.snapshot_download = snapshot_download  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "torch", torch)
+    monkeypatch.setitem(sys.modules, "FlagEmbedding", flag_embedding)
+    monkeypatch.setitem(sys.modules, "huggingface_hub", hub)
+
+    provider = BgeM3DenseProvider(
+        model_id=BGE_M3_MODEL_ID,
+        model_revision=BGE_M3_MODEL_REVISION,
+        cache_namespace="embedding:bge-m3",
+        model_cache_dir=model_cache_dir,
+    )
+
+    with pytest.raises(EmbeddingTaskError, match="EMBEDDING_PROVIDER_UNAVAILABLE"):
+        provider._load_model_if_needed()
+    assert wrapper_calls == []
 
 
 @pytest.mark.parametrize(

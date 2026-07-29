@@ -32,6 +32,20 @@ _FAKE_DESCRIPTOR = EmbeddingModelDescriptor(
     cache_namespace="embedding:fake",
 )
 _BGE_M3_DIMENSION = 1024
+BGE_M3_REQUIRED_FILES = (
+    "1_Pooling/config.json",
+    "colbert_linear.pt",
+    "config.json",
+    "config_sentence_transformers.json",
+    "modules.json",
+    "pytorch_model.bin",
+    "sentence_bert_config.json",
+    "sentencepiece.bpe.model",
+    "sparse_linear.pt",
+    "special_tokens_map.json",
+    "tokenizer.json",
+    "tokenizer_config.json",
+)
 _RUNTIME_PACKAGES = {
     "flagembedding_version": "FlagEmbedding",
     "torch_version": "torch",
@@ -197,7 +211,11 @@ class BgeM3DenseProvider:
                 repo_id=self._model_id,
                 revision=self._model_revision,
                 cache_dir=str(self._model_cache_dir),
+                allow_patterns=list(BGE_M3_REQUIRED_FILES),
+                max_workers=1,
             )
+            if not _has_complete_bge_m3_snapshot(Path(snapshot_path)):
+                raise EmbeddingTaskError("EMBEDDING_PROVIDER_UNAVAILABLE")
             model_kwargs: dict[str, object] = {
                 "normalize_embeddings": True,
                 "use_fp16": False,
@@ -219,3 +237,16 @@ class BgeM3DenseProvider:
 def _validate_embed_request(texts: Sequence[str], batch_size: int) -> None:
     if batch_size < 1 or any(not isinstance(text, str) for text in texts):
         raise EmbeddingTaskError("INVALID_EMBEDDING_INPUT")
+
+
+def _has_complete_bge_m3_snapshot(snapshot_path: Path) -> bool:
+    """Return whether the pinned runtime files are present and non-empty."""
+
+    for relative_path in BGE_M3_REQUIRED_FILES:
+        required_file = snapshot_path / relative_path
+        try:
+            if not required_file.is_file() or required_file.stat().st_size <= 0:
+                return False
+        except OSError:
+            return False
+    return True
