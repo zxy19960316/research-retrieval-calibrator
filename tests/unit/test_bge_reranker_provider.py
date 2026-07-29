@@ -110,26 +110,27 @@ class _FakeBatchEncoding(dict[str, object]):
 class _FakeAutoTokenizer:
     from_pretrained_calls: ClassVar[list[tuple[object, dict[str, object]]]] = []
     calls: ClassVar[list[tuple[object, dict[str, object]]]] = []
-    error: ClassVar[Exception | None] = None
+    load_error: ClassVar[Exception | None] = None
+    call_error: ClassVar[Exception | None] = None
 
     @classmethod
     def from_pretrained(cls, path: object, **kwargs: object) -> _FakeAutoTokenizer:
         cls.from_pretrained_calls.append((path, kwargs))
-        if cls.error is not None:
-            raise cls.error
+        if cls.load_error is not None:
+            raise cls.load_error
         return cls()
 
     def __call__(self, pairs: object, **kwargs: object) -> _FakeBatchEncoding:
         type(self).calls.append((pairs, kwargs))
-        if type(self).error is not None:
-            raise type(self).error
+        if type(self).call_error is not None:
+            raise type(self).call_error
         return _FakeBatchEncoding(input_ids=[1, 2])
 
 
 class _FakeAutoModelForSequenceClassification:
     from_pretrained_calls: ClassVar[list[tuple[object, dict[str, object]]]] = []
     instances: ClassVar[list[_FakeAutoModelForSequenceClassification]] = []
-    error: ClassVar[Exception | None] = None
+    load_error: ClassVar[Exception | None] = None
     logits: ClassVar[object | None] = _FakeTensor([-3.0, 0.25, 8.5])
 
     @classmethod
@@ -137,8 +138,8 @@ class _FakeAutoModelForSequenceClassification:
         cls, path: object, **kwargs: object
     ) -> _FakeAutoModelForSequenceClassification:
         cls.from_pretrained_calls.append((path, kwargs))
-        if cls.error is not None:
-            raise cls.error
+        if cls.load_error is not None:
+            raise cls.load_error
         instance = cls()
         cls.instances.append(instance)
         return instance
@@ -147,24 +148,26 @@ class _FakeAutoModelForSequenceClassification:
         self.to_calls: list[object] = []
         self.eval_calls = 0
         self.forward_calls: list[tuple[dict[str, object], dict[str, object]]] = []
-        self.error: Exception | None = None
+        self.to_error: Exception | None = None
+        self.eval_error: Exception | None = None
+        self.forward_error: Exception | None = None
 
     def to(self, device: object) -> _FakeAutoModelForSequenceClassification:
         self.to_calls.append(device)
-        if self.error is not None:
-            raise self.error
+        if self.to_error is not None:
+            raise self.to_error
         return self
 
     def eval(self) -> _FakeAutoModelForSequenceClassification:
         self.eval_calls += 1
-        if self.error is not None:
-            raise self.error
+        if self.eval_error is not None:
+            raise self.eval_error
         return self
 
     def __call__(self, **kwargs: object) -> _FakeModelOutput:
         self.forward_calls.append((dict(kwargs), {}))
-        if self.error is not None:
-            raise self.error
+        if self.forward_error is not None:
+            raise self.forward_error
         return _FakeModelOutput(type(self).logits)
 
 
@@ -178,15 +181,25 @@ class _FakeTorch:
         yield
 
 
+def _install_fake_runtime_versions(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        importlib.metadata,
+        "version",
+        lambda name: {"transformers": "4.test", "torch": "2.test"}[name],
+    )
+
+
 def _install_fake_runtime(monkeypatch: pytest.MonkeyPatch) -> None:
     _FakeAutoTokenizer.from_pretrained_calls = []
     _FakeAutoTokenizer.calls = []
-    _FakeAutoTokenizer.error = None
+    _FakeAutoTokenizer.load_error = None
+    _FakeAutoTokenizer.call_error = None
     _FakeAutoModelForSequenceClassification.from_pretrained_calls = []
     _FakeAutoModelForSequenceClassification.instances = []
-    _FakeAutoModelForSequenceClassification.error = None
+    _FakeAutoModelForSequenceClassification.load_error = None
     _FakeAutoModelForSequenceClassification.logits = _FakeTensor([-3.0, 0.25, 8.5])
     _FakeTorch.inference_mode_calls = 0
+    _install_fake_runtime_versions(monkeypatch)
     fake_transformers = types.ModuleType("transformers")
     fake_transformers.AutoTokenizer = _FakeAutoTokenizer
     fake_transformers.AutoModelForSequenceClassification = _FakeAutoModelForSequenceClassification
@@ -194,13 +207,20 @@ def _install_fake_runtime(monkeypatch: pytest.MonkeyPatch) -> None:
     fake_torch.inference_mode = _FakeTorch.inference_mode
     monkeypatch.setitem(sys.modules, "transformers", fake_transformers)
     monkeypatch.setitem(sys.modules, "torch", fake_torch)
-    monkeypatch.setattr(importlib.metadata, "version", lambda name: {"transformers": "4.test", "torch": "2.test"}[name])
 
 
 def _assert_error(code: str, action: Any) -> None:
     with pytest.raises(_task_error()) as raised:
         action()
     assert raised.value.code == code
+
+
+def _assert_score_error_without_partial_result(provider: Any, inputs: list[Any]) -> None:
+    returned_scores: list[Any] | None = None
+    with pytest.raises(_task_error()) as raised:
+        returned_scores = provider.score("radiation", inputs, batch_size=1)
+    assert raised.value.code == "PROVIDER_UNAVAILABLE"
+    assert returned_scores is None
 
 
 def test_importing_reranking_adapter_does_not_import_runtime_packages() -> None:
@@ -249,7 +269,10 @@ def test_provider_rejects_empty_required_local_snapshot_file(tmp_path: Path, emp
     _assert_error("PROVIDER_UNAVAILABLE", lambda: _provider(model_dir))
 
 
-def test_readme_is_not_a_runtime_required_file(tmp_path: Path) -> None:
+def test_readme_is_not_a_runtime_required_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _install_fake_runtime_versions(monkeypatch)
     provider = _provider(_snapshot(tmp_path))
     assert provider.descriptor.model_id == _MODEL_ID
 
@@ -289,7 +312,7 @@ def test_constructor_descriptor_and_empty_score_are_lazy(
 ) -> None:
     for package in ("torch", "transformers"):
         monkeypatch.delitem(sys.modules, package, raising=False)
-    monkeypatch.setattr(importlib.metadata, "version", lambda _name: "4.test")
+    _install_fake_runtime_versions(monkeypatch)
     provider = _provider(_snapshot(tmp_path))
     assert provider.descriptor.model_id == _MODEL_ID
     assert not {"torch", "transformers"} & set(sys.modules)
@@ -300,6 +323,7 @@ def test_constructor_descriptor_and_empty_score_are_lazy(
 def test_missing_runtime_package_maps_to_provider_unavailable(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, package: str
 ) -> None:
+    _install_fake_runtime_versions(monkeypatch)
     monkeypatch.setitem(sys.modules, package, None)
     provider = _provider(_snapshot(tmp_path))
     _assert_error(
@@ -360,36 +384,63 @@ def test_score_loads_once_uses_local_pair_encoding_and_preserves_raw_logits(
     ("query", "input_specs", "batch_size"),
     [
         ("", (("a", "input_a"),), 1),
+        ("   ", (("a", "input_a"),), 1),
+        (42, (("a", "input_a"),), 1),
         ("radiation", (("a", "input_a"),), 0),
+        ("radiation", (("a", "input_a"),), True),
+        ("radiation", (("a", "input_a"),), -1),
+        ("radiation", (("a", "input_a"),), 1.5),
+        ("radiation", (("a", "input_a"),), "1"),
         ("radiation", (("a", "input_a"), ("b", "input_b")), 1),
         ("radiation", (("a", "input_a"), ("a", "input_b")), 2),
     ],
 )
 def test_score_rejects_invalid_chunk_input(
     tmp_path: Path,
-    query: str,
+    monkeypatch: pytest.MonkeyPatch,
+    query: Any,
     input_specs: tuple[tuple[str, str], ...],
-    batch_size: int,
+    batch_size: Any,
 ) -> None:
     inputs = [_input(*spec) for spec in input_specs]
+    _install_fake_runtime(monkeypatch)
+    provider = _provider(_snapshot(tmp_path))
     _assert_error(
         "INVALID_INPUT",
-        lambda: _provider(_snapshot(tmp_path)).score(query, inputs, batch_size=batch_size),
+        lambda: provider.score(query, inputs, batch_size=batch_size),
     )
+    assert _FakeAutoTokenizer.from_pretrained_calls == []
+    assert _FakeAutoModelForSequenceClassification.from_pretrained_calls == []
 
 
-def test_score_rejects_constructed_blank_input_text(tmp_path: Path) -> None:
-    invalid_input = _models().RerankerInput.model_construct(
-        paper_id="a",
-        text="",
-        input_sha256="0" * 64,
-    )
-    _assert_error(
-        "INVALID_INPUT",
-        lambda: _provider(_snapshot(tmp_path)).score(
-            "radiation", [invalid_input], batch_size=1
+@pytest.mark.parametrize(
+    "invalid_input",
+    [
+        lambda: _models().RerankerInput.model_construct(
+            paper_id=" ", text="input_a", input_sha256=hashlib.sha256(b"input_a").hexdigest()
         ),
+        lambda: _models().RerankerInput.model_construct(
+            paper_id="a", text=" ", input_sha256=hashlib.sha256(b" ").hexdigest()
+        ),
+        lambda: _models().RerankerInput.model_construct(
+            paper_id="a", text="input_a", input_sha256="0" * 63
+        ),
+        lambda: _models().RerankerInput.model_construct(
+            paper_id="a", text="input_a", input_sha256="0" * 64
+        ),
+    ],
+)
+def test_score_rejects_constructed_invalid_input_without_runtime_load(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, invalid_input: Any
+) -> None:
+    _install_fake_runtime(monkeypatch)
+    provider = _provider(_snapshot(tmp_path))
+    _assert_error(
+        "INVALID_INPUT",
+        lambda: provider.score("radiation", [invalid_input()], batch_size=1),
     )
+    assert _FakeAutoTokenizer.from_pretrained_calls == []
+    assert _FakeAutoModelForSequenceClassification.from_pretrained_calls == []
 
 
 @pytest.mark.parametrize(
@@ -415,24 +466,61 @@ def test_score_rejects_invalid_model_output(
     _assert_error("INVALID_OUTPUT", lambda: _provider(_snapshot(tmp_path)).score("radiation", inputs, batch_size=3))
 
 
-@pytest.mark.parametrize("failure", ["tokenizer-load", "model-load", "tokenizer-call", "model-to", "model-eval", "model-forward"])
+@pytest.mark.parametrize(
+    "failure",
+    ["tokenizer-load", "model-load", "tokenizer-call", "model-to", "model-eval", "model-forward"],
+)
 def test_runtime_failures_map_to_provider_unavailable(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: str
 ) -> None:
     _install_fake_runtime(monkeypatch)
     if failure == "tokenizer-load":
-        _FakeAutoTokenizer.error = RuntimeError(failure)
+        _FakeAutoTokenizer.load_error = RuntimeError(failure)
     elif failure == "model-load":
-        _FakeAutoModelForSequenceClassification.error = RuntimeError(failure)
+        _FakeAutoModelForSequenceClassification.load_error = RuntimeError(failure)
     provider = _provider(_snapshot(tmp_path))
-    if failure in {"model-to", "model-eval", "model-forward"}:
-        original = _FakeAutoModelForSequenceClassification.__init__
-
-        def failing_init(self: _FakeAutoModelForSequenceClassification) -> None:
-            original(self)
-            self.error = RuntimeError(failure)
-
-        monkeypatch.setattr(_FakeAutoModelForSequenceClassification, "__init__", failing_init)
     if failure == "tokenizer-call":
-        _FakeAutoTokenizer.error = RuntimeError(failure)
-    _assert_error("PROVIDER_UNAVAILABLE", lambda: provider.score("radiation", [_input("a", "input_a")], batch_size=1))
+        _FakeAutoTokenizer.call_error = RuntimeError(failure)
+    if failure in {"model-to", "model-eval", "model-forward"}:
+        original = _FakeAutoModelForSequenceClassification.from_pretrained
+
+        @classmethod
+        def configured_loader(
+            cls, path: object, **kwargs: object
+        ) -> _FakeAutoModelForSequenceClassification:
+            instance = original(path, **kwargs)
+            setattr(instance, f"{failure.removeprefix('model-')}_error", RuntimeError(failure))
+            return instance
+
+        monkeypatch.setattr(
+            _FakeAutoModelForSequenceClassification,
+            "from_pretrained",
+            configured_loader,
+        )
+    inputs = [_input("a", "input_a")]
+    _assert_score_error_without_partial_result(provider, inputs)
+    if failure == "tokenizer-load":
+        assert len(_FakeAutoTokenizer.from_pretrained_calls) == 1
+        assert _FakeAutoTokenizer.calls == []
+        assert _FakeAutoModelForSequenceClassification.from_pretrained_calls == []
+    elif failure == "tokenizer-call":
+        assert len(_FakeAutoTokenizer.from_pretrained_calls) == 1
+        assert len(_FakeAutoModelForSequenceClassification.from_pretrained_calls) == 1
+        assert len(_FakeAutoTokenizer.calls) == 1
+        assert _FakeAutoModelForSequenceClassification.instances[0].forward_calls == []
+    elif failure == "model-to":
+        model = _FakeAutoModelForSequenceClassification.instances[0]
+        assert model.to_calls == ["cpu"]
+        assert model.eval_calls == 0
+        assert model.forward_calls == []
+    elif failure == "model-eval":
+        model = _FakeAutoModelForSequenceClassification.instances[0]
+        assert model.to_calls == ["cpu"]
+        assert model.eval_calls == 1
+        assert model.forward_calls == []
+    elif failure == "model-forward":
+        model = _FakeAutoModelForSequenceClassification.instances[0]
+        assert model.to_calls == ["cpu"]
+        assert model.eval_calls == 1
+        assert len(model.forward_calls) == 1
+    _assert_score_error_without_partial_result(provider, inputs)

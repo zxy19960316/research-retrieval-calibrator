@@ -327,6 +327,34 @@ git commit -m "test: define pinned BGE reranker provider contract"
 
 **Constraints:** B1-F may not download a model, access Hugging Face, use a token, load real weights, generate real scores, add dependencies, begin B2/B3/C, or update `STATUS.md`. It checks only required-file existence and non-emptiness; B2 owns digest verification.
 
+## B1-R.1 Failure-stage isolation and metadata semantics
+
+**Goal:** Repair the mocked red contracts so B1-F must satisfy each precise failure stage without changing production code.
+
+**Files:**
+
+- Modify: `tests/unit/test_bge_reranker_provider.py`
+- Modify: `docs/superpowers/plans/2026-07-29-m2-t02-reranker-provider.md`
+
+- [ ] **Step 1: Separate fake controls**
+
+Split tokenizer `load_error` from `call_error`; split model class `load_error` from instance `to_error`, `eval_error`, and `forward_error`. Reset every control in the fake-runtime installer and prove later stages were not reached after each injected failure.
+
+- [ ] **Step 2: Separate metadata from imports and strengthen invalid inputs**
+
+Create a metadata-only version helper that returns `transformers=4.test` and `torch=2.test` without writing `sys.modules`; use it for lazy and missing-module tests. Cover blank/non-string query, invalid batch-size types, blank paper/text, invalid digest length, and digest/text mismatch with `model_construct()`, requiring `INVALID_INPUT` before either loader is called.
+
+- [ ] **Step 3: Preserve intentional red verification**
+
+Run the focused B0.1-plus-provider pytest command and Ruff for the unit test. Require normal collection; the B0.1 and import characterization tests pass, while every provider behavior test fails solely because `BgeRerankerProvider` remains absent. Do not use `skip` or `xfail`.
+
+- [ ] **Step 4: Commit only B1-R.1**
+
+```powershell
+git add tests/unit/test_bge_reranker_provider.py docs/superpowers/plans/2026-07-29-m2-t02-reranker-provider.md
+git commit -m "test: isolate BGE provider failure stages"
+```
+
 ## B2 Controlled download and preflight
 
 B2 is the first task allowed to perform a controlled download. It must verify the B0 pinned revision and file digests before CPU float32 preflight. B2 is not authorized by B0.
