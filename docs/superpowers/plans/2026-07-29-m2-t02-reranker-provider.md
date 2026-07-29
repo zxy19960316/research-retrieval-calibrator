@@ -359,6 +359,52 @@ git commit -m "test: isolate BGE provider failure stages"
 
 B2 is the first task allowed to perform a controlled download. It must verify the B0 pinned revision and file digests before CPU float32 preflight. B2 is not authorized by B0.
 
+## B2-R Pinned snapshot preparation red contract
+
+**Goal:** Define a fully offline, collection-safe contract for B2-F's pinned reranker snapshot preparation. This contract does not create a downloader, import `huggingface_hub`, access the network, install a dependency, download a model or tokenizer, load a model, or run inference.
+
+**Files:**
+
+- Modify: `docs/superpowers/plans/2026-07-29-m2-t02-reranker-provider.md`
+- Create: `tests/unit/test_m2_t02_reranker_snapshot.py`
+- Do not create: `scripts/prepare_m2_t02_reranker_snapshot.py`
+
+**Future B2-F interface locked by this red suite:**
+
+`SnapshotPreparationError` must expose `.code` with one of `INSUFFICIENT_DISK_SPACE`, `DOWNLOAD_FAILED`, or `INTEGRITY_CHECK_FAILED`. `load_snapshot_plan(selection_path: Path) -> SnapshotPlan` must return a plan exposing `.model_id`, `.revision`, and ordered `.files`. `prepare_snapshot(*, selection_path: Path, snapshot_dir: Path, download_file: Callable[..., str], disk_usage: Callable[[Path], object]) -> SnapshotPreparationResult` must return `.status` (`PUBLISHED` or `REUSED`) and `.snapshot_dir` (the requested final path).
+
+- [ ] **Step 1: Add a dynamically resolved, collection-safe red suite**
+
+  Keep the module import inside `_snapshot_module()` and fail each test with `prepare_m2_t02_reranker_snapshot has not been implemented` while B2-F is absent. The test module may import only standard-library modules and pytest; it must not import `huggingface_hub`, `transformers`, torch, or a BGE provider.
+
+- [ ] **Step 2: Lock selection parsing and exact source identity**
+
+  Read only the committed local `evaluation/source-artifacts/m2-t02-reranker-selection.json`. Require `BAAI/bge-reranker-v2-m3`, revision `953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e`, and exactly these ordered `(path, digest_type)` pairs: `README.md/git_blob_sha1`, `config.json/git_blob_sha1`, `model.safetensors/sha256`, `sentencepiece.bpe.model/sha256`, `special_tokens_map.json/git_blob_sha1`, `tokenizer.json/sha256`, and `tokenizer_config.json/git_blob_sha1`.
+
+- [ ] **Step 3: Lock preflight and downloader-call safety before B2-F exists**
+
+  Use a locally rewritten small-file selection fixture so no test creates a real model file. Require a zero-free-space `disk_usage` result to raise `SnapshotPreparationError(code="INSUFFICIENT_DISK_SPACE")` before any downloader call. For a successful fake downloader, require each call to use the exact model ID and pinned revision, `repo_type="model"`, `token=False`, `local_dir_use_symlinks=False`, and a staging `local_dir` rather than the final destination.
+
+- [ ] **Step 4: Lock byte integrity, cleanup, atomic publication, and idempotence**
+
+  The fixture must cover both a Git blob SHA-1 mismatch (`config.json`) and an LFS SHA-256 mismatch (`tokenizer.json`), each failing as `INTEGRITY_CHECK_FAILED` with no final snapshot and no `.<snapshot>.staging-*` directory. Simulate an `OSError` on the third download and require `DOWNLOAD_FAILED`, cleanup, and no partial final snapshot. Then require all seven fake downloads to complete before a single `PUBLISHED` final directory becomes visible; a second call must verify and return `REUSED` without disk preflight or downloader access.
+
+- [ ] **Step 5: Record the intentional red state and commit only B2-R**
+
+  Run:
+
+  ```powershell
+  py -3.12 -m pytest -q tests/unit/test_m2_t02_reranker_snapshot.py
+  py -3.12 -m ruff check tests/unit/test_m2_t02_reranker_snapshot.py
+  ```
+
+  Expected: the focused suite collects without skip or xfail and every test fails only because `scripts.prepare_m2_t02_reranker_snapshot` is intentionally absent. Do not implement B2-F in this commit.
+
+  ```powershell
+  git add docs/superpowers/plans/2026-07-29-m2-t02-reranker-provider.md tests/unit/test_m2_t02_reranker_snapshot.py
+  git commit -m "test: define pinned reranker snapshot preparation contract"
+  ```
+
 ## B3 Real live/replay evidence
 
 B3 is the first task allowed to run real inference, generate real scores, and record separately labeled live and replay evidence. B3 is not authorized by B0.
