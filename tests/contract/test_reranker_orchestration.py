@@ -1,4 +1,4 @@
-"""Red-first, synthetic-only contracts for M2-T02 reranking."""
+"""Red-first orchestration contracts for M2-T02 reranking."""
 
 from __future__ import annotations
 
@@ -7,10 +7,9 @@ import json
 import math
 from collections.abc import Callable, Sequence
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
-from app.adapters.reranking import RerankerProvider
 from app.core.reranking import build_reranker_input, effective_top_k, rerank_candidates
 from app.models.reranking import (
     ProviderRawScore,
@@ -21,6 +20,9 @@ from app.models.reranking import (
 
 from app.models.dedup import SourceIdentity
 from app.models.embedding import FrozenCandidate
+
+if TYPE_CHECKING:
+    from app.adapters.reranking import RerankerProvider
 
 _QUERY = "Which papers calibrate retrieval?"
 
@@ -54,15 +56,18 @@ def _candidate(index: int, *, abstract: str | None = "Source-backed abstract.") 
 def _descriptor(
     revision: str = "a" * 40,
     *,
+    model_id: str = "synthetic-cross-encoder",
+    provider_library: str = "tests",
+    provider_library_version: str = "1",
     input_format_version: str = "m2-reranker-title-abstract-v1",
     cache_namespace: str = "reranker:synthetic",
 ) -> RerankerModelDescriptor:
     return RerankerModelDescriptor(
         provider_name="synthetic",
-        model_id="synthetic-cross-encoder",
+        model_id=model_id,
         model_revision=revision,
-        provider_library="tests",
-        provider_library_version="1",
+        provider_library=provider_library,
+        provider_library_version=provider_library_version,
         input_format_version=input_format_version,
         cache_namespace=cache_namespace,
     )
@@ -86,11 +91,14 @@ class _SyntheticProvider:
         self.calls = 0
         self.call_paper_ids: list[list[str]] = []
         self.call_batch_sizes: list[int] = []
+        self.call_queries: list[str] = []
 
     def score(self, query: str, inputs: Sequence[Any], *, batch_size: int) -> object:
-        assert query == _QUERY
+        assert isinstance(query, str)
+        assert query.strip()
         assert batch_size >= 1
         self.calls += 1
+        self.call_queries.append(query)
         self.call_paper_ids.append([item.paper_id for item in inputs])
         self.call_batch_sizes.append(len(inputs))
         if self.error is not None or self.fail_on_call == self.calls:
@@ -135,15 +143,6 @@ def _cache_payloads(cache_dir: Path) -> dict[str, dict[str, object]]:
     }
 
 
-def test_declares_only_the_required_fail_closed_states() -> None:
-    assert {state.value for state in RerankerRunState} == {
-        "SCORED",
-        "NOT_RUN",
-        "PROVIDER_UNAVAILABLE",
-        "INVALID_OUTPUT",
-    }
-
-
 @pytest.mark.parametrize(("configured_top_k", "available_count"), [(49, 0), (101, 0), (50, -1)])
 def test_effective_top_k_rejects_invalid_config_or_available_count(
     configured_top_k: int, available_count: int
@@ -161,6 +160,23 @@ def test_effective_top_k_caps_to_available_candidates_without_hard_coding_33() -
     assert effective_top_k(configured_top_k=100, available_count=33) == 33
     assert effective_top_k(configured_top_k=100, available_count=87) == 87
     assert effective_top_k(configured_top_k=50, available_count=87) == 50
+
+
+@pytest.mark.parametrize("batch_size", [0, -1])
+def test_rerank_candidates_rejects_non_positive_batch_size(tmp_path: Path, batch_size: int) -> None:
+    candidate = _candidate(1)
+    provider = _SyntheticProvider(_descriptor(), {candidate.paper_id: 1.0})
+
+    _assert_error_code(lambda: _run([candidate], provider, tmp_path, batch_size=batch_size), "INVALID_INPUT")
+
+
+def test_rerank_candidates_rejects_blank_query_and_duplicate_paper_id(tmp_path: Path) -> None:
+    candidate = _candidate(1)
+    provider = _SyntheticProvider(_descriptor(), {candidate.paper_id: 1.0})
+
+    _assert_error_code(lambda: _run([candidate], provider, tmp_path, query="  "), "INVALID_INPUT")
+    _assert_error_code(lambda: _run([candidate, candidate], provider, tmp_path), "INVALID_INPUT")
+    assert provider.calls == 0
 
 
 def test_empty_candidate_set_returns_not_run_without_provider_or_cache(tmp_path: Path) -> None:
@@ -237,7 +253,8 @@ def test_top_k_limits_provider_input_records_and_new_cache_entries(tmp_path: Pat
 def test_thirty_three_candidates_with_configured_100_processes_every_candidate(tmp_path: Path) -> None:
     candidates = [_candidate(index) for index in range(33)]
     provider = _SyntheticProvider(
-        _descriptor(), {candidate.paper_id: float(index) for index, candidate in enumerate(candidates)}
+        _descriptor(),
+        {candidate.paper_id: float(index) for index, candidate in enumerate(candidates)},
     )
 
     run = _run(candidates, provider, tmp_path, batch_size=8, configured_top_k=100)
@@ -385,8 +402,10 @@ def test_complete_cache_identity_and_batch_order_invariance(tmp_path: Path) -> N
     _run([second, first], provider, tmp_path, batch_size=33)
     assert provider.calls == 2
 
-    _run([first], provider, tmp_path, query="A changed query")
+    changed_query = "A changed query"
+    _run([first], provider, tmp_path, query=changed_query)
     assert provider.calls == 3
+    assert provider.call_queries[-1] == changed_query
 
     changed_title = first.model_copy(update={"title": "A changed title"})
     _run([changed_title], provider, tmp_path)
@@ -396,21 +415,17 @@ def test_complete_cache_identity_and_batch_order_invariance(tmp_path: Path) -> N
     _run([changed_abstract], provider, tmp_path)
     assert provider.calls == 5
 
-    revision_provider = _SyntheticProvider(_descriptor("b" * 40), scores)
-    _run([first], revision_provider, tmp_path)
-    assert revision_provider.calls == 1
-
-    format_provider = _SyntheticProvider(
-        _descriptor(input_format_version="m2-reranker-title-abstract-v2"), scores
-    )
-    _run([first], format_provider, tmp_path)
-    assert format_provider.calls == 1
-
-    namespace_provider = _SyntheticProvider(
-        _descriptor(cache_namespace="reranker:synthetic-v2"), scores
-    )
-    _run([first], namespace_provider, tmp_path)
-    assert namespace_provider.calls == 1
+    for descriptor in (
+        _descriptor("b" * 40),
+        _descriptor(model_id="synthetic-cross-encoder-v2"),
+        _descriptor(provider_library="other-tests"),
+        _descriptor(provider_library_version="2"),
+        _descriptor(input_format_version="m2-reranker-title-abstract-v2"),
+        _descriptor(cache_namespace="reranker:synthetic-v2"),
+    ):
+        changed_descriptor_provider = _SyntheticProvider(descriptor, scores)
+        _run([first], changed_descriptor_provider, tmp_path)
+        assert changed_descriptor_provider.calls == 1
 
 
 @pytest.mark.parametrize(
@@ -459,7 +474,10 @@ def test_normalized_scores_are_identical_across_batch_sizes_and_mixed_cache(tmp_
     _run([candidates[0]], first_provider, tmp_path / "mixed", batch_size=1)
     mixed_provider = _SyntheticProvider(_descriptor(), scores)
     mixed = _run(candidates, mixed_provider, tmp_path / "mixed", batch_size=2)
-    assert mixed_provider.call_paper_ids == [[candidates[1].paper_id, candidates[2].paper_id], [candidates[3].paper_id]]
+    assert mixed_provider.call_paper_ids == [
+        [candidates[1].paper_id, candidates[2].paper_id],
+        [candidates[3].paper_id],
+    ]
     assert [record.normalized_score for record in mixed.records] == pytest.approx([1.0, 0.9, 0.89, 0.0])
 
 

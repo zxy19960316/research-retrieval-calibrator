@@ -31,36 +31,45 @@
 - Cache writes are transactional for one call: retain pre-existing valid entries, stage all new raw-score entries only in memory or temporary files, and publish none unless every selected miss succeeds and validates. On any failure, delete temporary files and leave no new JSON cache entry.
 - After all selected raw scores, including cache hits, are available, normalize once using `(raw - min_raw) / (max_raw - min_raw)`. Use `1.0` for a single-item or all-equal raw-score set. Normalized scores never define ordering.
 
+## R0.2 Test-Layer Boundaries
+
+- `tests/contract/test_reranker_model_contracts.py` imports only `app.models.reranking` and `app.adapters.reranking.RerankerProvider`. It owns direct Pydantic/model and provider-protocol contracts, so A1 can make this file pass without creating the core.
+- `tests/contract/test_reranker_orchestration.py` owns every test that imports or calls `build_reranker_input`, `effective_top_k`, or `rerank_candidates`. It remains collection-red until A2 creates `app.core.reranking`.
+- `SCORED` and `NOT_RUN` are normal `rerank_candidates` return states. `PROVIDER_UNAVAILABLE` and `INVALID_OUTPUT` remain machine-readable outcome vocabulary, but the core raises `RerankerTaskError` for them and never returns a partial run.
+- `RerankerModelDescriptor.input_format_version` accepts exactly `m2-reranker-title-abstract-v1` and `m2-reranker-title-abstract-v2`; blank, whitespace-only, and unknown versions are invalid.
+- Synthetic providers record `call_queries`, `call_paper_ids`, and `call_batch_sizes`. A changed query is valid fixture input and must trigger a distinct provider call rather than a fixture assertion.
+
 ## File Structure
 
 - Create: `app/models/reranking.py` — closed descriptor, input, raw/final record, state, cache-entry, run-stat, and error-code contracts.
 - Create: `app/adapters/reranking.py` — `RerankerProvider` protocol only; later real adapters must implement it without changing core behavior.
 - Create: `app/core/reranking.py` — title/abstract serialization, cache-key construction, batch orchestration, fail-closed output validation, global normalization, and stable order restoration.
-- Create: `tests/contract/test_reranker_contracts.py` — synthetic red-first contract tests; no model runtime, network, or downloaded weight.
+- Create: `tests/contract/test_reranker_model_contracts.py` — direct model/provider red-green contracts; no core import.
+- Create: `tests/contract/test_reranker_orchestration.py` — synthetic-only core red contracts; no model runtime, network, or downloaded weight.
 
 ### Task 1: Close the data and provider contracts
 
 **Files:**
 - Create: `app/models/reranking.py`
 - Create: `app/adapters/reranking.py`
-- Test: `tests/contract/test_reranker_contracts.py`
+- Test: `tests/contract/test_reranker_model_contracts.py`
 
 **Interfaces:**
 - Produces `RerankerProvider.score(query: str, inputs: Sequence[RerankerInput], *, batch_size: int) -> list[ProviderRawScore]`.
 - Produces `RerankerModelDescriptor`, `RerankerInput`, `RerankRecord`, `RerankRun`, and `RerankerTaskError`.
 - `RerankRecord` exposes `paper_id`, `raw_score`, `normalized_score`, `descriptor`, and `input_sha256` only when its state is `SCORED`.
 - `RerankerTaskError.code` is one of `INVALID_INPUT`, `PROVIDER_UNAVAILABLE`, or `INVALID_OUTPUT`; the core uses `INVALID_INPUT` for invalid Top-K/count parameters.
-- `RerankerModelDescriptor.input_format_version` is a non-blank versioned string, not a one-value literal, so a format revision produces a distinct cache identity.
+- `RerankerModelDescriptor.input_format_version` permits the explicit v1 and v2 literals, so a format revision produces a distinct cache identity.
 
 - [ ] **Step 1: Write the failing contract tests**
 
-Add tests named `test_reranker_records_preserve_raw_score_descriptor_and_input_sha`, `test_provider_output_must_match_each_requested_unique_paper_id`, and `test_non_finite_or_non_numeric_scores_are_invalid_output`.
+Add direct tests for stable task-error codes, closed descriptor fields and immutable revisions, v1/v2 input formats, exact UTF-8 input hashes, finite strict raw scores, `RerankRecord` score/state invariants, and `RerankRun` cardinality/identity/descriptor invariants.
 
 - [ ] **Step 2: Run the focused tests to verify they fail**
 
-Run: `py -3.12 -m pytest -q tests/contract/test_reranker_contracts.py`
+Run: `py -3.12 -m pytest -q tests/contract/test_reranker_model_contracts.py`
 
-Expected: FAIL during collection because `app.models.reranking` and `app.core.reranking` do not exist.
+Expected: FAIL during collection because `app.models.reranking` or `app.adapters.reranking` does not exist.
 
 - [ ] **Step 3: Implement the closed models and protocol**
 
@@ -68,14 +77,18 @@ Define literal states `SCORED`, `NOT_RUN`, `PROVIDER_UNAVAILABLE`, and `INVALID_
 
 - [ ] **Step 4: Run the focused tests to verify the contracts pass**
 
-Run: `py -3.12 -m pytest -q tests/contract/test_reranker_contracts.py`
+Run: `py -3.12 -m pytest -q tests/contract/test_reranker_model_contracts.py`
 
-Expected: contract tests pass using only synthetic providers.
+Expected: model/provider contract tests pass without importing the core.
+
+Run: `py -3.12 -m pytest -q tests/contract/test_reranker_orchestration.py`
+
+Expected: collection error because `app.core.reranking` does not exist.
 
 - [ ] **Step 5: Commit**
 
 ```powershell
-git add app/models/reranking.py app/adapters/reranking.py tests/contract/test_reranker_contracts.py
+git add app/models/reranking.py app/adapters/reranking.py tests/contract/test_reranker_model_contracts.py
 git commit -m "feat: add reranker provider contracts"
 ```
 
@@ -83,7 +96,7 @@ git commit -m "feat: add reranker provider contracts"
 
 **Files:**
 - Create: `app/core/reranking.py`
-- Modify: `tests/contract/test_reranker_contracts.py`
+- Modify: `tests/contract/test_reranker_orchestration.py`
 
 **Interfaces:**
 - Consumes `FrozenCandidate`, `RerankerProvider`, and `RerankerModelDescriptor`.
@@ -95,9 +108,9 @@ Add tests named `test_effective_top_k_caps_to_available_candidates_without_hard_
 
 - [ ] **Step 2: Run the focused tests to verify they fail**
 
-Run: `py -3.12 -m pytest -q tests/contract/test_reranker_contracts.py`
+Run: `py -3.12 -m pytest -q tests/contract/test_reranker_orchestration.py`
 
-Expected: FAIL because the orchestration functions are not implemented.
+Expected: collection error because the orchestration module is not implemented.
 
 - [ ] **Step 3: Implement the minimal orchestration**
 
@@ -105,14 +118,14 @@ Serialize exactly `title:\n{title}` plus `\n\nabstract:\n{abstract}` only when t
 
 - [ ] **Step 4: Run the focused tests to verify deterministic behavior**
 
-Run: `py -3.12 -m pytest -q tests/contract/test_reranker_contracts.py`
+Run: `py -3.12 -m pytest -q tests/contract/test_reranker_orchestration.py`
 
 Expected: synthetic batch and cache tests pass for batch sizes 1, 2, 8, and 33.
 
 - [ ] **Step 5: Commit**
 
 ```powershell
-git add app/core/reranking.py tests/contract/test_reranker_contracts.py
+git add app/core/reranking.py tests/contract/test_reranker_orchestration.py
 git commit -m "feat: orchestrate deterministic reranker batches"
 ```
 
@@ -120,7 +133,7 @@ git commit -m "feat: orchestrate deterministic reranker batches"
 
 **Files:**
 - Modify: `app/core/reranking.py`
-- Modify: `tests/contract/test_reranker_contracts.py`
+- Modify: `tests/contract/test_reranker_orchestration.py`
 
 **Interfaces:**
 - Consumes complete validated `ProviderRawScore` values.
@@ -132,7 +145,7 @@ Add tests named `test_global_normalization_prevents_batch_local_rank_inversion`,
 
 - [ ] **Step 2: Run the focused tests to verify they fail**
 
-Run: `py -3.12 -m pytest -q tests/contract/test_reranker_contracts.py`
+Run: `py -3.12 -m pytest -q tests/contract/test_reranker_model_contracts.py tests/contract/test_reranker_orchestration.py`
 
 Expected: FAIL until normalization follows full validated raw-score collection.
 
@@ -142,7 +155,7 @@ Normalize once with `(raw - min_raw) / (max_raw - min_raw)` after complete valid
 
 - [ ] **Step 4: Run focused and full validation**
 
-Run: `py -3.12 -m pytest -q tests/contract/test_reranker_contracts.py`
+Run: `py -3.12 -m pytest -q tests/contract/test_reranker_model_contracts.py tests/contract/test_reranker_orchestration.py`
 
 Expected: all M2-T02 contract tests pass with synthetic providers only.
 
@@ -153,7 +166,7 @@ Expected: full regression passes without downloading a reranker model.
 - [ ] **Step 5: Commit**
 
 ```powershell
-git add app/core/reranking.py tests/contract/test_reranker_contracts.py
+git add app/core/reranking.py tests/contract/test_reranker_orchestration.py
 git commit -m "fix: fail closed on reranker output errors"
 ```
 
