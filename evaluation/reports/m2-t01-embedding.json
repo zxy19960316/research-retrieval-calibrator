@@ -57,7 +57,7 @@
       "status": "passed",
       "exit_code": 0,
       "command": "py -3.12 -m pytest -q",
-      "result": "561 passed"
+      "result": "562 passed"
     },
     {
       "name": "ruff",
