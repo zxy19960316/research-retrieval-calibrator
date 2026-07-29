@@ -175,6 +175,13 @@ def test_precompletion_main_is_valid_without_a_completion_report() -> None:
     assert result.valid is True
 
 
+def test_b2_run_audit_contract_is_pinned() -> None:
+    assert evidence.BGE_RUN_AUDIT_PATH == "evaluation/reports/m2-t01-bge-run-2026-07-29.json"
+    assert evidence.BGE_RUN_AUDIT_VERSION == "m2-t01-bge-run.v1"
+    assert evidence.M2_IMPLEMENTATION_COMMIT == "84cd61261c4f496e6b8255ad44c3849ed98841c2"
+    assert evidence.M2_SNAPSHOT_COMMIT == "438e7ad79a8d9e8085ea7eccefce68f5be85abec"
+
+
 def test_present_completion_report_is_fail_closed_when_incomplete(tmp_path: Path) -> None:
     report = tmp_path / "m2-t01-embedding.json"
     report.write_text('{"report_version":"m2-t01-embedding.v1"}\n', encoding="utf-8")

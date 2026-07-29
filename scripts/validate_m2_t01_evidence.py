@@ -40,6 +40,12 @@ from app.core.embedding import build_embedding_input_from_fields, build_query_em
 
 REPORT_PATH = Path("evaluation/reports/m2-t01-embedding.json")
 REPORT_VERSION = "m2-t01-embedding.v1"
+BGE_RUN_AUDIT_PATH = "evaluation/reports/m2-t01-bge-run-2026-07-29.json"
+BGE_RUN_AUDIT_VERSION = "m2-t01-bge-run.v1"
+M2_IMPLEMENTATION_COMMIT = "84cd61261c4f496e6b8255ad44c3849ed98841c2"
+M2_SNAPSHOT_COMMIT = "438e7ad79a8d9e8085ea7eccefce68f5be85abec"
+BGE_M3_WEIGHT_SHA256 = "b5e0ce3470abf5ef3831aa1bd5553b486803e83251590ab7ff35a117cf6aad38"
+BGE_M3_WEIGHT_SIZE_BYTES = 2271145830
 BASELINE_COMMIT = "0eb45fc22d10adb72cb66aa45494333057080bc1"
 M1_REBASELINE_REPORT = "evaluation/reports/m1-rebaseline-2026-07-28.json"
 M1_REBASELINE_SOURCE_BUNDLE = "evaluation/source-artifacts/m1-rebaseline-2026-07-28"
@@ -51,6 +57,13 @@ BGE_M3_MODEL_ID = "BAAI/bge-m3"
 BGE_M3_MODEL_REVISION = "5617a9f61b028005a4858fdac845db406aefb181"
 BGE_M3_FLAGEMBEDDING_VERSION = "1.3.5"
 B1_CANDIDATE_SNAPSHOT_SHA256 = "4a2aec0fd0a1d22adc801fd3bc506e5da89895d1276cd572e2ac64014c162448"
+B2_PATHS = (
+    "evaluation/snapshots/m2/m1-candidates.v1.json",
+    "evaluation/snapshots/m2/m1-candidates.v1.manifest.json",
+    "evaluation/snapshots/m2/bge-m3-dense-v1.json",
+    "evaluation/snapshots/m2/bge-m3-dense-v1.manifest.json",
+    BGE_RUN_AUDIT_PATH,
+)
 FORBIDDEN_PROVIDER_VERSIONS = frozenset({"optional", "unknown", "latest", "unavailable"})
 STATUS_ROW = re.compile(
     r"^\|\s*(M\d+)\b[^|]*\|\s*([A-Z0-9_]+)\s*\|\s*(\d+)/(\d+)\s*\|",
@@ -88,6 +101,13 @@ class VectorEvidenceContext:
     provider: dict[str, object]
     runtime: dict[str, object]
     stats: dict[str, object]
+
+
+@dataclass(frozen=True)
+class BgeRunAuditContext:
+    live: dict[str, object]
+    replay: dict[str, object]
+    canonical_sha256: str
 
 
 def _git(*arguments: str, repository_root: Path) -> subprocess.CompletedProcess[str]:
@@ -594,6 +614,65 @@ def _validate_model_evidence(
         errors.append("real replay must have zero provider calls/misses and equal vectors")
 
 
+def _validate_bge_run_audit(
+    audit: object, vector: VectorEvidenceContext | None, errors: list[str]
+) -> BgeRunAuditContext | None:
+    if not isinstance(audit, dict):
+        errors.append("B2 run audit must be a JSON object")
+        return None
+    if (audit.get("report_version"), audit.get("phase"), audit.get("task_id")) != (
+        BGE_RUN_AUDIT_VERSION, "M2", "M2-T01"
+    ) or audit.get("a6_2_commit") != M2_IMPLEMENTATION_COMMIT or audit.get("evidence_type") != "real":
+        errors.append("B2 run audit has invalid identity or implementation commit")
+    policy = audit.get("download_policy")
+    if not isinstance(policy, dict) or policy.get("allowlist") != "BGE_M3_REQUIRED_FILES" or policy.get("max_workers") != 1 or audit.get("xet_disabled") is not True or audit.get("onnx_file_count") != 0:
+        errors.append("B2 run audit has invalid controlled download evidence")
+    if audit.get("pytorch_model_sha256") != BGE_M3_WEIGHT_SHA256 or audit.get("pytorch_model_size_bytes") != BGE_M3_WEIGHT_SIZE_BYTES:
+        errors.append("B2 run audit has invalid weight identity")
+    expected_preflight = {"status": "success", "model_id": BGE_M3_MODEL_ID, "model_revision": BGE_M3_MODEL_REVISION, "dimension": 1024, "provider_library_version": BGE_M3_FLAGEMBEDDING_VERSION, "device": "cpu"}
+    online, offline = audit.get("online_preflight"), audit.get("offline_preflight")
+    if not isinstance(online, dict) or any(online.get(k) != v for k, v in expected_preflight.items()):
+        errors.append("B2 run audit has invalid online preflight")
+    if not isinstance(offline, dict) or any(offline.get(k) != v for k, v in expected_preflight.items()) or offline.get("offline") is not True:
+        errors.append("B2 run audit has invalid offline preflight")
+    live, replay = audit.get("live"), audit.get("replay")
+    expected_live = {"cache_corrupt_count": 0, "cache_hits": 0, "cache_misses": 34, "provider_call_count": 17, "provider_input_count": 34}
+    expected_replay = {"cache_corrupt_count": 0, "cache_hits": 34, "cache_misses": 0, "provider_call_count": 0, "provider_input_count": 0, "empty_model_cache_file_count": 0}
+    if live != expected_live or replay != expected_replay or audit.get("vector_arrays_equal") is not True or audit.get("exact_bytes_equal") is not True:
+        errors.append("B2 run audit has invalid live/replay evidence")
+    canonical = audit.get("vector_snapshot_canonical_sha256")
+    if not isinstance(canonical, str) or SHA256.fullmatch(canonical) is None or vector is None or canonical != vector.canonical_sha256 or live != vector.stats:
+        errors.append("B2 run audit does not bind to vector manifest")
+    return BgeRunAuditContext(live=live if isinstance(live, dict) else {}, replay=replay if isinstance(replay, dict) else {}, canonical_sha256=canonical if isinstance(canonical, str) else "")
+
+
+def _validate_committed_b2_precompletion(repository_root: Path, errors: list[str]) -> None:
+    present = [(repository_root / path).exists() for path in B2_PATHS[2:]]
+    if not any(present):
+        return
+    if not all(present):
+        errors.append("B2 evidence bundle is partial")
+        return
+    blobs = {path: _blob_bytes(M2_SNAPSHOT_COMMIT, path, repository_root) for path in B2_PATHS}
+    if any(value is None for value in blobs.values()):
+        errors.append("committed B2 evidence bundle is missing")
+        return
+    def fields(path: str, manifest: str, key: str) -> dict[str, str]:
+        raw, raw_manifest = blobs[path], blobs[manifest]
+        assert raw is not None and raw_manifest is not None
+        artifact_hash = hashlib.sha256(raw).hexdigest() if key == "snapshot_sha256" else _canonical_sha256(json.loads(raw))
+        return {"path": path, "blob_sha256": hashlib.sha256(raw).hexdigest(), "manifest_path": manifest, "manifest_blob_sha256": hashlib.sha256(raw_manifest).hexdigest(), key: artifact_hash}
+    payload = {"candidate_snapshot": fields(B2_PATHS[0], B2_PATHS[1], "snapshot_sha256"), "vector_snapshot": fields(B2_PATHS[2], B2_PATHS[3], "canonical_sha256")}
+    candidate = _validate_candidate_snapshot(payload, M2_SNAPSHOT_COMMIT, errors, repository_root)
+    vector = _validate_vector_snapshot(payload, M2_SNAPSHOT_COMMIT, candidate, errors, repository_root)
+    raw_audit = blobs[BGE_RUN_AUDIT_PATH]
+    assert raw_audit is not None
+    try:
+        _validate_bge_run_audit(json.loads(raw_audit), vector, errors)
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        errors.append("B2 run audit is invalid JSON")
+
+
 def _validate_status(payload: dict[str, Any], errors: list[str], repository_root: Path) -> None:
     expected = {"m2": "IN_PROGRESS 1/5", "m3": "BLOCKED_BY_M2"}
     if payload.get("status_after_evidence") != expected:
@@ -616,6 +695,7 @@ def validate_m2_t01_evidence(
     absolute_report = report_path if report_path.is_absolute() else repository_root / report_path
     if not absolute_report.exists():
         _validate_precompletion_status(repository_root, errors)
+        _validate_committed_b2_precompletion(repository_root, errors)
         return EvidenceValidationResult(not errors, errors)
     try:
         payload = json.loads(absolute_report.read_text(encoding="utf-8"))
@@ -649,7 +729,7 @@ def main() -> int:
     if (ROOT / REPORT_PATH).exists():
         print("PASS: completed M2-T01 evidence, snapshots, provenance, and status gate are valid.")
     else:
-        print("PASS: M2-T01 remains truthfully pre-completion; no completed evidence report exists.")
+        print("PASS: M2-T01 remains truthfully pre-completion; committed B2 real-model evidence is valid.")
     return 0
 
 
