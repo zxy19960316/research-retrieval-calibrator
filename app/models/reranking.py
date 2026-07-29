@@ -86,7 +86,7 @@ class RerankerModelDescriptor(BaseModel):
     @field_validator("input_format_version", mode="before")
     @classmethod
     def require_known_input_format(cls, value: object) -> object:
-        if value not in _INPUT_FORMATS:
+        if not isinstance(value, str) or value not in _INPUT_FORMATS:
             raise ValueError("Reranker input format must be a declared title-abstract format")
         return value
 

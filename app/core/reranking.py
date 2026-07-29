@@ -5,6 +5,9 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
+import tempfile
+import threading
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -25,6 +28,7 @@ from app.models.reranking import (
 _CACHE_KEYS = frozenset(
     {"cache_key", "paper_id", "query_sha256", "input_sha256", "descriptor", "raw_score"}
 )
+_CACHE_PUBLICATION_LOCK = threading.RLock()
 
 
 def build_reranker_input(candidate: FrozenCandidate) -> RerankerInput:
@@ -79,6 +83,7 @@ def rerank_candidates(
     )])
     if not selected:
         return RerankRun(state=RerankerRunState.NOT_RUN, records=[])
+    input_by_paper_id = {candidate.paper_id: build_reranker_input(candidate) for candidate in selected}
 
     try:
         descriptor = _validated_descriptor(provider.descriptor)
@@ -87,7 +92,6 @@ def rerank_candidates(
 
     query_sha256 = _sha256_text(normalized_query)
     destination = Path(cache_dir)
-    input_by_paper_id = {candidate.paper_id: build_reranker_input(candidate) for candidate in selected}
     cached_scores: dict[str, float] = {}
     misses: list[tuple[RerankerInput, str]] = []
 
@@ -120,18 +124,14 @@ def rerank_candidates(
         validated_scores = _validate_provider_output(provider_output, chunk)
         new_scores.update(validated_scores)
 
-    # Provider calls and validation are complete before any new cache entry is
-    # published.  Provider failures therefore cannot leave partial cache output.
     try:
-        for reranker_input, cache_key in misses:
-            _write_cache_entry(
-                destination / f"{cache_key}.json",
-                cache_key=cache_key,
-                query_sha256=query_sha256,
-                reranker_input=reranker_input,
-                descriptor=descriptor,
-                raw_score=new_scores[reranker_input.paper_id],
-            )
+        _publish_cache_entries(
+            destination=destination,
+            misses=misses,
+            query_sha256=query_sha256,
+            descriptor=descriptor,
+            new_scores=new_scores,
+        )
     except (OSError, TypeError, ValueError, KeyError) as error:
         raise RerankerTaskError("INVALID_OUTPUT") from error
 
@@ -242,7 +242,10 @@ def _validate_provider_output(
     scores: dict[str, float] = {}
     for item in output:
         try:
-            payload = item.model_dump(mode="python") if isinstance(item, ProviderRawScore) else item
+            if isinstance(item, ProviderRawScore):
+                payload = {"paper_id": item.paper_id, "raw_score": item.raw_score}
+            else:
+                payload = item
             validated = ProviderRawScore.model_validate(payload)
         except (AttributeError, TypeError, ValidationError, ValueError) as error:
             raise RerankerTaskError("INVALID_OUTPUT") from error
@@ -254,7 +257,76 @@ def _validate_provider_output(
     return scores
 
 
-def _write_cache_entry(
+def _publish_cache_entries(
+    *,
+    destination: Path,
+    misses: Sequence[tuple[RerankerInput, str]],
+    query_sha256: str,
+    descriptor: RerankerModelDescriptor,
+    new_scores: dict[str, float],
+) -> None:
+    """Stage all misses, then publish them as one rollback-safe operation."""
+
+    if not misses:
+        return
+    destination.mkdir(parents=True, exist_ok=True)
+    staging_dir = Path(tempfile.mkdtemp(prefix=".reranker-staging-", dir=destination))
+    try:
+        staged_entries: list[tuple[Path, Path]] = []
+        for reranker_input, cache_key in sorted(misses, key=lambda item: item[1]):
+            staged_path = staging_dir / f"{cache_key}.tmp"
+            _write_staged_cache_entry(
+                staged_path,
+                cache_key=cache_key,
+                query_sha256=query_sha256,
+                reranker_input=reranker_input,
+                descriptor=descriptor,
+                raw_score=new_scores[reranker_input.paper_id],
+            )
+            staged_entries.append((staged_path, destination / f"{cache_key}.json"))
+        _publish_staged_entries(staged_entries)
+    finally:
+        shutil.rmtree(staging_dir, ignore_errors=True)
+
+
+def _publish_staged_entries(staged_entries: Sequence[tuple[Path, Path]]) -> None:
+    """Atomically replace staged entries and restore every target on failure."""
+
+    with _CACHE_PUBLICATION_LOCK:
+        snapshots = {
+            target_path: target_path.read_bytes() if target_path.exists() else None
+            for _, target_path in staged_entries
+        }
+        published_targets: list[Path] = []
+        try:
+            for staged_path, target_path in staged_entries:
+                os.replace(staged_path, target_path)
+                published_targets.append(target_path)
+        except (OSError, TypeError, ValueError):
+            _rollback_published_entries(published_targets, snapshots)
+            raise
+
+
+def _rollback_published_entries(
+    published_targets: Sequence[Path], snapshots: dict[Path, bytes | None]
+) -> None:
+    """Best-effort reverse restoration that never masks the publication failure."""
+
+    for target_path in reversed(published_targets):
+        try:
+            snapshot = snapshots[target_path]
+            if snapshot is None:
+                target_path.unlink(missing_ok=True)
+            else:
+                with target_path.open("wb") as handle:
+                    handle.write(snapshot)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+        except (OSError, KeyError):
+            pass
+
+
+def _write_staged_cache_entry(
     path: Path,
     *,
     cache_key: str,
@@ -271,18 +343,15 @@ def _write_cache_entry(
         "descriptor": descriptor.model_dump(mode="json"),
         "raw_score": raw_score,
     }
-    temporary_path = path.with_suffix(".tmp")
     try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with temporary_path.open("w", encoding="utf-8", newline="\n") as handle:
+        with path.open("w", encoding="utf-8", newline="\n") as handle:
             json.dump(payload, handle, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
             handle.write("\n")
             handle.flush()
             os.fsync(handle.fileno())
-        os.replace(temporary_path, path)
     except (OSError, TypeError, ValueError):
         try:
-            temporary_path.unlink(missing_ok=True)
+            path.unlink(missing_ok=True)
         except OSError:
             pass
         raise
