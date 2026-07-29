@@ -215,3 +215,34 @@ git commit -m "fix: fail closed on reranker output errors"
 ## Execution Handoff
 
 Plan complete and saved to `docs/superpowers/plans/2026-07-29-m2-t02-reranker-provider.md`. The present branch stops after the plan and red tests. A later implementation can execute the three tasks inline, one red/green commit boundary at a time.
+
+## B0 Model selection and immutable source lock
+
+**Goal:** Select a documented reranker without downloading any model or tokenizer file, loading a model, or producing a score.
+
+**Files:**
+- Modify: `docs/superpowers/plans/2026-07-29-m2-t02-reranker-provider.md`
+- Create: `evaluation/source-artifacts/m2-t02-reranker-selection.json`
+- Create: `tests/contract/test_m2_t02_reranker_selection.py`
+
+- [ ] Query only official Hugging Face model APIs and pinned model cards for `BAAI/bge-reranker-v2-m3`, `Alibaba-NLP/gte-multilingual-reranker-base`, `cross-encoder/ms-marco-MiniLM-L6-v2`, and `jinaai/jina-reranker-v2-base-multilingual`. Do not download file bodies other than small metadata/model-card text.
+- [ ] Resolve the selected BAAI model to a lowercase 40-character commit SHA; record Apache-2.0, `transformers`, `trust_remote_code: false`, raw relevance logits, core-owned global min-max normalization, repository/weight sizes, and file metadata with either an LFS SHA-256 or explicitly typed Git blob SHA-1.
+- [ ] Record the three alternatives without performance ranking: GTE is backup-only because its official configuration requires remote custom code; MiniLM is an English CPU baseline only; Jina is not selected because its card declares CC-BY-NC-4.0 and its configuration provides remote custom code.
+- [ ] Keep `weights_downloaded`, `tokenizer_downloaded`, `model_loaded`, `inference_run`, and `real_scores_generated` all false. The contract test must read only the local JSON artifact and reject an unpinned revision, duplicate file paths, invalid digest types, secrets, absolute paths, or invented runtime/benchmark fields.
+- [ ] Run `py -3.12 -m pytest -q tests/contract/test_m2_t02_reranker_selection.py` before and after creating the artifact. Then run the full offline regression and all static/historical validators before committing only these three files.
+
+## B1 Provider implementation with mocked runtime
+
+B1 may implement a `transformers` adapter using mocked imports and mocked runtime objects only. Unit tests must not access the network, download files, load weights, or create real scores. B1 is not authorized by B0.
+
+## B2 Controlled download and preflight
+
+B2 is the first task allowed to perform a controlled download. It must verify the B0 pinned revision and file digests before CPU float32 preflight. B2 is not authorized by B0.
+
+## B3 Real live/replay evidence
+
+B3 is the first task allowed to run real inference, generate real scores, and record separately labeled live and replay evidence. B3 is not authorized by B0.
+
+## C Completion evidence and STATUS
+
+Only C may consolidate completion evidence and consider `STATUS.md`; until C, M2 remains 1/5. B0 must not start B1, B2, B3, C, M2-T03, or M3.

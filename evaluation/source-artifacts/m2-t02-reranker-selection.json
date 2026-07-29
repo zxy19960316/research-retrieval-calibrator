@@ -1,0 +1,160 @@
+{
+  "report_version": "m2-t02-reranker-selection.v1",
+  "phase": "M2",
+  "task_id": "M2-T02",
+  "baseline_commit": "1ebcc5d2c0b0efe2172633ece0a90d7f3d9290fa",
+  "decision_status": "selected_not_downloaded",
+  "selected_model": {
+    "provider_name": "bge_reranker_v2_m3",
+    "model_id": "BAAI/bge-reranker-v2-m3",
+    "model_revision": "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e",
+    "license": "apache-2.0",
+    "multilingual": true,
+    "trust_remote_code": false,
+    "runtime_library": "transformers",
+    "raw_score_semantics": "higher_logit_is_more_relevant",
+    "normalization_owner": "app.core.reranking.global_min_max",
+    "repository_size_bytes": 7975340915,
+    "weight_size_bytes": 2271071852,
+    "model_parameter_count": 567755777,
+    "standard_transformers_compatibility": true,
+    "maximum_supported_input": 512,
+    "cpu_feasibility_risk": "requires_B2_cpu_preflight_due_to_568M_parameters_and_2.27GB_float32_weights",
+    "offline_replay_complexity": "standard_transformers_pinned_files_required",
+    "commercial_use_constraint": "apache-2.0",
+    "official_api_url": "https://huggingface.co/api/models/BAAI/bge-reranker-v2-m3?blobs=true",
+    "official_model_card_url": "https://huggingface.co/BAAI/bge-reranker-v2-m3/blob/953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e/README.md"
+  },
+  "alternatives": [
+    {
+      "model_id": "Alibaba-NLP/gte-multilingual-reranker-base",
+      "model_revision": "8215cf04918ba6f7b6a62bb44238ce2953d8831c",
+      "license": "apache-2.0",
+      "multilingual": true,
+      "trust_remote_code": true,
+      "selection_status": "backup_only_due_to_remote_custom_code",
+      "reason": "official_configuration_exposes_auto_map_to_Alibaba-NLP_new-impl",
+      "languages": "75_languages",
+      "model_parameter_count": 305959681,
+      "weight_size_bytes": 611934706,
+      "standard_transformers_compatibility": "requires_remote_custom_code",
+      "raw_score_semantics": "sequence_classification_relevance_output_not_run_in_B0",
+      "maximum_supported_input": 8192,
+      "cpu_feasibility_risk": "requires_B2_cpu_preflight",
+      "offline_replay_complexity": "custom_code_dependency_requires_additional_pinning",
+      "commercial_use_constraint": "apache-2.0",
+      "official_api_url": "https://huggingface.co/api/models/Alibaba-NLP/gte-multilingual-reranker-base?blobs=true"
+    },
+    {
+      "model_id": "cross-encoder/ms-marco-MiniLM-L6-v2",
+      "model_revision": "c5ee24cb16019beea0893ab7796b1df96625c6b8",
+      "license": "apache-2.0",
+      "multilingual": false,
+      "trust_remote_code": false,
+      "selection_status": "english_cpu_baseline_only",
+      "reason": "official_card_data_declares_english_language_only",
+      "languages": "en",
+      "model_parameter_count": 22714113,
+      "weight_size_bytes": 90870598,
+      "standard_transformers_compatibility": "standard_sequence_classification",
+      "raw_score_semantics": "sequence_classification_relevance_logit_not_run_in_B0",
+      "maximum_supported_input": 512,
+      "cpu_feasibility_risk": "lower_parameter_count_still_requires_B2_preflight",
+      "offline_replay_complexity": "standard_transformers_pinned_files_required",
+      "commercial_use_constraint": "apache-2.0",
+      "official_api_url": "https://huggingface.co/api/models/cross-encoder/ms-marco-MiniLM-L6-v2?blobs=true"
+    },
+    {
+      "model_id": "jinaai/jina-reranker-v2-base-multilingual",
+      "model_revision": "9cfeff2df7d40d1b78e75e5e9cebec92a99813c9",
+      "license": "cc-by-nc-4.0",
+      "multilingual": true,
+      "trust_remote_code": true,
+      "selection_status": "not_selected_due_to_noncommercial_license_and_remote_custom_code",
+      "reason": "official_card_declares_CC-BY-NC-4.0_and_configuration_exposes_custom_auto_map",
+      "languages": "multilingual",
+      "model_parameter_count": 278437633,
+      "weight_size_bytes": 556892306,
+      "standard_transformers_compatibility": "requires_remote_custom_code",
+      "raw_score_semantics": "sequence_classification_relevance_output_not_run_in_B0",
+      "maximum_supported_input": 1024,
+      "cpu_feasibility_risk": "requires_B2_cpu_preflight",
+      "offline_replay_complexity": "custom_code_dependency_requires_additional_pinning",
+      "commercial_use_constraint": "noncommercial_CC-BY-NC-4.0",
+      "official_api_url": "https://huggingface.co/api/models/jinaai/jina-reranker-v2-base-multilingual?blobs=true"
+    }
+  ],
+  "runtime_policy": {
+    "device": "cpu_preflight_required",
+    "dtype": "float32_initial_preflight",
+    "max_length": 512,
+    "truncation": "only_second_or_pair_truncation_explicitly_recorded",
+    "batch_size": "to_be_determined_by_preflight",
+    "network_after_download": "forbidden"
+  },
+  "source_files": [
+    {
+      "path": "README.md",
+      "size_bytes": 17229,
+      "digest": "553540879ec61aea21df00434c984c0f760a3fcc",
+      "digest_type": "git_blob_sha1",
+      "storage_type": "git",
+      "required_for_runtime": false
+    },
+    {
+      "path": "config.json",
+      "size_bytes": 795,
+      "digest": "9f62673cb00ec41dcec8947b9ed16f6f2eb23ba2",
+      "digest_type": "git_blob_sha1",
+      "storage_type": "git",
+      "required_for_runtime": true
+    },
+    {
+      "path": "model.safetensors",
+      "size_bytes": 2271071852,
+      "digest": "d9e3e081faff1eefb84019509b2f5558fd74c1a05a2c7db22f74174fcedb5286",
+      "digest_type": "sha256",
+      "storage_type": "lfs",
+      "required_for_runtime": true
+    },
+    {
+      "path": "sentencepiece.bpe.model",
+      "size_bytes": 5069051,
+      "digest": "cfc8146abe2a0488e9e2a0c56de7952f7c11ab059eca145a0a727afce0db2865",
+      "digest_type": "sha256",
+      "storage_type": "lfs",
+      "required_for_runtime": true
+    },
+    {
+      "path": "special_tokens_map.json",
+      "size_bytes": 964,
+      "digest": "b1879d702821e753ffe4245048eee415d54a9385",
+      "digest_type": "git_blob_sha1",
+      "storage_type": "git",
+      "required_for_runtime": true
+    },
+    {
+      "path": "tokenizer.json",
+      "size_bytes": 17098273,
+      "digest": "69564b696052886ed0ac63fa393e928384e0f8caada38c1f4864a9bfbf379c15",
+      "digest_type": "sha256",
+      "storage_type": "lfs",
+      "required_for_runtime": true
+    },
+    {
+      "path": "tokenizer_config.json",
+      "size_bytes": 1173,
+      "digest": "328a00a9a560aadcf2a3064f917517359eb3cc26",
+      "digest_type": "git_blob_sha1",
+      "storage_type": "git",
+      "required_for_runtime": true
+    }
+  ],
+  "execution_state": {
+    "weights_downloaded": false,
+    "tokenizer_downloaded": false,
+    "model_loaded": false,
+    "inference_run": false,
+    "real_scores_generated": false
+  }
+}
