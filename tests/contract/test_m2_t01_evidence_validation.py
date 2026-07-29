@@ -336,3 +336,46 @@ def test_final_report_cannot_describe_a_different_vector_provider_or_runtime() -
     errors = []
     evidence._validate_model_evidence(payload, vector_context, audit_context, errors)
     assert "real model evidence provider must match vector manifest" in errors
+
+
+def _valid_vector_context() -> evidence.VectorEvidenceContext:
+    return evidence.VectorEvidenceContext(
+        canonical_sha256="a" * 64,
+        provider=_real_provider(), runtime=_real_runtime(),
+        stats={"cache_corrupt_count": 0, "cache_hits": 0, "cache_misses": 34, "provider_call_count": 17, "provider_input_count": 34},
+    )
+
+
+def _valid_run_audit() -> dict[str, object]:
+    preflight = {"status": "success", "model_id": "BAAI/bge-m3", "model_revision": evidence.BGE_M3_MODEL_REVISION, "dimension": 1024, "provider_library_version": "1.3.5", "device": "cpu"}
+    return {"report_version": evidence.BGE_RUN_AUDIT_VERSION, "phase": "M2", "task_id": "M2-T01", "a6_2_commit": evidence.M2_IMPLEMENTATION_COMMIT, "evidence_type": "real", "download_policy": {"allowlist": "BGE_M3_REQUIRED_FILES", "max_workers": 1}, "xet_disabled": True, "onnx_file_count": 0, "pytorch_model_sha256": evidence.BGE_M3_WEIGHT_SHA256, "pytorch_model_size_bytes": evidence.BGE_M3_WEIGHT_SIZE_BYTES, "online_preflight": preflight, "offline_preflight": {**preflight, "offline": True}, "live": _valid_vector_context().stats, "replay": {"cache_corrupt_count": 0, "cache_hits": 34, "cache_misses": 0, "provider_call_count": 0, "provider_input_count": 0, "empty_model_cache_file_count": 0}, "vector_arrays_equal": True, "exact_bytes_equal": True, "vector_snapshot_canonical_sha256": "a" * 64}
+
+
+def test_valid_bge_run_audit_returns_exact_context() -> None:
+    errors: list[str] = []
+    context = evidence._validate_bge_run_audit(_valid_run_audit(), _valid_vector_context(), errors)
+    assert errors == []
+    assert context is not None and context.live == _valid_vector_context().stats
+    assert context.replay["cache_hits"] == 34 and context.canonical_sha256 == "a" * 64
+
+
+@pytest.mark.parametrize("path,value", [
+    ("report_version", "wrong"), ("phase", "M1"), ("task_id", "wrong"), ("a6_2_commit", "0" * 40), ("evidence_type", "fake"),
+    ("download_policy.allowlist", "wrong"), ("download_policy.max_workers", 2), ("xet_disabled", False), ("onnx_file_count", 1),
+    ("pytorch_model_sha256", "0" * 64), ("pytorch_model_size_bytes", 1), ("online_preflight.status", "failed"),
+    ("online_preflight.model_id", "wrong"), ("online_preflight.model_revision", "0" * 40), ("online_preflight.dimension", 16),
+    ("online_preflight.provider_library_version", "1.0"), ("online_preflight.device", "cuda"), ("offline_preflight.offline", False),
+    ("live.cache_hits", 1), ("live.cache_misses", 0), ("live.provider_call_count", 0), ("replay.cache_hits", 0),
+    ("replay.empty_model_cache_file_count", 1), ("vector_arrays_equal", False), ("exact_bytes_equal", False),
+    ("vector_snapshot_canonical_sha256", "b" * 64),
+])
+def test_bge_run_audit_rejects_each_security_critical_mutation(path: str, value: object) -> None:
+    audit = deepcopy(_valid_run_audit())
+    target: dict[str, object] = audit
+    parts = path.split(".")
+    for part in parts[:-1]:
+        target = target[part]  # type: ignore[assignment,index]
+    target[parts[-1]] = value
+    errors: list[str] = []
+    evidence._validate_bge_run_audit(audit, _valid_vector_context(), errors)
+    assert errors
