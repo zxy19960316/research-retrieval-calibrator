@@ -186,8 +186,11 @@ def validate_current_m1_closure_status(status: str) -> list[str]:
         phases[phase] = (state, int(completed), int(total))
     if phases.get("M1") != ("COMPLETE", 4, 4):
         errors.append("STATUS.md must declare M1 COMPLETE 4/4")
-    if phases.get("M2") != ("READY", 0, 5):
-        errors.append("STATUS.md must declare M2 READY")
+    m2 = phases.get("M2")
+    if m2 is None:
+        errors.append("STATUS.md must declare an M2 state")
+    elif m2[0] == "BLOCKED_BY_M1":
+        errors.append("STATUS.md must not declare M2 BLOCKED_BY_M1 after M1 is COMPLETE")
     if phases.get("M1") == ("COMPLETE", 4, 4):
         prose = status.replace("`", "")
         for phrase in CONTRADICTORY_M1_CLOSURE_PROSE:

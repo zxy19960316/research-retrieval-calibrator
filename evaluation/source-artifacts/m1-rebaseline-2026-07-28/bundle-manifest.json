@@ -1,0 +1,119 @@
+{
+  "adapter_schema_version": "m1-t04.v2",
+  "bundle_file_count": 17,
+  "bundle_total_bytes": 208018,
+  "bundle_version": "m1-rebaseline-source-bundle.v1",
+  "cache_file_count": 12,
+  "cache_namespace": "first-round:real",
+  "candidate_arrays_equal": true,
+  "copy_verification": {
+    "all_file_bytes_equal": true,
+    "source_file_count": 16,
+    "target_file_count": 16
+  },
+  "empty_cache_entry_count": 1,
+  "empty_query_ids": [
+    "Q1-3fb237a1ce9ed2b3"
+  ],
+  "environment": {
+    "jsonschema": "4.26.0",
+    "pydantic": "2.13.4",
+    "python": "3.12.10",
+    "pyyaml": "6.0.3"
+  },
+  "file_inventory": [
+    {
+      "byte_size": 10325,
+      "path": "cache/first-round_real/084475f1bb50a9bcd88ca12ac33bc5a623249807e1a5a71a868ede610c48839e.json",
+      "sha256": "5d4c729e9ead04a9fcbeeda215d87853d093a7e93b38645838858a9a64c5fba6"
+    },
+    {
+      "byte_size": 7499,
+      "path": "cache/first-round_real/111795cdabeb897827e0f35255bf1e1601867b7d6e77abdcf59b8bd0bb54a649.json",
+      "sha256": "35b614d56e841b339ce1286e8c19ff1aab4f3902b6c78f88527b4d8ab628ad96"
+    },
+    {
+      "byte_size": 8515,
+      "path": "cache/first-round_real/13bde5e18a9f46f6b14d735384b3636464227bf36a9fcc9fb144e615eb20d0ae.json",
+      "sha256": "7677d46dba8ddfdbe6ff329bb1437ca051670e0b7c8f4787e4eb0c6cab00e433"
+    },
+    {
+      "byte_size": 9383,
+      "path": "cache/first-round_real/44ccc7d03e2ee668e0550230c226afb2d9410535b3dc52232b18ee8c213a69c6.json",
+      "sha256": "5e84b636d52a8833d0cddceb2b94dbc9e736ecfc6038cc89c002c2622aa6b4b2"
+    },
+    {
+      "byte_size": 9080,
+      "path": "cache/first-round_real/4e9b0613e8eda15e51b0084cc3ec97318db6549b63d9f88cdbebd3573d5cb1b4.json",
+      "sha256": "4c2f7a7961941f2ee363ed3ad80e8947d71b6ce29f679467f47117c13e9e6364"
+    },
+    {
+      "byte_size": 8891,
+      "path": "cache/first-round_real/97717333cbca38ac05dce35cae35e1fc827d9c5cebf38913290fc03fbebd892e.json",
+      "sha256": "fc5bcf73d77d8241e15c487d66ee886b8c0c96b716f889292480b81e955db466"
+    },
+    {
+      "byte_size": 8787,
+      "path": "cache/first-round_real/99c8f7327f4eb41731d99c89e91680f0f6d4c9299ddfe4b0c5353f7993ecb6a5.json",
+      "sha256": "61993816a9e24d8eaf1b35675514c4ca62cf222f99133f97ca4336d248ce3bcf"
+    },
+    {
+      "byte_size": 290,
+      "path": "cache/first-round_real/9f96b40444e8fdca196539d0729a346c1f1663099cb88b32664d725fae4c4af9.json",
+      "sha256": "f7fa9d049fab47e19954d4aa2b4992e363ce4a048c72cd55920b5511e049256b"
+    },
+    {
+      "byte_size": 9338,
+      "path": "cache/first-round_real/a4c0a0898c066d34b7e47c3da4441b1815bc62d0d72deb41f5b5daf790a67b2a.json",
+      "sha256": "46810a5416603151ad6c0b0681aaa8e8033b49939534f78add53373c88638142"
+    },
+    {
+      "byte_size": 8033,
+      "path": "cache/first-round_real/ce64b59a151f3ca5ac918a73e6d5c12eaf14e74e75e41ec8765d7ff15d31fcdc.json",
+      "sha256": "3f02c945b12f290a6fae8250198c8e389c089345b52a51fee98ffbd5be708e1c"
+    },
+    {
+      "byte_size": 7439,
+      "path": "cache/first-round_real/d421c03f89cc96bf0f74b462481667d2745be6d6c1a310f96eb3cf44a25a22c8.json",
+      "sha256": "5d18b970bf92884c03336aa1bba5557d05d9b9faf9af73fdd32ccc2883dd19b7"
+    },
+    {
+      "byte_size": 1627,
+      "path": "cache/first-round_real/fb0d0f077725de20b195d192ee63ce86e8ab7e2f070fb8b41f964c72940aeffd.json",
+      "sha256": "e5add8cdcfda90ed6c8f320821b389c4a12ea2395677f6c28cc879515e0cea13"
+    },
+    {
+      "byte_size": 43519,
+      "path": "first-run/first-round.json",
+      "sha256": "ed4a4d89a247c535e6138644069094d3c59a046bdefd44a79e48a4f861f95afa"
+    },
+    {
+      "byte_size": 13632,
+      "path": "first-run/first-round.md",
+      "sha256": "9983fbfd6fa04678f45b5b4dcfa1069a7b88b599a29fa868864e578196f4bece"
+    },
+    {
+      "byte_size": 43247,
+      "path": "replay/first-round.json",
+      "sha256": "6caecd1454ff2e0bd945a6a51dac276dfc0ce9fda5716033014e245843d0aab7"
+    },
+    {
+      "byte_size": 13632,
+      "path": "replay/first-round.md",
+      "sha256": "9983fbfd6fa04678f45b5b4dcfa1069a7b88b599a29fa868864e578196f4bece"
+    }
+  ],
+  "file_inventory_excludes": [
+    "bundle-manifest.json"
+  ],
+  "first_run_candidate_array_sha256": "e51eb84d4e772bba324a199478caa5f0983edef0b0dbf4c58fce5f9da5803209",
+  "generated_at_utc": "2026-07-28T07:14:37.788946Z",
+  "payload_file_count": 16,
+  "payload_total_bytes": 203237,
+  "query_count": 12,
+  "query_plan_sha256": "225ff93f098891d58e6315fefcfdf209478cb0208228a6cf322c6028ccdc68f3",
+  "question": "How can graph-based retrieval support scientific literature discovery?",
+  "replay_candidate_array_sha256": "e51eb84d4e772bba324a199478caa5f0983edef0b0dbf4c58fce5f9da5803209",
+  "source_bundle": "evaluation/source-artifacts/m1-rebaseline-2026-07-28",
+  "source_implementation_commit": "0eb45fc22d10adb72cb66aa45494333057080bc1"
+}

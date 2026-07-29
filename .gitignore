@@ -19,6 +19,7 @@ venv/
 *.sqlite3
 data/cache/
 data/runtime/
+.runtime/
 
 # Models and large artifacts
 models/
