@@ -6,6 +6,7 @@ import hashlib
 import json
 from copy import deepcopy
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -379,3 +380,325 @@ def test_bge_run_audit_rejects_each_security_critical_mutation(path: str, value:
     errors: list[str] = []
     evidence._validate_bge_run_audit(audit, _valid_vector_context(), errors)
     assert errors
+
+
+def _valid_inputs(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, str]]:
+    blobs = {path: b"fixed:" + path.encode() for path in evidence.REQUIRED_VALIDATED_INPUT_PATHS}
+    monkeypatch.setattr(evidence, "_blob_bytes", lambda _commit, path, _root: blobs.get(path))
+    return [{"path": path, "sha256": hashlib.sha256(raw).hexdigest()} for path, raw in blobs.items()]
+
+
+def test_validated_inputs_accepts_exact_required_set(monkeypatch: pytest.MonkeyPatch) -> None:
+    errors: list[str] = []
+    inputs = _valid_inputs(monkeypatch)
+    assert evidence._validate_inputs({"validated_inputs": inputs}, "a" * 40, errors, Path(".")) == evidence.REQUIRED_VALIDATED_INPUT_PATHS
+    assert errors == []
+
+
+@pytest.mark.parametrize("removed", sorted(evidence.REQUIRED_VALIDATED_INPUT_PATHS))
+def test_validated_inputs_rejects_each_missing_required_path(monkeypatch: pytest.MonkeyPatch, removed: str) -> None:
+    errors: list[str] = []
+    inputs = [item for item in _valid_inputs(monkeypatch) if item["path"] != removed]
+    evidence._validate_inputs({"validated_inputs": inputs}, "a" * 40, errors, Path("."))
+    assert f"missing required validated input: {removed}" in errors
+
+
+@pytest.mark.parametrize("path,expected", [("C:/x.json", "validated input path is missing, duplicate, or unsafe"), ("/x.json", "validated input path is missing, duplicate, or unsafe"), ("../x.json", "validated input path is missing, duplicate, or unsafe"), ("evaluation/x.json", "validated input hash mismatch: evaluation/x.json")])
+def test_validated_inputs_rejects_unsafe_or_unavailable_entries(monkeypatch: pytest.MonkeyPatch, path: str, expected: str) -> None:
+    errors: list[str] = []
+    inputs = _valid_inputs(monkeypatch) + [{"path": path, "sha256": "a" * 64}]
+    evidence._validate_inputs({"validated_inputs": inputs}, "a" * 40, errors, Path("."))
+    assert expected in errors
+
+
+@pytest.mark.parametrize(
+    ("mutate", "expected"),
+    [
+        (lambda inputs: inputs.append(deepcopy(inputs[0])), "validated input path is missing, duplicate, or unsafe"),
+        (lambda inputs: inputs.append({"path": r"C:\\outside.json", "sha256": "a" * 64}), "validated input path is missing, duplicate, or unsafe"),
+        (lambda inputs: inputs.append({"path": "/outside.json", "sha256": "a" * 64}), "validated input path is missing, duplicate, or unsafe"),
+        (lambda inputs: inputs.append({"path": "evaluation/../outside.json", "sha256": "a" * 64}), "validated input path is missing, duplicate, or unsafe"),
+        (lambda inputs: inputs.__setitem__(0, {**inputs[0], "sha256": "not-a-sha"}), "validated input has invalid sha256"),
+        (lambda inputs: inputs.__setitem__(0, {**inputs[0], "sha256": "0" * 64}), "validated input hash mismatch"),
+        (lambda inputs: inputs.__setitem__(0, {**inputs[0], "path": "evaluation/missing.json", "sha256": "a" * 64}), "validated input hash mismatch: evaluation/missing.json"),
+        (lambda inputs: inputs.__setitem__(0, "not-an-object"), "validated input entry must be an object"),
+    ],
+)
+def test_validated_inputs_rejects_each_remaining_invalid_entry(
+    monkeypatch: pytest.MonkeyPatch,
+    mutate: object,
+    expected: str,
+) -> None:
+    errors: list[str] = []
+    inputs: list[object] = _valid_inputs(monkeypatch)
+    mutate(inputs)  # type: ignore[operator]
+    evidence._validate_inputs({"validated_inputs": inputs}, "a" * 40, errors, Path("."))
+    assert any(error.startswith(expected) for error in errors)
+
+
+@pytest.mark.parametrize("inputs", [None, [], "not-a-list"])
+def test_validated_inputs_rejects_missing_or_non_list_collection(inputs: object) -> None:
+    errors: list[str] = []
+    assert evidence._validate_inputs({"validated_inputs": inputs}, "a" * 40, errors, Path(".")) == set()
+    assert errors == ["validated_inputs must be a non-empty list"]
+
+
+@pytest.mark.parametrize("field", ["baseline_commit", "implementation_commit_a", "snapshot_commit_b"])
+def test_provenance_rejects_each_fixed_commit_mutation(monkeypatch: pytest.MonkeyPatch, field: str) -> None:
+    monkeypatch.setattr(evidence, "_is_ancestor", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(evidence, "_git", lambda *_args, **_kwargs: SimpleNamespace(returncode=0))
+    payload = {"baseline_commit": evidence.BASELINE_COMMIT, "implementation_commit_a": evidence.M2_IMPLEMENTATION_COMMIT, "snapshot_commit_b": evidence.M2_SNAPSHOT_COMMIT, "validated_commit": "a" * 40}
+    payload[field] = "b" * 40
+    errors: list[str] = []
+    evidence._validate_provenance(payload, errors, Path("."))
+    assert errors
+
+
+def _provenance_payload() -> dict[str, str]:
+    return {
+        "baseline_commit": evidence.BASELINE_COMMIT,
+        "implementation_commit_a": evidence.M2_IMPLEMENTATION_COMMIT,
+        "snapshot_commit_b": evidence.M2_SNAPSHOT_COMMIT,
+        "validated_commit": "a" * 40,
+    }
+
+
+def test_provenance_accepts_the_fixed_ordered_chain(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(evidence, "_git", lambda *_args, **_kwargs: SimpleNamespace(returncode=0))
+    errors: list[str] = []
+    assert evidence._validate_provenance(_provenance_payload(), errors, Path(".")) == "a" * 40
+    assert errors == []
+
+
+@pytest.mark.parametrize(
+    ("mutate", "git_returncode", "expected"),
+    [
+        (lambda payload: payload.__setitem__("baseline_commit", "b" * 40), 0, "baseline_commit must equal the M1 merge baseline"),
+        (lambda payload: payload.__setitem__("implementation_commit_a", "b" * 40), 0, "implementation_commit_a must equal the fixed A6.2 implementation commit"),
+        (lambda payload: payload.__setitem__("snapshot_commit_b", "b" * 40), 0, "snapshot_commit_b must equal the fixed B2 snapshot commit"),
+        (lambda payload: payload.__setitem__("validated_commit", "not-a-sha"), 0, "baseline, implementation, snapshot, and validated commits must be HEAD ancestors"),
+        (lambda _payload: None, 1, "baseline, implementation, snapshot, and validated commits must be HEAD ancestors"),
+    ],
+)
+def test_provenance_rejects_invalid_identity_or_non_ancestor(
+    monkeypatch: pytest.MonkeyPatch,
+    mutate: object,
+    git_returncode: int,
+    expected: str,
+) -> None:
+    mutate(_provenance_payload())  # type: ignore[operator]
+    payload = _provenance_payload()
+    mutate(payload)  # type: ignore[operator]
+    monkeypatch.setattr(evidence, "_git", lambda *_args, **_kwargs: SimpleNamespace(returncode=git_returncode))
+    errors: list[str] = []
+    evidence._validate_provenance(payload, errors, Path("."))
+    assert expected in errors
+
+
+def test_provenance_rejects_validated_ancestry_order(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = 0
+
+    def git(*_args: str, **_kwargs: object) -> SimpleNamespace:
+        nonlocal calls
+        calls += 1
+        return SimpleNamespace(returncode=1 if calls == 6 else 0)
+
+    monkeypatch.setattr(evidence, "_git", git)
+    errors: list[str] = []
+    evidence._validate_provenance(_provenance_payload(), errors, Path("."))
+    assert errors == ["implementation/data/validated commits are not in required ancestry order"]
+
+
+@pytest.mark.parametrize("case", ["missing_input", "validated_missing", "frozen_missing", "bytes_differ", "invalid_json", "bad_weight", "bad_canonical"])
+def test_run_audit_loader_rejects_each_invalid_source(monkeypatch: pytest.MonkeyPatch, case: str) -> None:
+    audit = _valid_run_audit()
+    if case == "bad_weight":
+        audit["pytorch_model_sha256"] = "0" * 64
+    if case == "bad_canonical":
+        audit["vector_snapshot_canonical_sha256"] = "b" * 64
+    raw = b"not-json" if case == "invalid_json" else json.dumps(audit).encode()
+    inputs = {evidence.BGE_RUN_AUDIT_PATH}
+    if case == "missing_input":
+        inputs = set()
+    def blob(commit: str | None, path: str, _root: Path) -> bytes | None:
+        if path != evidence.BGE_RUN_AUDIT_PATH or case == "validated_missing" and commit == "a" * 40 or case == "frozen_missing" and commit == evidence.M2_SNAPSHOT_COMMIT:
+            return None
+        return raw + (b"x" if case == "bytes_differ" and commit == evidence.M2_SNAPSHOT_COMMIT else b"")
+    monkeypatch.setattr(evidence, "_blob_bytes", blob)
+    errors: list[str] = []
+    context = evidence._load_validated_bge_run_audit("a" * 40, inputs, _valid_vector_context(), errors, Path("."))
+    assert context is None
+    assert errors
+
+
+def test_run_audit_loader_returns_a_validated_context(monkeypatch: pytest.MonkeyPatch) -> None:
+    raw = json.dumps(_valid_run_audit()).encode()
+    monkeypatch.setattr(evidence, "_blob_bytes", lambda *_args: raw)
+    errors: list[str] = []
+    context = evidence._load_validated_bge_run_audit(
+        "a" * 40,
+        {evidence.BGE_RUN_AUDIT_PATH},
+        _valid_vector_context(),
+        errors,
+        Path("."),
+    )
+    assert errors == []
+    assert context is not None
+    assert context.live == _valid_vector_context().stats
+    assert context.replay["cache_hits"] == 34
+    assert context.canonical_sha256 == "a" * 64
+
+
+def _complete_model_payload() -> dict[str, object]:
+    context = evidence.BgeRunAuditContext(
+        live=_valid_vector_context().stats,
+        replay={
+            "cache_corrupt_count": 0,
+            "cache_hits": 34,
+            "cache_misses": 0,
+            "provider_call_count": 0,
+            "provider_input_count": 0,
+            "empty_model_cache_file_count": 0,
+        },
+        canonical_sha256="a" * 64,
+    )
+    return {
+        "fake_evidence": {
+            "classification": "deterministic_fake",
+            "provider": {
+                "provider_name": "deterministic_fake",
+                "cache_namespace": "embedding:fake",
+            },
+        },
+        "real_model_evidence": {
+            "classification": "real",
+            "provider": _real_provider(),
+            "runtime": _real_runtime(),
+            "candidate_vector_count": 33,
+            "query_vector_count": 1,
+            "non_finite_count": 0,
+            "non_unit_norm_count": 0,
+            "live_cache": context.live,
+            "replay_cache": {
+                **context.replay,
+                "vector_arrays_equal": True,
+                "exact_bytes_equal": True,
+            },
+        },
+    }
+
+
+def _complete_run_context() -> evidence.BgeRunAuditContext:
+    payload = _complete_model_payload()
+    real = payload["real_model_evidence"]
+    assert isinstance(real, dict)
+    replay = real["replay_cache"]
+    assert isinstance(replay, dict)
+    return evidence.BgeRunAuditContext(
+        live=_valid_vector_context().stats,
+        replay={key: value for key, value in replay.items() if key not in {"vector_arrays_equal", "exact_bytes_equal"}},
+        canonical_sha256="a" * 64,
+    )
+
+
+def test_model_evidence_accepts_the_complete_b2_live_and_replay_fixture() -> None:
+    errors: list[str] = []
+    evidence._validate_model_evidence(
+        _complete_model_payload(), _valid_vector_context(), _complete_run_context(), errors
+    )
+    assert errors == []
+
+
+@pytest.mark.parametrize(
+    ("mutate", "expected"),
+    [
+        (lambda _payload: None, "completed evidence requires validated B2 run audit context"),
+        (lambda payload: payload["real_model_evidence"]["live_cache"].pop("cache_hits"), "real live cache evidence must exactly match B2 run audit"),
+        (lambda payload: payload["real_model_evidence"]["live_cache"].__setitem__("cache_hits", 1), "real live cache evidence must exactly match B2 run audit"),
+        (lambda payload: payload["real_model_evidence"]["replay_cache"].pop("cache_hits"), "real replay cache evidence must exactly match B2 run audit"),
+        (lambda payload: payload["real_model_evidence"]["replay_cache"].__setitem__("cache_hits", 0), "real replay cache evidence must exactly match B2 run audit"),
+        (lambda payload: payload["real_model_evidence"]["replay_cache"].__setitem__("vector_arrays_equal", False), "real replay cache evidence must exactly match B2 run audit"),
+        (lambda payload: payload["real_model_evidence"]["replay_cache"].__setitem__("exact_bytes_equal", False), "real replay cache evidence must exactly match B2 run audit"),
+        (lambda payload: payload["real_model_evidence"].__setitem__("provider", {**_real_provider(), "cache_namespace": "embedding:other"}), "real model evidence provider must match vector manifest"),
+        (lambda payload: payload["real_model_evidence"].__setitem__("runtime", {**_real_runtime(), "device_request": "cuda:9"}), "real model evidence runtime must match vector manifest"),
+        (lambda payload: payload["real_model_evidence"].__setitem__("candidate_vector_count", 32), "real model evidence must record 33 candidate vectors and one query vector"),
+        (lambda payload: payload["real_model_evidence"].__setitem__("query_vector_count", 2), "real model evidence must record 33 candidate vectors and one query vector"),
+        (lambda payload: payload["real_model_evidence"].__setitem__("non_finite_count", 1), "real model evidence must record zero non-finite vectors"),
+        (lambda payload: payload["real_model_evidence"].__setitem__("non_unit_norm_count", 1), "real model evidence must record zero non-unit vectors"),
+    ],
+)
+def test_model_evidence_rejects_each_completion_gate_mutation(
+    mutate: object, expected: str
+) -> None:
+    payload = _complete_model_payload()
+    mutate(payload)  # type: ignore[operator]
+    errors: list[str] = []
+    audit = None if expected == "completed evidence requires validated B2 run audit context" else _complete_run_context()
+    evidence._validate_model_evidence(payload, _valid_vector_context(), audit, errors)
+    assert expected in errors
+
+
+def _run_synthetic_completion(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    run_audit_context: evidence.BgeRunAuditContext | None,
+) -> tuple[evidence.EvidenceValidationResult, dict[str, object]]:
+    report = tmp_path / "m2-t01-completion.json"
+    report.write_text(
+        json.dumps(
+            {
+                "report_version": evidence.REPORT_VERSION,
+                "phase": "M2",
+                "task_id": "M2-T01",
+                "m1_provenance": {"metadata_projection_mismatch_count": 0},
+            }
+        ),
+        encoding="utf-8",
+    )
+    calls: dict[str, object] = {}
+    candidate = evidence.CandidateEvidenceContext("b" * 64, frozenset(), {})
+    vector = _valid_vector_context()
+    inputs = set(evidence.REQUIRED_VALIDATED_INPUT_PATHS)
+    monkeypatch.setattr(evidence, "_validate_provenance", lambda *_args: "a" * 40)
+    monkeypatch.setattr(evidence, "_validate_inputs", lambda *_args: inputs)
+    monkeypatch.setattr(evidence, "_validate_candidate_snapshot", lambda *_args: candidate)
+    monkeypatch.setattr(evidence, "_validate_vector_snapshot", lambda *_args: vector)
+    monkeypatch.setattr(evidence, "_validate_checks", lambda *_args: None)
+
+    def load(commit: str, seen: set[str], context: object, *_args: object) -> evidence.BgeRunAuditContext | None:
+        calls["loader"] = (commit, seen, context)
+        return run_audit_context
+
+    def model(_payload: object, context: object, audit: object, errors: list[str]) -> None:
+        calls["model"] = (context, audit)
+        if audit is None:
+            errors.append("completed evidence requires validated B2 run audit context")
+
+    monkeypatch.setattr(evidence, "_load_validated_bge_run_audit", load)
+    monkeypatch.setattr(evidence, "_validate_model_evidence", model)
+    monkeypatch.setattr(evidence, "_validate_status", lambda *_args: None)
+    monkeypatch.setattr(
+        evidence,
+        "_validate_committed_b2_precompletion",
+        lambda *_args: pytest.fail("completion must not use the precompletion validator"),
+    )
+    return evidence.validate_m2_t01_evidence(report_path=report, repository_root=tmp_path), calls
+
+
+def test_completion_wiring_passes_the_loader_context_to_model_validation(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    audit = _complete_run_context()
+    result, calls = _run_synthetic_completion(monkeypatch, tmp_path, audit)
+    assert result.valid is True
+    assert calls["loader"] == ("a" * 40, evidence.REQUIRED_VALIDATED_INPUT_PATHS, _valid_vector_context())
+    assert calls["model"] == (_valid_vector_context(), audit)
+
+
+def test_completion_wiring_fails_closed_when_loader_returns_none(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    result, calls = _run_synthetic_completion(monkeypatch, tmp_path, None)
+    assert result.valid is False
+    assert result.errors == ["completed evidence requires validated B2 run audit context"]
+    assert calls["model"] == (_valid_vector_context(), None)
