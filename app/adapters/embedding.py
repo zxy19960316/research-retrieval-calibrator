@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from app.models.embedding import (
+    BGE_M3_FLAGEMBEDDING_VERSION,
     BGE_M3_MODEL_ID,
     BGE_M3_MODEL_REVISION,
     EmbeddingModelDescriptor,
@@ -110,6 +111,8 @@ class BgeM3DenseProvider:
             runtime_versions = {field: version(package) for field, package in _RUNTIME_PACKAGES.items()}
         except PackageNotFoundError as error:
             raise EmbeddingTaskError("EMBEDDING_PROVIDER_UNAVAILABLE") from error
+        if runtime_versions["flagembedding_version"] != BGE_M3_FLAGEMBEDDING_VERSION:
+            raise EmbeddingTaskError("EMBEDDING_PROVIDER_UNAVAILABLE")
         self._model_id = model_id
         self._model_revision = model_revision
         self._device = device

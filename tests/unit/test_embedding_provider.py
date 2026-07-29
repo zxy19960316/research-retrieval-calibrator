@@ -111,6 +111,27 @@ def test_bge_missing_runtime_package_is_unavailable(tmp_path: Path, monkeypatch:
         )
 
 
+def test_bge_rejects_a_present_but_unpinned_flagembedding_version(
+    tmp_path: Path, runtime_versions: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    versions = {
+        "FlagEmbedding": "1.3.4",
+        "torch": "2.4.1",
+        "transformers": "4.45.2",
+        "huggingface-hub": "0.25.2",
+        "numpy": "2.1.1",
+    }
+    monkeypatch.setattr(adapter, "version", versions.__getitem__)
+
+    with pytest.raises(EmbeddingTaskError, match="EMBEDDING_PROVIDER_UNAVAILABLE"):
+        BgeM3DenseProvider(
+            model_id=BGE_M3_MODEL_ID,
+            model_revision=BGE_M3_MODEL_REVISION,
+            cache_namespace="embedding:bge-m3",
+            model_cache_dir=tmp_path / "model-cache",
+        )
+
+
 @pytest.mark.parametrize(
     ("device", "expected_device_kwargs"),
     [("cpu", {"devices": "cpu"}), ("cuda:0", {"devices": "cuda:0"}), (None, {})],

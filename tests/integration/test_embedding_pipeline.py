@@ -18,7 +18,11 @@ from app.models.embedding import (
     EmbeddingTaskError,
     FrozenCandidate,
 )
-from scripts.embed_frozen_candidates import embed_frozen_candidates, main
+from scripts.embed_frozen_candidates import (
+    _validate_bge_runtime_paths,
+    embed_frozen_candidates,
+    main,
+)
 from scripts.freeze_m2_candidates import _canonical_json_sha256, _render_json_bytes
 
 
@@ -195,6 +199,42 @@ def test_cli_separates_model_cache_from_vector_cache_and_validates_devices(
     assert json.loads(capsys.readouterr().out)["error_code"] == "INVALID_EMBEDDING_INPUT"
 
 
+@pytest.mark.parametrize(
+    ("model_cache", "vector_cache", "output_dir"),
+    [
+        ("same", "same", "output"),
+        ("model", "model/vectors", "output"),
+        ("model/vectors", "model", "output"),
+        ("model", "vectors", "model/output"),
+        ("output/model", "vectors", "output"),
+    ],
+)
+def test_real_runtime_paths_reject_equal_or_nested_cache_and_output_locations(
+    tmp_path: Path, model_cache: str, vector_cache: str, output_dir: str
+) -> None:
+    with pytest.raises(EmbeddingTaskError, match="INVALID_EMBEDDING_INPUT"):
+        _validate_bge_runtime_paths(
+            tmp_path / ".runtime" / model_cache,
+            tmp_path / ".runtime" / vector_cache,
+            tmp_path / ".runtime" / output_dir,
+            repository_root=tmp_path,
+        )
+
+
+def test_real_runtime_paths_allow_three_disjoint_runtime_directories(tmp_path: Path) -> None:
+    model_cache, vector_cache, output_dir = _validate_bge_runtime_paths(
+        tmp_path / ".runtime" / "models",
+        tmp_path / ".runtime" / "vectors",
+        tmp_path / "outputs",
+        repository_root=tmp_path,
+    )
+
+    assert (model_cache, vector_cache, output_dir) == (
+        (tmp_path / ".runtime" / "models").resolve(),
+        (tmp_path / ".runtime" / "vectors").resolve(),
+        (tmp_path / "outputs").resolve(),
+    )
+
 def test_bge_manifest_records_complete_runtime_identity_with_a_stubbed_wrapper(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -233,6 +273,12 @@ def test_bge_manifest_records_complete_runtime_identity_with_a_stubbed_wrapper(
     manifest = json.loads(Path(str(result["manifest_path"])).read_text(encoding="utf-8"))
     assert manifest["evidence_type"] == "real"
     assert manifest["runtime"] == provider.runtime
+    assert manifest["vector_norm_audit"] == {
+        "checked_count": 34,
+        "non_unit_norm_count": 0,
+        "relative_tolerance": 0.001,
+        "absolute_tolerance": 0.001,
+    }
 
 
 class _NoOpContext:

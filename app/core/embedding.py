@@ -30,8 +30,20 @@ def build_embedding_text(
     record: FrozenCandidate, source_snapshot_sha256: str
 ) -> EmbeddingInput:
     """Create the exact, source-backed text representation for one paper."""
-    normalized_title = record.title.replace("\r\n", "\n").strip()
-    normalized_abstract = (record.abstract or "").replace("\r\n", "\n").strip()
+    return build_embedding_input_from_fields(
+        paper_id=record.paper_id,
+        title=record.title,
+        abstract=record.abstract,
+        source_snapshot_sha256=source_snapshot_sha256,
+    )
+
+
+def build_embedding_input_from_fields(
+    *, paper_id: str, title: str, abstract: str | None, source_snapshot_sha256: str
+) -> EmbeddingInput:
+    """Build the paper input from snapshot fields for generation and validation."""
+    normalized_title = title.replace("\r\n", "\n").strip()
+    normalized_abstract = (abstract or "").replace("\r\n", "\n").strip()
     if not normalized_title or normalized_abstract.casefold() in {
         "no abstract",
         "not provided",
@@ -43,9 +55,9 @@ def build_embedding_text(
     if normalized_abstract:
         text += f"\n\nabstract:\n{normalized_abstract}"
     return EmbeddingInput(
-        input_id=record.paper_id,
+        input_id=paper_id,
         input_kind="paper",
-        paper_id=record.paper_id,
+        paper_id=paper_id,
         query_id=None,
         input_format_version=_INPUT_FORMAT_VERSION,
         text=text,

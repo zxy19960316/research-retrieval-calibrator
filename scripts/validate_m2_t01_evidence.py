@@ -26,12 +26,18 @@ import json
 import math
 import re
 import subprocess
+import sys
 from dataclasses import dataclass
 from itertools import pairwise
 from pathlib import Path, PureWindowsPath
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from app.core.embedding import build_embedding_input_from_fields, build_query_embedding_input
+
 REPORT_PATH = Path("evaluation/reports/m2-t01-embedding.json")
 REPORT_VERSION = "m2-t01-embedding.v1"
 BASELINE_COMMIT = "0eb45fc22d10adb72cb66aa45494333057080bc1"
@@ -43,6 +49,8 @@ SHA256 = re.compile(r"[0-9a-f]{64}")
 HF_COMMIT = re.compile(r"[0-9a-f]{40}")
 BGE_M3_MODEL_ID = "BAAI/bge-m3"
 BGE_M3_MODEL_REVISION = "5617a9f61b028005a4858fdac845db406aefb181"
+BGE_M3_FLAGEMBEDDING_VERSION = "1.3.5"
+B1_CANDIDATE_SNAPSHOT_SHA256 = "4a2aec0fd0a1d22adc801fd3bc506e5da89895d1276cd572e2ac64014c162448"
 FORBIDDEN_PROVIDER_VERSIONS = frozenset({"optional", "unknown", "latest", "unavailable"})
 STATUS_ROW = re.compile(
     r"^\|\s*(M\d+)\b[^|]*\|\s*([A-Z0-9_]+)\s*\|\s*(\d+)/(\d+)\s*\|",
@@ -65,6 +73,21 @@ REQUIRED_CHECKS = {
 class EvidenceValidationResult:
     valid: bool
     errors: list[str]
+
+
+@dataclass(frozen=True)
+class CandidateEvidenceContext:
+    snapshot_sha256: str
+    expected_input_ids: frozenset[str]
+    expected_text_sha256_by_input_id: dict[str, str]
+
+
+@dataclass(frozen=True)
+class VectorEvidenceContext:
+    canonical_sha256: str
+    provider: dict[str, object]
+    runtime: dict[str, object]
+    stats: dict[str, object]
 
 
 def _git(*arguments: str, repository_root: Path) -> subprocess.CompletedProcess[str]:
@@ -265,7 +288,7 @@ def _load_snapshot_json(
 
 def _validate_candidate_snapshot(
     payload: dict[str, Any], commit: str | None, errors: list[str], repository_root: Path
-) -> str | None:
+) -> CandidateEvidenceContext | None:
     fields = _snapshot_fields(payload, "candidate_snapshot", "snapshot_sha256", errors, repository_root)
     loaded = _load_snapshot_json(commit, fields, "candidate snapshot", errors, repository_root)
     if fields is None or loaded is None:
@@ -276,6 +299,7 @@ def _validate_candidate_snapshot(
     if snapshot.get("source_phase") != "M1" or snapshot.get("source_merge_commit") != BASELINE_COMMIT:
         errors.append("candidate snapshot must retain its M1 baseline provenance")
     candidates = snapshot.get("candidates")
+    expected_text_sha256_by_input_id: dict[str, str] = {}
     if not isinstance(candidates, list) or len(candidates) != 33:
         errors.append("candidate snapshot must contain exactly 33 candidates")
     else:
@@ -312,12 +336,32 @@ def _validate_candidate_snapshot(
                 errors.append("candidate snapshot contains a fabricated abstract placeholder")
             paper_ids.append(paper_id)
             source_identities.append((source, source_id))
+            title = candidate.get("title")
+            abstract = candidate.get("abstract")
+            if not isinstance(title, str) or not isinstance(abstract, (str, type(None))):
+                errors.append("candidate snapshot lacks production embedding text fields")
+                continue
+            try:
+                embedding_input = build_embedding_input_from_fields(
+                    paper_id=paper_id,
+                    title=title,
+                    abstract=abstract,
+                    source_snapshot_sha256=B1_CANDIDATE_SNAPSHOT_SHA256,
+                )
+            except ValueError:
+                errors.append("candidate snapshot has invalid production embedding text")
+                continue
+            expected_text_sha256_by_input_id[embedding_input.input_id] = embedding_input.text_sha256
         if len(paper_ids) != len(set(paper_ids)):
             errors.append("candidate snapshot has duplicate paper IDs")
         if len(source_identities) != len(set(source_identities)):
             errors.append("candidate snapshot has duplicate source identities")
     exact_snapshot_sha256 = hashlib.sha256(raw_snapshot).hexdigest()
-    if manifest.get("snapshot_sha256") != exact_snapshot_sha256 or fields[4] != exact_snapshot_sha256:
+    if (
+        exact_snapshot_sha256 != B1_CANDIDATE_SNAPSHOT_SHA256
+        or manifest.get("snapshot_sha256") != exact_snapshot_sha256
+        or fields[4] != exact_snapshot_sha256
+    ):
         errors.append("candidate snapshot exact SHA-256 does not match manifest/report")
     if (
         snapshot.get("source_evidence_report") != M1_REBASELINE_REPORT
@@ -339,20 +383,45 @@ def _validate_candidate_snapshot(
         or manifest.get("metadata_mismatch_count") != 0
     ):
         errors.append("candidate snapshot manifest has invalid zero-transport replay audit")
-    return exact_snapshot_sha256
+    question = snapshot.get("question")
+    if not isinstance(question, str):
+        errors.append("candidate snapshot question must be available for query binding")
+    else:
+        try:
+            query_input = build_query_embedding_input(question, B1_CANDIDATE_SNAPSHOT_SHA256)
+        except ValueError:
+            errors.append("candidate snapshot question has invalid production embedding text")
+        else:
+            expected_text_sha256_by_input_id[query_input.input_id] = query_input.text_sha256
+    if len(expected_text_sha256_by_input_id) != 34:
+        errors.append("candidate snapshot must derive exactly 33 paper and one query embedding inputs")
+    return CandidateEvidenceContext(
+        snapshot_sha256=exact_snapshot_sha256,
+        expected_input_ids=frozenset(expected_text_sha256_by_input_id),
+        expected_text_sha256_by_input_id=expected_text_sha256_by_input_id,
+    )
 
 
 def _validate_vector_snapshot(
-    payload: dict[str, Any], commit: str | None, candidate_sha256: str | None, errors: list[str], repository_root: Path
-) -> None:
+    payload: dict[str, Any],
+    commit: str | None,
+    candidate_context: CandidateEvidenceContext | None,
+    errors: list[str],
+    repository_root: Path,
+) -> VectorEvidenceContext | None:
     fields = _snapshot_fields(payload, "vector_snapshot", "canonical_sha256", errors, repository_root)
     loaded = _load_snapshot_json(commit, fields, "vector snapshot", errors, repository_root)
     if fields is None or loaded is None:
-        return
+        return None
     _, _, snapshot, manifest = loaded
     if snapshot.get("snapshot_version") != "m2-embedding-v1":
         errors.append("vector snapshot must use m2-embedding-v1")
-    if candidate_sha256 is None or snapshot.get("candidate_snapshot_sha256") != candidate_sha256:
+    if (
+        candidate_context is None
+        or snapshot.get("candidate_snapshot_sha256") != candidate_context.snapshot_sha256
+        or manifest.get("candidate_snapshot_sha256") != candidate_context.snapshot_sha256
+        or candidate_context.snapshot_sha256 != B1_CANDIDATE_SNAPSHOT_SHA256
+    ):
         errors.append("vector snapshot must reference the validated candidate snapshot")
     canonical = _canonical_sha256(snapshot)
     if manifest.get("vector_snapshot_sha256") != canonical or fields[4] != canonical:
@@ -360,10 +429,15 @@ def _validate_vector_snapshot(
     records = snapshot.get("records")
     if not isinstance(records, list) or len(records) != 34:
         errors.append("vector snapshot must contain exactly 33 candidate and one query record")
-        return
+        return None
+    provider = snapshot.get("provider")
+    runtime = manifest.get("runtime")
+    if not isinstance(provider, dict) or not isinstance(manifest.get("provider"), dict) or provider != manifest.get("provider"):
+        errors.append("vector snapshot and manifest providers must match exactly")
+        provider = {}
+    _validate_real_provider_contract(provider, runtime, errors)
     input_ids: set[str] = set()
-    dimensions: set[int] = set()
-    query_count = 0
+    non_unit_norm_count = 0
     for record in records:
         if not isinstance(record, dict):
             errors.append("vector snapshot records must be objects")
@@ -371,24 +445,50 @@ def _validate_vector_snapshot(
         input_id, dimension, vector = record.get("input_id"), record.get("dimension"), record.get("vector")
         if not isinstance(input_id, str) or not input_id or input_id in input_ids:
             errors.append("vector snapshot has blank or duplicate input IDs")
-        elif input_id.startswith("query:"):
-            query_count += 1
         input_ids.add(input_id) if isinstance(input_id, str) else None
-        if not isinstance(dimension, int) or isinstance(dimension, bool) or dimension <= 0:
-            errors.append("vector snapshot has a non-positive dimension")
+        if not isinstance(dimension, int) or isinstance(dimension, bool) or dimension != 1024:
+            errors.append("vector snapshot records must be exactly 1024-dimensional")
             continue
-        dimensions.add(dimension)
         if not isinstance(vector, list) or len(vector) != dimension or any(
             not isinstance(value, (int, float)) or isinstance(value, bool) or not math.isfinite(value)
             for value in vector
         ):
             errors.append("vector snapshot contains a dimension mismatch or non-finite value")
-    if query_count != 1 or len(dimensions) != 1:
-        errors.append("vector snapshot must have one query and one positive uniform dimension")
+            continue
+        if not isinstance(input_id, str) or record.get("text_sha256") != (
+            candidate_context.expected_text_sha256_by_input_id.get(input_id) if candidate_context else None
+        ):
+            errors.append("vector snapshot record text SHA-256 does not bind to the B1 input")
+        if record.get("descriptor") != provider:
+            errors.append("vector snapshot record descriptor must match snapshot provider")
+        norm = math.sqrt(sum(float(value) * float(value) for value in vector))
+        if not math.isclose(norm, 1.0, rel_tol=1e-3, abs_tol=1e-3):
+            non_unit_norm_count += 1
+    if candidate_context is None or input_ids != candidate_context.expected_input_ids:
+        errors.append("vector snapshot input IDs must exactly match the B1-derived input set")
     if manifest.get("candidate_count") != 33 or manifest.get("query_count") != 1:
         errors.append("vector manifest must record 33 candidate vectors and one query vector")
-    if manifest.get("evidence_type") == "real":
-        _validate_real_provider_contract(manifest.get("provider"), manifest.get("runtime"), errors)
+    if manifest.get("evidence_type") != "real":
+        errors.append("vector manifest must be explicitly classified real")
+    audit = manifest.get("vector_norm_audit")
+    if audit != {
+        "checked_count": 34,
+        "non_unit_norm_count": non_unit_norm_count,
+        "relative_tolerance": 0.001,
+        "absolute_tolerance": 0.001,
+    }:
+        errors.append("vector manifest norm audit does not match actual vectors")
+    if non_unit_norm_count:
+        errors.append("vector snapshot contains non-unit vectors")
+    stats = manifest.get("stats")
+    if not isinstance(stats, dict):
+        stats = {}
+    return VectorEvidenceContext(
+        canonical_sha256=canonical,
+        provider=provider,
+        runtime=runtime if isinstance(runtime, dict) else {},
+        stats=stats,
+    )
 
 
 def _validate_real_provider_contract(
@@ -405,13 +505,8 @@ def _validate_real_provider_contract(
     if not isinstance(revision, str) or HF_COMMIT.fullmatch(revision) is None or revision != BGE_M3_MODEL_REVISION:
         errors.append("real model evidence requires the fixed full 40-character model revision")
     library_version = provider.get("provider_library_version")
-    if (
-        provider.get("provider_library") != "FlagEmbedding"
-        or not isinstance(library_version, str)
-        or not library_version.strip()
-        or library_version.casefold() in FORBIDDEN_PROVIDER_VERSIONS
-    ):
-        errors.append("real model evidence requires a resolved FlagEmbedding provider version")
+    if provider.get("provider_library") != "FlagEmbedding" or library_version != BGE_M3_FLAGEMBEDDING_VERSION:
+        errors.append("real model evidence requires FlagEmbedding 1.3.5")
     if provider.get("embedding_mode") != "dense" or provider.get("dimension") != 1024 or provider.get("normalized") is not True:
         errors.append("real model evidence must record normalized 1024-dimensional dense vectors")
     namespace = provider.get("cache_namespace")
@@ -433,8 +528,12 @@ def _validate_real_provider_contract(
             errors.append(f"real runtime has an invalid {field}")
     if runtime.get("model_revision") != revision:
         errors.append("real runtime model revision does not match provider")
-    if not isinstance(runtime.get("use_fp16"), bool):
-        errors.append("real runtime use_fp16 must be boolean")
+    if runtime.get("flagembedding_version") != BGE_M3_FLAGEMBEDDING_VERSION or runtime.get("flagembedding_version") != library_version:
+        errors.append("real runtime FlagEmbedding version does not match provider")
+    if runtime.get("use_fp16") is not False:
+        errors.append("real runtime use_fp16 must be false")
+    if runtime.get("device_request") not in {None, "cpu", "cuda", "cuda:0", "mps"}:
+        errors.append("real runtime has an invalid device_request")
 
 
 def _validate_checks(payload: dict[str, Any], errors: list[str]) -> None:
@@ -462,7 +561,9 @@ def _validate_checks(payload: dict[str, Any], errors: list[str]) -> None:
             errors.append(f"automated check is not green: {name}")
 
 
-def _validate_model_evidence(payload: dict[str, Any], errors: list[str]) -> None:
+def _validate_model_evidence(
+    payload: dict[str, Any], vector_context: VectorEvidenceContext | None, errors: list[str]
+) -> None:
     fake = payload.get("fake_evidence")
     if not isinstance(fake, dict) or fake.get("classification") != "deterministic_fake":
         errors.append("fake_evidence must be explicitly classified deterministic_fake")
@@ -476,10 +577,16 @@ def _validate_model_evidence(payload: dict[str, Any], errors: list[str]) -> None
         errors.append("real_model_evidence must be explicitly classified real")
         return
     _validate_real_provider_contract(real.get("provider"), real.get("runtime"), errors)
+    if vector_context is None or real.get("provider") != vector_context.provider:
+        errors.append("real model evidence provider must match vector manifest")
+    if vector_context is None or real.get("runtime") != vector_context.runtime:
+        errors.append("real model evidence runtime must match vector manifest")
     if real.get("candidate_vector_count") != 33 or real.get("query_vector_count") != 1:
         errors.append("real model evidence must record 33 candidate vectors and one query vector")
     if real.get("non_finite_count") != 0:
         errors.append("real model evidence must record zero non-finite vectors")
+    if real.get("non_unit_norm_count") != 0:
+        errors.append("real model evidence must record zero non-unit vectors")
     live, replay = real.get("live_cache"), real.get("replay_cache")
     if not isinstance(live, dict) or live.get("cache_hits") != 0 or not isinstance(live.get("provider_call_count"), int) or live["provider_call_count"] <= 0:
         errors.append("real live cache evidence must have zero hits and positive provider calls")
@@ -522,10 +629,10 @@ def validate_m2_t01_evidence(
         errors.append("report must identify phase M2 and task M2-T01")
     validated_commit = _validate_provenance(payload, errors, repository_root)
     _validate_inputs(payload, validated_commit, errors, repository_root)
-    candidate_sha256 = _validate_candidate_snapshot(payload, validated_commit, errors, repository_root)
-    _validate_vector_snapshot(payload, validated_commit, candidate_sha256, errors, repository_root)
+    candidate_context = _validate_candidate_snapshot(payload, validated_commit, errors, repository_root)
+    vector_context = _validate_vector_snapshot(payload, validated_commit, candidate_context, errors, repository_root)
     _validate_checks(payload, errors)
-    _validate_model_evidence(payload, errors)
+    _validate_model_evidence(payload, vector_context, errors)
     m1_provenance = payload.get("m1_provenance")
     if not isinstance(m1_provenance, dict) or m1_provenance.get("metadata_projection_mismatch_count") != 0:
         errors.append("M1 provenance audit must record metadata_projection_mismatch_count = 0")

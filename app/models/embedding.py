@@ -46,6 +46,7 @@ _HF_COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 _PLACEHOLDER_ABSTRACTS = frozenset({"no abstract", "not provided", "no abstract available"})
 BGE_M3_MODEL_ID = "BAAI/bge-m3"
 BGE_M3_MODEL_REVISION = "5617a9f61b028005a4858fdac845db406aefb181"
+BGE_M3_FLAGEMBEDDING_VERSION = "1.3.5"
 _FORBIDDEN_PROVIDER_VERSIONS = frozenset({"optional", "unknown", "latest", "unavailable"})
 
 
@@ -115,8 +116,8 @@ class EmbeddingModelDescriptor(BaseModel):
                 raise ValueError("BGE-M3 descriptors must use the fixed BGE-M3 model revision")
             if self.provider_library != "FlagEmbedding":
                 raise ValueError("BGE-M3 descriptors must identify FlagEmbedding")
-            if self.provider_library_version.casefold() in _FORBIDDEN_PROVIDER_VERSIONS:
-                raise ValueError("BGE-M3 descriptors require a resolved provider library version")
+            if self.provider_library_version != BGE_M3_FLAGEMBEDDING_VERSION:
+                raise ValueError("BGE-M3 descriptors require the pinned FlagEmbedding version")
             if self.embedding_mode != "dense" or self.dimension != 1024 or self.normalized is not True:
                 raise ValueError("BGE-M3 descriptors must describe normalized 1024-dimensional dense vectors")
         elif not self.model_revision.strip() or not _HF_COMMIT_RE.fullmatch(self.model_revision):

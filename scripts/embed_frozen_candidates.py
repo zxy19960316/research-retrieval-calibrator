@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 import sys
 from collections.abc import Sequence
@@ -29,7 +30,12 @@ from app.adapters.embedding import (
     EmbeddingProvider,
 )
 from app.core.embedding import build_embedding_text, build_query_embedding_input, embed_inputs
-from app.models.embedding import EmbeddingTaskError, FrozenCandidate, FrozenCandidateSnapshot
+from app.models.embedding import (
+    EmbeddingTaskError,
+    EmbeddingVectorRecord,
+    FrozenCandidate,
+    FrozenCandidateSnapshot,
+)
 from scripts.freeze_m2_candidates import _canonical_json_sha256, validate_frozen_snapshot_bytes
 
 _BGE_VECTOR_SNAPSHOT = "bge-m3-dense-v1.json"
@@ -109,6 +115,12 @@ def embed_frozen_candidates(
     if provider_mode == "fake" and (vector_name == _BGE_VECTOR_SNAPSHOT or manifest_name == _BGE_VECTOR_MANIFEST):
         raise EmbeddingTaskError("INVALID_EMBEDDING_INPUT")
 
+    if provider_mode == "bge-m3":
+        _, cache_dir, output_dir = _validate_bge_runtime_paths(
+            provider._model_cache_dir if isinstance(provider, BgeM3DenseProvider) else Path("."),
+            cache_dir,
+            output_dir,
+        )
     frozen = load_validated_frozen_inputs(snapshot_path, manifest_path)
     inputs = [build_query_embedding_input(frozen.question, frozen.snapshot_sha256)]
     inputs.extend(build_embedding_text(candidate, frozen.snapshot_sha256) for candidate in frozen.candidates)
@@ -140,6 +152,7 @@ def embed_frozen_candidates(
         if not isinstance(runtime, dict):
             raise EmbeddingTaskError("EMBEDDING_PROVIDER_FAILED")
         result_manifest["runtime"] = runtime
+        result_manifest["vector_norm_audit"] = _vector_norm_audit(records)
     _write_json(output_dir / vector_name, payload)
     _write_json(output_dir / manifest_name, result_manifest)
     return {
@@ -158,6 +171,18 @@ def _artifact_names(provider_mode: str) -> tuple[str, str]:
     if provider_mode == "bge-m3":
         return _BGE_VECTOR_SNAPSHOT, _BGE_VECTOR_MANIFEST
     raise EmbeddingTaskError("INVALID_EMBEDDING_INPUT")
+
+
+def _vector_norm_audit(records: Sequence[EmbeddingVectorRecord]) -> dict[str, object]:
+    norms = [math.sqrt(sum(value * value for value in record.vector)) for record in records]
+    return {
+        "checked_count": len(norms),
+        "non_unit_norm_count": sum(
+            not math.isclose(norm, 1.0, rel_tol=1e-3, abs_tol=1e-3) for norm in norms
+        ),
+        "relative_tolerance": 0.001,
+        "absolute_tolerance": 0.001,
+    }
 
 
 def _write_json(path: Path, value: object) -> None:
@@ -207,7 +232,14 @@ def _provider_for_arguments(arguments: argparse.Namespace) -> EmbeddingProvider:
         raise EmbeddingTaskError("MODEL_REVISION_UNPINNED")
     if not arguments.cache_namespace or arguments.model_cache_dir is None:
         raise EmbeddingTaskError("INVALID_EMBEDDING_INPUT")
-    model_cache_dir = _validated_model_cache_dir(arguments.model_cache_dir)
+    model_cache_dir, vector_cache_dir, output_dir = _validate_bge_runtime_paths(
+        arguments.model_cache_dir,
+        arguments.cache_dir,
+        arguments.output_dir,
+    )
+    arguments.model_cache_dir = model_cache_dir
+    arguments.cache_dir = vector_cache_dir
+    arguments.output_dir = output_dir
     return BgeM3DenseProvider(
         model_id="BAAI/bge-m3",
         model_revision=arguments.model_revision,
@@ -217,13 +249,28 @@ def _provider_for_arguments(arguments: argparse.Namespace) -> EmbeddingProvider:
     )
 
 
-def _validated_model_cache_dir(path: Path) -> Path:
-    """Allow only a dedicated runtime cache outside tracked evaluation artifacts."""
+def _paths_overlap(left: Path, right: Path) -> bool:
+    """Return whether either normalized directory contains the other."""
+
+    try:
+        left.relative_to(right)
+        return True
+    except ValueError:
+        try:
+            right.relative_to(left)
+            return True
+        except ValueError:
+            return False
+
+
+def _validated_runtime_cache_dir(path: Path, *, repository_root: Path) -> Path:
+    """Allow cache only below .runtime/ when it is inside this repository."""
 
     resolved = path.resolve()
-    runtime_root = (ROOT / ".runtime").resolve()
+    root = repository_root.resolve()
+    runtime_root = root / ".runtime"
     try:
-        resolved.relative_to(ROOT.resolve())
+        resolved.relative_to(root)
     except ValueError:
         return resolved
     try:
@@ -231,6 +278,29 @@ def _validated_model_cache_dir(path: Path) -> Path:
     except ValueError as error:
         raise EmbeddingTaskError("INVALID_EMBEDDING_INPUT") from error
     return resolved
+
+
+def _validated_model_cache_dir(path: Path) -> Path:
+    """Backward-compatible model-cache validation for the preflight command."""
+
+    return _validated_runtime_cache_dir(path, repository_root=ROOT)
+
+
+def _validate_bge_runtime_paths(
+    model_cache_dir: Path,
+    vector_cache_dir: Path,
+    output_dir: Path,
+    *,
+    repository_root: Path = ROOT,
+) -> tuple[Path, Path, Path]:
+    """Normalize and isolate real-model cache and output destinations."""
+
+    model_cache = _validated_runtime_cache_dir(model_cache_dir, repository_root=repository_root)
+    vector_cache = _validated_runtime_cache_dir(vector_cache_dir, repository_root=repository_root)
+    output = output_dir.resolve()
+    if _paths_overlap(model_cache, vector_cache) or _paths_overlap(output, model_cache) or _paths_overlap(output, vector_cache):
+        raise EmbeddingTaskError("INVALID_EMBEDDING_INPUT")
+    return model_cache, vector_cache, output
 
 
 def main(argv: Sequence[str] | None = None) -> int:

@@ -25,6 +25,7 @@ def _candidate_snapshot() -> dict[str, object]:
     return {
         "snapshot_version": "m2-candidates.v1",
         "count": 33,
+        "question": "Which verified question binds the query embedding?",
         "source_phase": "M1",
         "source_merge_commit": evidence.BASELINE_COMMIT,
         "source_evidence_report": M1_REPORT_PATH,
@@ -35,6 +36,7 @@ def _candidate_snapshot() -> dict[str, object]:
                 "source": "arxiv",
                 "source_id": f"{index:04d}.00001",
                 "url": f"https://arxiv.org/abs/{index:04d}.00001",
+                "title": f"Verified title {index}.",
                 "abstract": "Verified abstract.",
             }
             for index in range(33)
@@ -88,25 +90,69 @@ def _candidate_validation(
         "snapshots/candidates.manifest.json": raw_manifest,
     }
     monkeypatch.setattr(evidence, "_blob_bytes", lambda _commit, path, _root: blobs.get(path))
+    monkeypatch.setattr(evidence, "B1_CANDIDATE_SNAPSHOT_SHA256", exact_snapshot_sha256)
     errors: list[str] = []
     result = evidence._validate_candidate_snapshot(payload, "a" * 40, errors, Path("."))
     return result, errors
 
 
-def _vector_validation(monkeypatch: pytest.MonkeyPatch) -> list[str]:
-    candidate_sha256 = "b" * 64
+def _real_provider() -> dict[str, object]:
+    return {
+        "provider_name": "bge_m3", "model_id": "BAAI/bge-m3",
+        "model_revision": "5617a9f61b028005a4858fdac845db406aefb181",
+        "provider_library": "FlagEmbedding", "provider_library_version": "1.3.5",
+        "embedding_mode": "dense", "normalized": True, "dimension": 1024,
+        "cache_namespace": "embedding:bge-m3",
+    }
+
+
+def _real_runtime() -> dict[str, object]:
+    return {
+        "python_version": "3.12.x", "flagembedding_version": "1.3.5", "torch_version": "2.4.1",
+        "transformers_version": "4.45.2", "huggingface_hub_version": "0.25.2", "numpy_version": "2.1.1",
+        "device_request": "cpu", "use_fp16": False,
+        "model_revision": "5617a9f61b028005a4858fdac845db406aefb181",
+    }
+
+
+def _vector_validation(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    dimension: int = 1024,
+    vector_scale: float = 1.0,
+    record_descriptor: dict[str, object] | None = None,
+    manifest_provider: dict[str, object] | None = None,
+    input_id_override: str | None = None,
+    text_sha256_override: str | None = None,
+) -> list[str]:
+    candidate_sha256 = evidence.B1_CANDIDATE_SNAPSHOT_SHA256
+    expected_ids = {*(f"candidate:{index}" for index in range(33)), "query:main"}
+    context = evidence.CandidateEvidenceContext(
+        snapshot_sha256=candidate_sha256,
+        expected_input_ids=frozenset(expected_ids),
+        expected_text_sha256_by_input_id={input_id: "a" * 64 for input_id in expected_ids},
+    )
+    provider = _real_provider()
+    runtime = _real_runtime()
+    vector = [vector_scale / (dimension**0.5)] * dimension
     snapshot = {
         "snapshot_version": "m2-embedding-v1",
         "candidate_snapshot_sha256": candidate_sha256,
+        "provider": provider,
         "records": [
-            {"input_id": f"candidate:{index}", "dimension": 2, "vector": [0.1, 0.2]}
+            {"input_id": input_id_override if index == 0 and input_id_override else f"candidate:{index}", "text_sha256": text_sha256_override or "a" * 64, "descriptor": record_descriptor or provider, "dimension": dimension, "vector": vector}
             for index in range(33)
         ]
-        + [{"input_id": "query:main", "dimension": 2, "vector": [0.3, 0.4]}],
+        + [{"input_id": "query:main", "text_sha256": "a" * 64, "descriptor": record_descriptor or provider, "dimension": dimension, "vector": vector}],
     }
     raw_snapshot = _json_bytes(snapshot)
     canonical_sha256 = evidence._canonical_sha256(snapshot)
-    manifest = {"vector_snapshot_sha256": canonical_sha256, "candidate_count": 33, "query_count": 1}
+    manifest = {
+        "vector_snapshot_sha256": canonical_sha256, "candidate_snapshot_sha256": candidate_sha256,
+        "candidate_count": 33, "query_count": 1, "evidence_type": "real", "provider": manifest_provider or provider,
+        "runtime": runtime, "stats": {},
+        "vector_norm_audit": {"checked_count": 34, "non_unit_norm_count": 0, "relative_tolerance": 0.001, "absolute_tolerance": 0.001},
+    }
     raw_manifest = _json_bytes(manifest)
     payload = {
         "vector_snapshot": {
@@ -120,7 +166,7 @@ def _vector_validation(monkeypatch: pytest.MonkeyPatch) -> list[str]:
     blobs = {"snapshots/vectors.json": raw_snapshot, "snapshots/vectors.manifest.json": raw_manifest}
     monkeypatch.setattr(evidence, "_blob_bytes", lambda _commit, path, _root: blobs.get(path))
     errors: list[str] = []
-    evidence._validate_vector_snapshot(payload, "a" * 40, candidate_sha256, errors, Path("."))
+    evidence._validate_vector_snapshot(payload, "a" * 40, context, errors, Path("."))
     return errors
 
 
@@ -203,29 +249,38 @@ def test_vector_snapshot_retains_canonical_hash_contract(monkeypatch: pytest.Mon
     assert _vector_validation(monkeypatch) == []
 
 
+@pytest.mark.parametrize("dimension", [2, 1023])
+def test_vector_snapshot_rejects_non_1024_dimensions(
+    monkeypatch: pytest.MonkeyPatch, dimension: int
+) -> None:
+    assert "vector snapshot records must be exactly 1024-dimensional" in _vector_validation(
+        monkeypatch, dimension=dimension
+    )
+
+
+def test_vector_snapshot_rejects_non_unit_vectors_and_cross_artifact_provider_mismatches(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert "vector snapshot contains non-unit vectors" in _vector_validation(monkeypatch, vector_scale=2.0)
+    assert "vector snapshot record descriptor must match snapshot provider" in _vector_validation(
+        monkeypatch, record_descriptor={**_real_provider(), "cache_namespace": "embedding:other"}
+    )
+    assert "vector snapshot and manifest providers must match exactly" in _vector_validation(
+        monkeypatch, manifest_provider={**_real_provider(), "cache_namespace": "embedding:other"}
+    )
+
+
+def test_vector_snapshot_rejects_wrong_b1_input_id_and_text_hash(monkeypatch: pytest.MonkeyPatch) -> None:
+    assert "vector snapshot input IDs must exactly match the B1-derived input set" in _vector_validation(
+        monkeypatch, input_id_override="query:substituted"
+    )
+    assert "vector snapshot record text SHA-256 does not bind to the B1 input" in _vector_validation(
+        monkeypatch, text_sha256_override="b" * 64
+    )
+
+
 def test_final_evidence_rejects_forged_real_provider_runtime_identity() -> None:
-    provider = {
-        "provider_name": "bge_m3",
-        "model_id": "BAAI/bge-m3",
-        "model_revision": "5617a9f61b028005a4858fdac845db406aefb181",
-        "provider_library": "FlagEmbedding",
-        "provider_library_version": "1.3.5",
-        "embedding_mode": "dense",
-        "normalized": True,
-        "dimension": 1024,
-        "cache_namespace": "embedding:bge-m3",
-    }
-    runtime = {
-        "python_version": "3.12.x",
-        "flagembedding_version": "1.3.5",
-        "torch_version": "2.4.1",
-        "transformers_version": "4.45.2",
-        "huggingface_hub_version": "0.25.2",
-        "numpy_version": "2.1.1",
-        "device_request": "cpu",
-        "use_fp16": False,
-        "model_revision": provider["model_revision"],
-    }
+    provider, runtime = _real_provider(), _real_runtime()
     errors: list[str] = []
     evidence._validate_real_provider_contract(provider, runtime, errors)
     assert errors == []
@@ -235,6 +290,36 @@ def test_final_evidence_rejects_forged_real_provider_runtime_identity() -> None:
         errors = []
         evidence._validate_real_provider_contract(invalid, runtime, errors)
         assert errors
+    for invalid_runtime in (
+        {**runtime, "use_fp16": "false"},
+        {**runtime, "use_fp16": True},
+        {**runtime, "flagembedding_version": "1.3.4"},
+        {**runtime, "device_request": "cuda:1"},
+    ):
+        errors = []
+        evidence._validate_real_provider_contract(provider, invalid_runtime, errors)
+        assert errors
+
+
+def test_final_report_cannot_describe_a_different_vector_provider_or_runtime() -> None:
+    provider, runtime = _real_provider(), _real_runtime()
+    vector_context = evidence.VectorEvidenceContext(
+        canonical_sha256="a" * 64, provider=provider, runtime=runtime, stats={}
+    )
+    payload = {
+        "fake_evidence": {"classification": "deterministic_fake", "provider": {"provider_name": "deterministic_fake", "cache_namespace": "embedding:fake"}},
+        "real_model_evidence": {
+            "classification": "real", "provider": provider, "runtime": runtime,
+            "candidate_vector_count": 33, "query_vector_count": 1, "non_finite_count": 0,
+            "non_unit_norm_count": 0,
+            "live_cache": {"cache_hits": 0, "provider_call_count": 1},
+            "replay_cache": {"provider_call_count": 0, "cache_misses": 0, "vector_arrays_equal": True},
+        },
+    }
+    errors: list[str] = []
+    evidence._validate_model_evidence(payload, vector_context, errors)
+    assert errors == []
+    payload["real_model_evidence"] = {**payload["real_model_evidence"], "provider": {**provider, "cache_namespace": "embedding:other"}}
     errors = []
-    evidence._validate_real_provider_contract(provider, {**runtime, "use_fp16": "false"}, errors)
-    assert errors
+    evidence._validate_model_evidence(payload, vector_context, errors)
+    assert "real model evidence provider must match vector manifest" in errors

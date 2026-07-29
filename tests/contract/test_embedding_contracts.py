@@ -176,7 +176,7 @@ def test_bge_m3_descriptor_requires_the_fixed_full_commit_identity(
     for invalid in ("main", "5617a9f", BGE_M3_MODEL_REVISION.upper(), "f" * 40):
         with pytest.raises(ValidationError, match="40-character|fixed BGE-M3"):
             EmbeddingModelDescriptor.model_validate({**real, "model_revision": invalid})
-    with pytest.raises(ValidationError, match="provider library version"):
+    with pytest.raises(ValidationError, match="pinned FlagEmbedding version"):
         EmbeddingModelDescriptor.model_validate({**real, "provider_library_version": "optional"})
 
 
