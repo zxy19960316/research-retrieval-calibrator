@@ -279,6 +279,54 @@ git commit -m "fix: harden M2 reranker selection lock"
 
 B1 may implement a `transformers` adapter using mocked imports and mocked runtime objects only. Unit tests must not access the network, download files, load weights, or create real scores. B1 is not authorized by B0.
 
+## B1-R Mocked provider red contracts
+
+**Goal:** Define collection-safe, mocked red contracts for the future pinned BGE provider while preserving the B0.1 selection contract.
+
+**Files:**
+
+- Modify: `tests/contract/test_m2_t02_reranker_selection.py`
+- Create: `tests/unit/test_bge_reranker_provider.py`
+- Modify: `docs/superpowers/plans/2026-07-29-m2-t02-reranker-provider.md`
+
+**Interfaces:** B1-F will add `BgeRerankerProvider(model_id, model_revision, cache_namespace, model_dir, max_length=512, device="cpu")`, with `.descriptor`, `.runtime`, and `score(query, inputs, *, batch_size)` to `app/adapters/reranking.py`. B1-R does not create that production class or constants.
+
+- [ ] **Step 1: Preserve B0.1 model-card guarantees**
+
+Add non-blocking assertions for `model_parameter_count: 567755777`, standard-transformers compatibility, Apache-2.0 commercial-use constraint, and the exact pinned README URL. Reject `/main/`, `/latest/`, and missing revision text.
+
+- [ ] **Step 2: Add collection-safe mocked red tests**
+
+Import only `app.adapters.reranking` at module level. Resolve the absent provider in `_provider_type()` with `getattr`, so pytest collects and each behavioral test fails with `BgeRerankerProvider has not been implemented` rather than an import error. Include a subprocess characterization that adapter import leaves `torch`, `transformers`, `huggingface_hub`, `sentence_transformers`, and `FlagEmbedding` absent.
+
+- [ ] **Step 3: Lock B1-F's local-only behavior**
+
+Use `sys.modules` fake `torch` and `transformers` modules, non-empty temporary placeholders for the six runtime files, and fixed metadata versions. Assert exact CPU/float32 construction gates, snapshot presence/non-empty checks, lazy loading, local-only `from_pretrained` arguments, ordered query/passage pairs, no provider-side normalization, exact raw logits, output validation, and stable `INVALID_INPUT`, `INVALID_OUTPUT`, or `PROVIDER_UNAVAILABLE` codes.
+
+- [ ] **Step 4: Run and record the intentional red state**
+
+Run:
+
+```powershell
+py -3.12 -m pytest -q tests/contract/test_m2_t02_reranker_selection.py tests/unit/test_bge_reranker_provider.py
+py -3.12 -m ruff check tests/contract/test_m2_t02_reranker_selection.py tests/unit/test_bge_reranker_provider.py
+```
+
+Expected: B0.1 selection and import-side-effect tests pass; provider behavior tests fail only because B1-F has not implemented `BgeRerankerProvider`. Do not use `skip` or `xfail`.
+
+- [ ] **Step 5: Commit only B1-R**
+
+```powershell
+git add docs/superpowers/plans/2026-07-29-m2-t02-reranker-provider.md tests/contract/test_m2_t02_reranker_selection.py tests/unit/test_bge_reranker_provider.py
+git commit -m "test: define pinned BGE reranker provider contract"
+```
+
+## B1-F Offline local-snapshot provider implementation
+
+**Goal:** Implement only the B1-R contract in `app/adapters/reranking.py` with lazy, CPU float32, local-snapshot-only mocked-runtime behavior.
+
+**Constraints:** B1-F may not download a model, access Hugging Face, use a token, load real weights, generate real scores, add dependencies, begin B2/B3/C, or update `STATUS.md`. It checks only required-file existence and non-emptiness; B2 owns digest verification.
+
 ## B2 Controlled download and preflight
 
 B2 is the first task allowed to perform a controlled download. It must verify the B0 pinned revision and file digests before CPU float32 preflight. B2 is not authorized by B0.

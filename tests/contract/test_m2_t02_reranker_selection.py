@@ -191,6 +191,16 @@ def test_b0_selection_artifact_is_closed_pinned_and_not_run() -> None:
     assert selected["model_id"] == "BAAI/bge-reranker-v2-m3"
     assert selected["model_revision"] == "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e"
     assert selected["license"] == "apache-2.0"
+    assert selected["model_parameter_count"] == 567755777
+    assert selected["standard_transformers_compatibility"] is True
+    assert selected["commercial_use_constraint"] == "apache-2.0"
+    assert selected["official_model_card_url"] == (
+        "https://huggingface.co/BAAI/bge-reranker-v2-m3/"
+        "blob/953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e/README.md"
+    )
+    assert "/main/" not in selected["official_model_card_url"]
+    assert "/latest/" not in selected["official_model_card_url"]
+    assert selected["model_revision"] in selected["official_model_card_url"]
     assert selected["multilingual"] is True
     assert selected["trust_remote_code"] is False
     assert selected["runtime_library"] == "transformers"
