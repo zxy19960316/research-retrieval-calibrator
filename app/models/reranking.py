@@ -10,6 +10,20 @@ from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+BGE_RERANKER_PROVIDER_NAME = "bge_reranker_v2_m3"
+BGE_RERANKER_MODEL_ID = "BAAI/bge-reranker-v2-m3"
+BGE_RERANKER_MODEL_REVISION = "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e"
+BGE_RERANKER_INPUT_FORMAT_VERSION = "m2-reranker-title-abstract-v1"
+BGE_RERANKER_MAX_LENGTH = 512
+BGE_RERANKER_REQUIRED_FILES = (
+    "config.json",
+    "model.safetensors",
+    "sentencepiece.bpe.model",
+    "special_tokens_map.json",
+    "tokenizer.json",
+    "tokenizer_config.json",
+)
+
 RerankerErrorCode = Literal[
     "INVALID_INPUT",
     "PROVIDER_UNAVAILABLE",
