@@ -405,6 +405,66 @@ B2 is the first task allowed to perform a controlled download. It must verify th
   git commit -m "test: define pinned reranker snapshot preparation contract"
   ```
 
+## B2-R.1 False-green closure and path safety
+
+**Goal:** Close B2-R false-green gaps before any snapshot preparation code exists by fixing digest corruption semantics and defining fail-closed selection, disk, target-path, downloader-return, staging-content, publication, reuse, and cleanup contracts.
+
+**Files:**
+
+- Modify: `tests/unit/test_m2_t02_reranker_snapshot.py`
+- Modify: `docs/superpowers/plans/2026-07-29-m2-t02-reranker-provider.md`
+- Do not create or modify: `scripts/**`, `app/**`, `evaluation/**`, `tests/contract/**`, dependencies, model files, runtime evidence, or `STATUS.md`
+
+**Boundary sequence:**
+
+- B2-F may implement only the dependency-free, offline-testable preparation core specified by B2-R and B2-R.1. It must not install dependencies, access the network, download files, construct a reranker provider, load a tokenizer/model, run inference, or produce scores.
+- B2-D is the first step allowed to lock and install runtime/download dependencies.
+- B2-L is the first step allowed to perform the real pinned download.
+- B2-P is the first step allowed to load the real tokenizer/model for CPU float32 preflight.
+- B3 is the first step allowed to generate complete real reranker scores.
+- Until C, `STATUS.md` remains M2 `IN_PROGRESS` with `1/5`; PR #11 remains Draft.
+
+- [ ] **Step 1: Add independent characterization gates**
+
+  Read `.gitignore` directly and require `models/` plus `*.safetensors`, without starting Git. Read the committed selection artifact directly and require `decision_status == "selected_not_downloaded"` plus all five execution-state flags false. Verify the fixed `b"reranker-snapshot\n"` Git-object digest is `f62d0c3a99a7648eaced175f791324b04930b7a0` and differs from the plain-file SHA-1. These three tests must pass while the future module is absent.
+
+- [ ] **Step 2: Remove digest-size false greens and close selection parsing**
+
+  Corrupt `config.json` and `tokenizer.json` by flipping one bit while preserving byte length, then explicitly prove unchanged size and changed Git blob SHA-1/SHA-256. Parameterize single-field mutations for the pinned model/revisions/status/execution flags, exact seven-file set, safe relative paths, positive sizes, digest/storage pairings, boolean runtime flags, digest syntax, and all three declared byte totals. Every invalid selection must raise the same `INTEGRITY_CHECK_FAILED` code without network access or artifact repair.
+
+- [ ] **Step 3: Lock disk and target-path preflight**
+
+  Expose `DOWNLOAD_HEADROOM_BYTES = 1073741824`; require `plan.total_size_bytes + DOWNLOAD_HEADROOM_BYTES`, which is exactly `3,367,001,161` bytes for the committed selection. Permit download when free bytes equal the requirement; reject one byte less before downloader/staging. Map a disk-probe `OSError` to `DOWNLOAD_FAILED`. Reject existing-file targets, symlinks, the selection path, a controlled repository root, unresolved `..`, and file parents before download, preserving every existing byte.
+
+- [ ] **Step 4: Close destination, downloader-return, and staging contents**
+
+  Reuse an exact existing seven-file snapshot without disk probing, downloading, rewriting bytes/mtimes, or staging. Reject missing, same-length-corrupt, extra-file, extra-directory, and symlink-bearing existing snapshots without repair. Require every downloader return to resolve inside the current staging directory; reject outside files, final-destination paths, another staging directory, and relative traversal without deleting external data. Before publication, require exactly the seven declared root files; reject extra files/directories, symlinks, and nested declared files. A staging-only `.cache/huggingface` may either be rejected or removed before publication, but must never appear in the final snapshot or affect caches outside staging.
+
+- [ ] **Step 5: Prove one atomic publication and exhaustive cleanup**
+
+  Allocate each unique sibling staging directory with `tempfile.mkdtemp`, then patch the future module's `os.replace` and require exactly one directory rename from `.<snapshot>.staging-*` to the absent final target. A publication `OSError` maps to `DOWNLOAD_FAILED` and removes all staging files. Cover first, third, last, and post-write download failures, staging-directory creation failure, same-length digest failure, and publication failure; every case leaves no destination/staging/partial path and preserves unrelated directories, external caches, and a pre-existing staging-shaped sentinel. Two independent failed calls must use distinct sibling staging paths. Cross-process locking remains out of scope.
+
+- [ ] **Step 6: Preserve import isolation and intentional red evidence**
+
+  In an isolated Python process, importing the future module and running fake preparation must not import `torch`, `transformers`, `huggingface_hub`, `FlagEmbedding`, or `sentence_transformers`, and must not construct `BgeRerankerProvider`. Run:
+
+  ```powershell
+  py -3.12 -m pytest -q tests/unit/test_m2_t02_reranker_snapshot.py
+  py -3.12 -m ruff check tests/unit/test_m2_t02_reranker_snapshot.py
+  ```
+
+  Expected for B2-R.1: collection succeeds with `3 passed, 67 failed`; the three characterization tests pass, and all 67 parameterized behavior cases fail only with `prepare_m2_t02_reranker_snapshot has not been implemented`. No fixture, network, package-import, skip, or xfail outcome is permitted.
+
+- [ ] **Step 7: Commit and publish only B2-R.1**
+
+  ```powershell
+  git add tests/unit/test_m2_t02_reranker_snapshot.py docs/superpowers/plans/2026-07-29-m2-t02-reranker-provider.md
+  git diff --cached --name-only
+  git diff --cached --check
+  git commit -m "test: harden reranker snapshot preparation boundaries"
+  git push origin agent/m2-t02-reranker-provider
+  ```
+
 ## B3 Real live/replay evidence
 
 B3 is the first task allowed to run real inference, generate real scores, and record separately labeled live and replay evidence. B3 is not authorized by B0.
