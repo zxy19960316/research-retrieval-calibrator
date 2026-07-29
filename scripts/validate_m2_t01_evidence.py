@@ -640,7 +640,9 @@ def _load_validated_bge_run_audit(
         errors.append("validated run audit must exactly match fixed B2 commit")
         return None
     try:
-        return _validate_bge_run_audit(json.loads(raw), vector, errors)
+        error_count = len(errors)
+        context = _validate_bge_run_audit(json.loads(raw), vector, errors)
+        return context if len(errors) == error_count else None
     except (UnicodeDecodeError, json.JSONDecodeError):
         errors.append("B2 run audit is invalid JSON")
         return None
