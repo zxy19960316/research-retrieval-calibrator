@@ -6,6 +6,8 @@ import hashlib
 import math
 
 import pytest
+from pydantic import ValidationError
+
 from app.adapters.reranking import RerankerProvider
 from app.models.reranking import (
     ProviderRawScore,
@@ -16,7 +18,6 @@ from app.models.reranking import (
     RerankRecord,
     RerankRun,
 )
-from pydantic import ValidationError
 
 
 def _descriptor_payload(**overrides: object) -> dict[str, object]:

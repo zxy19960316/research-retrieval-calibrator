@@ -10,16 +10,16 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import pytest
+
 from app.core.reranking import build_reranker_input, effective_top_k, rerank_candidates
+from app.models.dedup import SourceIdentity
+from app.models.embedding import FrozenCandidate
 from app.models.reranking import (
     ProviderRawScore,
     RerankerModelDescriptor,
     RerankerRunState,
     RerankerTaskError,
 )
-
-from app.models.dedup import SourceIdentity
-from app.models.embedding import FrozenCandidate
 
 if TYPE_CHECKING:
     from app.adapters.reranking import RerankerProvider
