@@ -324,9 +324,15 @@ def test_final_report_cannot_describe_a_different_vector_provider_or_runtime() -
         },
     }
     errors: list[str] = []
-    evidence._validate_model_evidence(payload, vector_context, errors)
+    audit_context = evidence.BgeRunAuditContext(
+        live={"cache_hits": 0, "provider_call_count": 1},
+        replay={"provider_call_count": 0, "cache_misses": 0},
+        canonical_sha256="a" * 64,
+    )
+    payload["real_model_evidence"]["replay_cache"]["exact_bytes_equal"] = True
+    evidence._validate_model_evidence(payload, vector_context, audit_context, errors)
     assert errors == []
     payload["real_model_evidence"] = {**payload["real_model_evidence"], "provider": {**provider, "cache_namespace": "embedding:other"}}
     errors = []
-    evidence._validate_model_evidence(payload, vector_context, errors)
+    evidence._validate_model_evidence(payload, vector_context, audit_context, errors)
     assert "real model evidence provider must match vector manifest" in errors

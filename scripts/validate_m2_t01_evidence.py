@@ -64,6 +64,7 @@ B2_PATHS = (
     "evaluation/snapshots/m2/bge-m3-dense-v1.manifest.json",
     BGE_RUN_AUDIT_PATH,
 )
+REQUIRED_VALIDATED_INPUT_PATHS = frozenset(B2_PATHS)
 FORBIDDEN_PROVIDER_VERSIONS = frozenset({"optional", "unknown", "latest", "unavailable"})
 STATUS_ROW = re.compile(
     r"^\|\s*(M\d+)\b[^|]*\|\s*([A-Z0-9_]+)\s*\|\s*(\d+)/(\d+)\s*\|",
@@ -205,6 +206,10 @@ def _validate_provenance(
 ) -> str | None:
     if payload.get("baseline_commit") != BASELINE_COMMIT:
         errors.append("baseline_commit must equal the M1 merge baseline")
+    if payload.get("implementation_commit_a") != M2_IMPLEMENTATION_COMMIT:
+        errors.append("implementation_commit_a must equal the fixed A6.2 implementation commit")
+    if payload.get("snapshot_commit_b") != M2_SNAPSHOT_COMMIT:
+        errors.append("snapshot_commit_b must equal the fixed B2 snapshot commit")
     ordered = [
         payload.get("baseline_commit"),
         payload.get("implementation_commit_a"),
@@ -226,11 +231,11 @@ def _validate_provenance(
 
 def _validate_inputs(
     payload: dict[str, Any], validated_commit: str | None, errors: list[str], repository_root: Path
-) -> None:
+) -> set[str]:
     inputs = payload.get("validated_inputs")
     if not isinstance(inputs, list) or not inputs:
         errors.append("validated_inputs must be a non-empty list")
-        return
+        return set()
     seen: set[str] = set()
     for item in inputs:
         if not isinstance(item, dict):
@@ -247,6 +252,9 @@ def _validate_inputs(
         contents = _blob_bytes(validated_commit, path, repository_root) if validated_commit else None
         if contents is None or hashlib.sha256(contents).hexdigest() != expected:
             errors.append(f"validated input hash mismatch: {path}")
+    for path in sorted(REQUIRED_VALIDATED_INPUT_PATHS - seen):
+        errors.append(f"missing required validated input: {path}")
+    return seen
 
 
 def _snapshot_fields(
@@ -582,7 +590,8 @@ def _validate_checks(payload: dict[str, Any], errors: list[str]) -> None:
 
 
 def _validate_model_evidence(
-    payload: dict[str, Any], vector_context: VectorEvidenceContext | None, errors: list[str]
+    payload: dict[str, Any], vector_context: VectorEvidenceContext | None,
+    run_audit_context: BgeRunAuditContext | None, errors: list[str]
 ) -> None:
     fake = payload.get("fake_evidence")
     if not isinstance(fake, dict) or fake.get("classification") != "deterministic_fake":
@@ -608,10 +617,33 @@ def _validate_model_evidence(
     if real.get("non_unit_norm_count") != 0:
         errors.append("real model evidence must record zero non-unit vectors")
     live, replay = real.get("live_cache"), real.get("replay_cache")
-    if not isinstance(live, dict) or live.get("cache_hits") != 0 or not isinstance(live.get("provider_call_count"), int) or live["provider_call_count"] <= 0:
-        errors.append("real live cache evidence must have zero hits and positive provider calls")
-    if not isinstance(replay, dict) or replay.get("provider_call_count") != 0 or replay.get("cache_misses") != 0 or replay.get("vector_arrays_equal") is not True:
-        errors.append("real replay must have zero provider calls/misses and equal vectors")
+    if run_audit_context is None:
+        errors.append("completed evidence requires validated B2 run audit context")
+    else:
+        expected_replay = {**run_audit_context.replay, "vector_arrays_equal": True, "exact_bytes_equal": True}
+        if live != run_audit_context.live:
+            errors.append("real live cache evidence must exactly match B2 run audit")
+        if replay != expected_replay:
+            errors.append("real replay cache evidence must exactly match B2 run audit")
+
+
+def _load_validated_bge_run_audit(
+    validated_commit: str | None, validated_inputs: set[str], vector: VectorEvidenceContext | None,
+    errors: list[str], repository_root: Path
+) -> BgeRunAuditContext | None:
+    if BGE_RUN_AUDIT_PATH not in validated_inputs:
+        errors.append(f"missing required validated input: {BGE_RUN_AUDIT_PATH}")
+        return None
+    raw = _blob_bytes(validated_commit, BGE_RUN_AUDIT_PATH, repository_root) if validated_commit else None
+    frozen = _blob_bytes(M2_SNAPSHOT_COMMIT, BGE_RUN_AUDIT_PATH, repository_root)
+    if raw is None or frozen is None or raw != frozen:
+        errors.append("validated run audit must exactly match fixed B2 commit")
+        return None
+    try:
+        return _validate_bge_run_audit(json.loads(raw), vector, errors)
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        errors.append("B2 run audit is invalid JSON")
+        return None
 
 
 def _validate_bge_run_audit(
@@ -708,11 +740,12 @@ def validate_m2_t01_evidence(
     if payload.get("phase") != "M2" or payload.get("task_id") != "M2-T01":
         errors.append("report must identify phase M2 and task M2-T01")
     validated_commit = _validate_provenance(payload, errors, repository_root)
-    _validate_inputs(payload, validated_commit, errors, repository_root)
+    validated_inputs = _validate_inputs(payload, validated_commit, errors, repository_root)
     candidate_context = _validate_candidate_snapshot(payload, validated_commit, errors, repository_root)
     vector_context = _validate_vector_snapshot(payload, validated_commit, candidate_context, errors, repository_root)
     _validate_checks(payload, errors)
-    _validate_model_evidence(payload, vector_context, errors)
+    run_audit_context = _load_validated_bge_run_audit(validated_commit, validated_inputs, vector_context, errors, repository_root)
+    _validate_model_evidence(payload, vector_context, run_audit_context, errors)
     m1_provenance = payload.get("m1_provenance")
     if not isinstance(m1_provenance, dict) or m1_provenance.get("metadata_projection_mismatch_count") != 0:
         errors.append("M1 provenance audit must record metadata_projection_mismatch_count = 0")
