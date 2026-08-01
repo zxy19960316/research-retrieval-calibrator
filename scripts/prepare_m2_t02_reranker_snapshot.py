@@ -21,6 +21,14 @@ SnapshotPreparationErrorCode = Literal[
     "DOWNLOAD_FAILED",
     "INTEGRITY_CHECK_FAILED",
 ]
+SnapshotDownloadDiagnostic = Literal[
+    "HTTP_4XX",
+    "HTTP_5XX",
+    "NETWORK_TIMEOUT",
+    "TLS_OR_CERTIFICATE_FAILURE",
+    "NETWORK_CONNECTION_FAILED",
+    "DOWNLOAD_EXCEPTION",
+]
 DigestType = Literal["git_blob_sha1", "sha256"]
 StorageType = Literal["git", "lfs"]
 SnapshotPreparationStatus = Literal["PUBLISHED", "REUSED"]
@@ -57,9 +65,15 @@ class SnapshotPreparationError(RuntimeError):
     """Closed public failure for snapshot preparation."""
 
     code: SnapshotPreparationErrorCode
+    diagnostic: SnapshotDownloadDiagnostic | None
 
-    def __init__(self, code: SnapshotPreparationErrorCode) -> None:
+    def __init__(
+        self,
+        code: SnapshotPreparationErrorCode,
+        diagnostic: SnapshotDownloadDiagnostic | None = None,
+    ) -> None:
         self.code = code
+        self.diagnostic = diagnostic
         super().__init__(code)
 
 
@@ -99,12 +113,48 @@ def _integrity_error() -> SnapshotPreparationError:
     return SnapshotPreparationError("INTEGRITY_CHECK_FAILED")
 
 
-def _download_error() -> SnapshotPreparationError:
-    return SnapshotPreparationError("DOWNLOAD_FAILED")
+def _download_error(
+    diagnostic: SnapshotDownloadDiagnostic | None = None,
+) -> SnapshotPreparationError:
+    return SnapshotPreparationError("DOWNLOAD_FAILED", diagnostic)
 
 
 def _is_strict_int(value: object) -> TypeGuard[int]:
     return isinstance(value, int) and not isinstance(value, bool)
+
+
+def _download_failure_diagnostic(exc: BaseException) -> SnapshotDownloadDiagnostic:
+    """Classify a downloader exception without reading its text or payload."""
+
+    try:
+        response = getattr(exc, "response", None)
+        status_code = getattr(response, "status_code", None)
+        if not _is_strict_int(status_code):
+            status_code = getattr(exc, "status_code", None)
+    except Exception:  # noqa: BLE001
+        status_code = None
+    if _is_strict_int(status_code):
+        if 400 <= status_code < 500:
+            return "HTTP_4XX"
+        if 500 <= status_code < 600:
+            return "HTTP_5XX"
+
+    type_names = tuple(error_type.__name__.casefold() for error_type in type(exc).__mro__)
+    if any("timeout" in name for name in type_names):
+        return "NETWORK_TIMEOUT"
+    if any(
+        marker in name
+        for name in type_names
+        for marker in ("ssl", "tls", "certificate")
+    ):
+        return "TLS_OR_CERTIFICATE_FAILURE"
+    if any(
+        marker in name
+        for name in type_names
+        for marker in ("connection", "connect", "proxy")
+    ):
+        return "NETWORK_CONNECTION_FAILED"
+    return "DOWNLOAD_EXCEPTION"
 
 
 def _is_path_input(value: object) -> TypeGuard[str | os.PathLike[str]]:
@@ -724,8 +774,8 @@ def prepare_snapshot(
                     local_dir=staging_dir,
                     local_dir_use_symlinks=False,
                 )
-            except Exception:  # noqa: BLE001
-                raise _download_error() from None
+            except Exception as exc:  # noqa: BLE001
+                raise _download_error(_download_failure_diagnostic(exc)) from None
             _validate_download_result(
                 result,
                 staging_dir,

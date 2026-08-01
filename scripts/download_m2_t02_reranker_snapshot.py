@@ -24,7 +24,9 @@ if __package__ in {None, ""}:
         sys.path.insert(0, repository_root_text)
 
 from scripts.prepare_m2_t02_reranker_snapshot import (
+    SnapshotDownloadDiagnostic,
     SnapshotPlan,
+    SnapshotPreparationError,
     load_snapshot_plan,
     prepare_snapshot,
 )
@@ -82,9 +84,15 @@ class DownloadRunnerError(RuntimeError):
     """Closed, non-sensitive failure reported by the controlled download runner."""
 
     code: DownloadRunnerErrorCode
+    diagnostic: SnapshotDownloadDiagnostic | None
 
-    def __init__(self, code: DownloadRunnerErrorCode) -> None:
+    def __init__(
+        self,
+        code: DownloadRunnerErrorCode,
+        diagnostic: SnapshotDownloadDiagnostic | None = None,
+    ) -> None:
         self.code = code
+        self.diagnostic = diagnostic
         super().__init__(code)
 
 
@@ -389,6 +397,8 @@ def run_download(
                 download_file=download_file,
                 disk_usage=selected_disk_usage,
             )
+        except SnapshotPreparationError as exc:
+            raise DownloadRunnerError("PREPARATION_FAILED", exc.diagnostic) from None
         except Exception:  # noqa: BLE001
             raise DownloadRunnerError("PREPARATION_FAILED") from None
 
@@ -452,7 +462,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         run_download(execute_live_download=True)
     except DownloadRunnerError as exc:
-        print(exc.code, file=sys.stderr)
+        message: str = exc.code
+        if exc.diagnostic is not None:
+            message = f"{message}:{exc.diagnostic}"
+        print(message, file=sys.stderr)
         return 1
     return 0
 

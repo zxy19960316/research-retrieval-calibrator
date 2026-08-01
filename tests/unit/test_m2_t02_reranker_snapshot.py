@@ -424,6 +424,38 @@ def test_disk_usage_oserror_maps_to_download_failed_without_partial_state(
     _assert_no_staging(snapshot_dir)
 
 
+def test_downloader_tls_error_preserves_only_sanitized_diagnostic(
+    tmp_path: Path,
+) -> None:
+    module = _snapshot_module()
+    selection_path, _payloads = _write_small_selection(tmp_path)
+    snapshot_dir = tmp_path / "snapshot"
+    plan = module.load_snapshot_plan(selection_path)
+
+    class SimulatedSSLError(Exception):
+        pass
+
+    def downloader(**_kwargs: object) -> str:
+        raise SimulatedSSLError("opaque transport failure marker")
+
+    with pytest.raises(module.SnapshotPreparationError) as raised:
+        module.prepare_snapshot(
+            selection_path=selection_path,
+            snapshot_dir=snapshot_dir,
+            download_file=downloader,
+            disk_usage=lambda _path: SimpleNamespace(
+                free=plan.total_size_bytes + module.DOWNLOAD_HEADROOM_BYTES
+            ),
+        )
+
+    assert raised.value.code == "DOWNLOAD_FAILED"
+    assert raised.value.diagnostic == "TLS_OR_CERTIFICATE_FAILURE"
+    assert str(raised.value) == "DOWNLOAD_FAILED"
+    assert "opaque transport failure marker" not in str(raised.value)
+    assert not snapshot_dir.exists()
+    _assert_no_staging(snapshot_dir)
+
+
 @pytest.mark.parametrize(
     "target_case",
     (

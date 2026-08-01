@@ -518,6 +518,46 @@ def test_live_failure_never_claims_success_or_mutates_immutable_artifacts(
     assert real_replace is None or module.os.replace is not real_replace
 
 
+def test_runner_retains_sanitized_preparation_diagnostic_only(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    preparation = importlib.import_module(_PREPARATION_MODULE)
+
+    def fake_preparation(**_kwargs: object) -> object:
+        raise preparation.SnapshotPreparationError(
+            "DOWNLOAD_FAILED",
+            "TLS_OR_CERTIFICATE_FAILURE",
+        )
+
+    _install_fake_preparation(monkeypatch, fake_preparation)
+    module = _download_module()
+    monkeypatch.setattr(module, "SNAPSHOT_DIR", tmp_path / "models" / "snapshot")
+    monkeypatch.setattr(
+        module,
+        "EVIDENCE_PATH",
+        tmp_path / "m2-t02-reranker-snapshot-download.json",
+    )
+    _configure_fake_hub(monkeypatch, module)
+
+    with pytest.raises(module.DownloadRunnerError) as raised:
+        module.run_download(execute_live_download=True)
+
+    assert raised.value.code == "PREPARATION_FAILED"
+    assert raised.value.diagnostic == "TLS_OR_CERTIFICATE_FAILURE"
+    assert str(raised.value) == "PREPARATION_FAILED"
+
+    def fail_run_download(*, execute_live_download: bool) -> dict[str, object]:
+        assert execute_live_download is True
+        raise raised.value
+
+    monkeypatch.setattr(module, "run_download", fail_run_download)
+
+    assert module.main(["--execute-live-download"]) == 1
+    assert capsys.readouterr().err == "PREPARATION_FAILED:TLS_OR_CERTIFICATE_FAILURE\n"
+
+
 @pytest.mark.parametrize(
     ("failure", "expected_code"),
     (
