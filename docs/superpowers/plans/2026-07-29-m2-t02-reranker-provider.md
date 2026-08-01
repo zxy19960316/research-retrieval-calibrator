@@ -655,12 +655,101 @@ Only C may consolidate completion evidence and consider `STATUS.md`; until C, M2
 
 ### B2-L Controlled pinned snapshot download
 
-**Goal:** In a later, separately authorized task, download only the B0.1-pinned snapshot after the B2-D-F clean-environment installation evidence is accepted.
+**Goal:** Download exactly the B0.1-pinned seven-file snapshot only after the
+B2-D-F clean-environment installation evidence is accepted, while preserving a
+separate auditable record of the download and offline-reuse verification.
 
-**Boundary:** B2-L may use the locked `huggingface-hub` dependency to download and byte-verify the selected snapshot revision. It must not construct a provider, load a tokenizer/model, run inference, create a score, modify `STATUS.md`, or begin B2-P, B3, M2-T03, or M3.
+#### B2-L-R Live download adapter and evidence red contract
+
+**Files:**
+
+- Modify: `docs/superpowers/plans/2026-07-29-m2-t02-reranker-provider.md`
+- Create: `tests/unit/test_m2_t02_reranker_snapshot_download_runner.py`
+- Create: `tests/contract/test_m2_t02_reranker_snapshot_download.py`
+
+**Goal:** Define the fail-closed future runner and download-evidence contract
+without creating `scripts/download_m2_t02_reranker_snapshot.py`, contacting
+Hugging Face, importing the real Hub client, downloading a model, creating a
+snapshot, loading a tokenizer/model, or running inference.
+
+- [ ] Dynamically import only the future runner in its red tests so collection
+  succeeds and the absent runner is the single intentional root cause. Do not
+  use `skip` or `xfail`.
+- [ ] Lock `HUGGINGFACE_HUB_VERSION == "0.34.3"`, the BAAI model ID, pinned
+  revision, seven-file selection allowlist, fixed selection/snapshot/evidence
+  paths, and the `run_download`/`main` interfaces. CLI options must never
+  override those fixed values.
+- [ ] Lock a default-deny `execute_live_download` switch: a false function
+  argument and a CLI invocation without `--execute-live-download` must not
+  import the Hub client, call preparation, create `models/`, create evidence,
+  or access the network.
+- [ ] Use fake Hub imports, fake `hf_hub_download`, and fake preparation
+  results to specify late Hub import after
+  `HF_HUB_DISABLE_IMPLICIT_TOKEN=1` and `HF_HUB_DISABLE_TELEMETRY=1`, exact
+  package-version checking before preparation, `token=False`, and forwarding
+  of the injected downloader and `disk_usage` to the existing preparation
+  core. Do not set `HF_HUB_OFFLINE`, read token/cookie/authorization sources,
+  or import model runtimes.
+- [ ] Specify `PUBLISHED` and `REUSED` handling, fail-closed mappings for
+  missing/wrong/unreadable Hub versions, Hub import errors, preparation errors
+  and unknown statuses, wrong snapshot paths, and evidence-write failures.
+  Preparation owns staging, byte/digest checks, publication, cleanup, and
+  reuse; the runner must not reimplement them or delete a published snapshot
+  after an evidence-write failure.
+- [ ] Specify atomic download evidence publication through one uniquely named
+  `.m2-t02-reranker-snapshot-download.json.tmp-<uuid>` sibling and one
+  `os.replace`, including cleanup of only this invocation's temporary file.
+  Lock the closed evidence schema, exact seven-file projection from the
+  immutable selection artifact, privacy/secret exclusions (including the
+  `r"bearer\s"` expression), download verification, and non-inference state.
+- [ ] Add characterization checks that the committed selection artifact remains
+  `selected_not_downloaded` with every execution-state flag false, and that
+  the installation evidence still records Hub `0.34.3`, CPU Torch `2.4.1`,
+  `pip_check == "passed"`, `all_imports == "passed"`, and no model download.
+- [ ] Run the two focused test files. The two immutable-artifact
+  characterizations pass; all future-runner/evidence cases remain red solely
+  because the runner does not exist. Run Ruff on the two new files, then commit
+  only the plan and these red tests as
+  `test: define controlled reranker snapshot download contract`.
+
+#### B2-L-F Controlled pinned snapshot live download
+
+**Files:**
+
+- Create: `scripts/download_m2_t02_reranker_snapshot.py`
+- Create: `evaluation/source-artifacts/m2-t02-reranker-snapshot-download.json`
+
+**Goal:** In a separately authorized, networked task, use the exact
+`huggingface-hub==0.34.3` client to download only the immutable seven-file
+allowlist for `BAAI/bge-reranker-v2-m3` revision
+`953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e`, through the existing
+`scripts.prepare_m2_t02_reranker_snapshot.prepare_snapshot` core.
+
+- [ ] Require the explicit `--execute-live-download` flag before importing the
+  Hub client. Set the two token/telemetry environment guards before the delayed
+  import, require the exact Hub version before any preparation call, and use
+  only `huggingface_hub.hf_hub_download` with `repo_type="model"` and
+  `token=False`.
+- [ ] Pass the fixed selection and snapshot paths plus the Hub downloader and
+  `shutil.disk_usage` to `prepare_snapshot`; do not duplicate its disk gate,
+  staging, digest, Git-blob, atomic-publication, cleanup, or reuse logic.
+- [ ] After a verified `PUBLISHED` or `REUSED` preparation result, write and
+  self-validate closed UTF-8 JSON download evidence atomically. The evidence
+  records only the fixed model/provenance, exact selection-file projection,
+  verification facts, and non-loading/non-inference execution state. It must
+  never contain credentials, host/user data, absolute paths, file contents,
+  scores, benchmarks, or elapsed time.
+- [ ] Do not load a tokenizer/model, construct `BgeRerankerProvider`, run
+  inference, generate scores, modify the selection or installation evidence,
+  modify `STATUS.md`, or begin B2-P, B3, M2-T03, or M3.
 
 ### B2-P CPU float32 preflight
 
 **Goal:** In a later, separately authorized task, run the first local-only CPU `float32` tokenizer/model preflight against the verified B2-L snapshot.
 
-**Boundary:** B2-P must use `local_files_only=True`, `trust_remote_code=False`, and safetensors. It may record tokenizer/model loading evidence but must not score the full 33-candidate set, modify `STATUS.md`, or begin B3, M2-T03, or M3.
+**Boundary:** B2-P is the first task allowed to load a tokenizer and model. It
+must use `local_files_only=True`, `trust_remote_code=False`, and safetensors.
+It may record tokenizer/model loading evidence but must not score the full
+33-candidate set, modify `STATUS.md`, or begin B3, M2-T03, or M3. Until the
+later C closure task, M2 remains `1/5`; B3 alone may run the complete 33-paper
+candidate set.
