@@ -472,3 +472,69 @@ B3 is the first task allowed to run real inference, generate real scores, and re
 ## C Completion evidence and STATUS
 
 Only C may consolidate completion evidence and consider `STATUS.md`; until C, M2 remains 1/5. B0 must not start B1, B2, B3, C, M2-T03, or M3.
+
+## B2-D Runtime dependency lock and clean-environment verification
+
+### B2-D-R Dependency selection contract
+
+**Goal:** Select, document, and machine-validate the exact reranker runtime dependency set without installing a package, downloading a model/tokenizer, reading model weights, loading a model, or running inference.
+
+**Files:**
+
+- Modify: `docs/superpowers/plans/2026-07-29-m2-t02-reranker-provider.md`
+- Create: `evaluation/source-artifacts/m2-t02-reranker-runtime-dependencies.json`
+- Create: `tests/contract/test_m2_t02_reranker_runtime_dependencies.py`
+
+**Locked decision:** `torch==2.7.1`, `transformers==4.53.2`, `huggingface-hub==0.34.3`, `safetensors==0.5.3`, and `tokenizers==0.21.2` are the complete direct runtime package set for the later B2-L and B2-P tasks. They target Python `>=3.12,<3.13`, CPU `float32`, `BAAI/bge-reranker-v2-m3` revision `953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e`, standard `AutoTokenizer`, standard `AutoModelForSequenceClassification`, `local_files_only=True` after download, `trust_remote_code=False`, and safetensors weights.
+
+**Evidence boundary:** Research may query only the listed official PyPI metadata and PyTorch/Hugging Face documentation. The artifact records source type and query date but no cookie, authorization, token, local absolute path, score, timing, or benchmark. Every verification-state field remains `false`; this is selection evidence, not an installation or runtime claim.
+
+- [ ] **Step 1: Add the offline red contract**
+
+  Create `tests/contract/test_m2_t02_reranker_runtime_dependencies.py` with closed-field checks for the artifact, the exact baseline commit, `selected_not_installed`, Python 3.12 range, exact five-name package set, exact semantic versions, non-empty licenses, runtime policy, six false verification flags, B0.1 model ID/revision, official HTTPS sources, and forbidden secret/result fields.
+
+- [ ] **Step 2: Record the red result**
+
+  Run:
+
+  ```powershell
+  py -3.12 -m pytest -q tests/contract/test_m2_t02_reranker_runtime_dependencies.py
+  ```
+
+  Expected: FAIL only because `evaluation/source-artifacts/m2-t02-reranker-runtime-dependencies.json` does not yet exist. Do not install a dependency to make this test pass.
+
+- [ ] **Step 3: Add the selected-not-installed artifact**
+
+  Add the JSON artifact with no fields beyond `report_version`, `phase`, `task_id`, `baseline_commit`, `decision_status`, `python`, `packages`, `runtime_policy`, `verification_state`, and `sources`. Each package has exactly `name`, `version`, `role`, `python_compatibility`, `license`, `source_type`, `source_reference`, and `selection_reason`.
+
+- [ ] **Step 4: Verify the selection contract and repository gates**
+
+  Run the focused contract, full pytest suite, Ruff, mypy, documentation and historical evidence validators, then `pip check`. These commands validate existing installed development dependencies only; they must not install the selected runtime set, download a model/tokenizer, or run a provider.
+
+- [ ] **Step 5: Commit only B2-D-R**
+
+  ```powershell
+  git add docs/superpowers/plans/2026-07-29-m2-t02-reranker-provider.md evaluation/source-artifacts/m2-t02-reranker-runtime-dependencies.json tests/contract/test_m2_t02_reranker_runtime_dependencies.py
+  git diff --cached --name-only
+  git diff --cached --check
+  git commit -m "test: define reranker runtime dependency lock"
+  git push origin agent/m2-t02-reranker-provider
+  ```
+
+### B2-D-F Exact optional dependency group and clean-environment verification
+
+**Goal:** In a later, separately authorized task, add the locked five-package group to `pyproject.toml` and verify installation in a clean environment. B2-D-F is the first task allowed to install runtime dependencies.
+
+**Boundary:** B2-D-F may modify `pyproject.toml` and create installation evidence only. It must not download a model/tokenizer, read model weights, construct a provider, load a tokenizer/model, run inference, create a score, modify `STATUS.md`, or begin B2-L, B2-P, B3, M2-T03, or M3.
+
+### B2-L Controlled pinned snapshot download
+
+**Goal:** In a later, separately authorized task, download only the B0.1-pinned snapshot after the B2-D-F clean-environment installation evidence is accepted.
+
+**Boundary:** B2-L may use the locked `huggingface-hub` dependency to download and byte-verify the selected snapshot revision. It must not construct a provider, load a tokenizer/model, run inference, create a score, modify `STATUS.md`, or begin B2-P, B3, M2-T03, or M3.
+
+### B2-P CPU float32 preflight
+
+**Goal:** In a later, separately authorized task, run the first local-only CPU `float32` tokenizer/model preflight against the verified B2-L snapshot.
+
+**Boundary:** B2-P must use `local_files_only=True`, `trust_remote_code=False`, and safetensors. It may record tokenizer/model loading evidence but must not score the full 33-candidate set, modify `STATUS.md`, or begin B3, M2-T03, or M3.
