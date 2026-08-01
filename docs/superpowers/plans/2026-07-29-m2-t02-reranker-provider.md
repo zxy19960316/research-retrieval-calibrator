@@ -485,7 +485,7 @@ Only C may consolidate completion evidence and consider `STATUS.md`; until C, M2
 - Create: `evaluation/source-artifacts/m2-t02-reranker-runtime-dependencies.json`
 - Create: `tests/contract/test_m2_t02_reranker_runtime_dependencies.py`
 
-**Locked decision:** `torch==2.7.1`, `transformers==4.53.2`, `huggingface-hub==0.34.3`, `safetensors==0.5.3`, and `tokenizers==0.21.2` are the complete direct runtime package set for the later B2-L and B2-P tasks. They target Python `>=3.12,<3.13`, CPU `float32`, `BAAI/bge-reranker-v2-m3` revision `953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e`, standard `AutoTokenizer`, standard `AutoModelForSequenceClassification`, `local_files_only=True` after download, `trust_remote_code=False`, and safetensors weights.
+**Locked decision:** `torch==2.4.1`, `transformers==4.53.2`, `huggingface-hub==0.34.3`, `safetensors==0.5.3`, and `tokenizers==0.21.2` are the complete direct runtime package set for the later B2-L and B2-P tasks. Torch reuses the existing embedding extra's exact Python 3.12 pin so embedding and reranking share one process environment. They target CPU `float32`, `BAAI/bge-reranker-v2-m3` revision `953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e`, standard `AutoTokenizer`, standard `AutoModelForSequenceClassification`, `local_files_only=True` after download, `trust_remote_code=False`, and safetensors weights.
 
 **Evidence boundary:** Research may query only the listed official PyPI metadata and PyTorch/Hugging Face documentation. The artifact records source type and query date but no cookie, authorization, token, local absolute path, score, timing, or benchmark. Every verification-state field remains `false`; this is selection evidence, not an installation or runtime claim.
 
@@ -518,6 +518,51 @@ Only C may consolidate completion evidence and consider `STATUS.md`; until C, M2
   git diff --cached --name-only
   git diff --cached --check
   git commit -m "test: define reranker runtime dependency lock"
+  git push origin agent/m2-t02-reranker-provider
+  ```
+
+### B2-D-R.1 Shared embedding and reranker environment reconciliation
+
+**Goal:** Reconcile the reranker selection artifact with the existing embedding extra so both can later be installed into one Python 3.12 process without a conflicting Torch exact pin. This task selects and validates metadata only; it does not install or run any runtime package.
+
+**Files:**
+
+- Modify: `docs/superpowers/plans/2026-07-29-m2-t02-reranker-provider.md`
+- Modify: `evaluation/source-artifacts/m2-t02-reranker-runtime-dependencies.json`
+- Modify: `tests/contract/test_m2_t02_reranker_runtime_dependencies.py`
+
+**Interfaces:**
+
+- Consumes: the existing `pyproject.toml` embedding extra containing `FlagEmbedding==1.3.5` and `torch==2.4.1`.
+- Produces: artifact version `m2-t02-reranker-runtime-dependencies.v1.1`, the current baseline commit, a shared Torch `2.4.1` policy, and machine-checked package declaration compatibility for the later B2-D-F gate.
+
+- [ ] **Step 1: Make the shared-environment contract red**
+
+  Add closed `environment_policy` and `compatibility_policy` expectations, parse `pyproject.toml` with `tomllib`, and require the artifact Torch version to equal the embedding extra Torch version. Keep the existing five direct reranker packages and all six execution-state flags false.
+
+  Run:
+
+  ```powershell
+  py -3.12 -m pytest -q tests/contract/test_m2_t02_reranker_runtime_dependencies.py
+  ```
+
+  Expected: FAIL because the v1 artifact has no `environment_policy` or `compatibility_policy` and selects `torch==2.7.1` rather than the embedding pin.
+
+- [ ] **Step 2: Record the metadata-only reconciliation**
+
+  Change the artifact to v1.1 with baseline `9a5518665ccc2ae6b7fb7d385206362a13bf3b93`; set the reranker Torch package and shared-environment policy to `2.4.1`; retain `selected_not_installed`; add exact FlagEmbedding and Transformers declaration ranges; and record only official HTTPS source URLs with no query, fragment, credentials, token, or local absolute path.
+
+- [ ] **Step 3: Prove the contract and symlink regression stay green**
+
+  Run the dependency focused contract, the snapshot focused suite without excluding symlink tests, then the full pytest, Ruff, mypy, project documentation, M0, M1, M2-T01, and `pip check` gates. Do not install packages, create an environment, download/load a model or tokenizer, invoke a provider, generate scores, or begin B2-D-F/B2-L/B2-P/B3.
+
+- [ ] **Step 4: Commit only B2-D-R.1**
+
+  ```powershell
+  git add docs/superpowers/plans/2026-07-29-m2-t02-reranker-provider.md evaluation/source-artifacts/m2-t02-reranker-runtime-dependencies.json tests/contract/test_m2_t02_reranker_runtime_dependencies.py
+  git diff --cached --name-only
+  git diff --cached --check
+  git commit -m "fix: reconcile reranker runtime with embedding environment"
   git push origin agent/m2-t02-reranker-provider
   ```
 

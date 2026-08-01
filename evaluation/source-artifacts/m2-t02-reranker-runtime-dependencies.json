@@ -1,8 +1,8 @@
 {
-  "report_version": "m2-t02-reranker-runtime-dependencies.v1",
+  "report_version": "m2-t02-reranker-runtime-dependencies.v1.1",
   "phase": "M2",
   "task_id": "M2-T02",
-  "baseline_commit": "902ccea0eae1475db2143a68021cee70d2139b68",
+  "baseline_commit": "9a5518665ccc2ae6b7fb7d385206362a13bf3b93",
   "decision_status": "selected_not_installed",
   "python": {
     "requires_python": ">=3.12,<3.13",
@@ -11,13 +11,13 @@
   "packages": [
     {
       "name": "torch",
-      "version": "2.7.1",
+      "version": "2.4.1",
       "role": "cpu_float32_tensor_runtime",
-      "python_compatibility": ">=3.9.0; PyPI metadata classifies Python 3.12 support",
+      "python_compatibility": ">=3.8.0; PyPI metadata classifies Python 3.12 support and publishes Windows wheels",
       "license": "BSD-3-Clause",
       "source_type": "pypi_project_metadata",
-      "source_reference": "https://pypi.org/pypi/torch/2.7.1/json",
-      "selection_reason": "Pinned stable release with Python 3.12 support; PyTorch v2.7.1 documents a Windows CPU-only wheel command, so CUDA is not a required installation path."
+      "source_reference": "https://pypi.org/pypi/torch/2.4.1/json",
+      "selection_reason": "Reuses the project's embedding torch==2.4.1 lock for a shared Python 3.12 environment: FlagEmbedding 1.3.5 declares torch>=1.6.0 and transformers 4.53.2 declares torch>=2.1; 2.4.1 satisfies both, supports Python 3.12 and Windows, and PyTorch publishes an official CPU-only wheel index. Reusing the shared pin avoids an unnecessary shared-Torch upgrade risk."
     },
     {
       "name": "transformers",
@@ -60,6 +60,25 @@
       "selection_reason": "Pinned stable release satisfies transformers 4.53.2 declared tokenizers>=0.21,<0.22 dependency range."
     }
   ],
+  "environment_policy": {
+    "environment_strategy": "shared_embedding_and_reranker",
+    "python_version": "3.12",
+    "torch_version": "2.4.1",
+    "torch_distribution": "cpu_only",
+    "torch_install_source": "official_pytorch_cpu_index",
+    "combined_extras_install_required": true,
+    "separate_runtime_environments": false
+  },
+  "compatibility_policy": {
+    "flagembedding_version": "1.3.5",
+    "flagembedding_torch_requirement": ">=1.6.0",
+    "flagembedding_transformers_requirement": ">=4.44.2",
+    "transformers_torch_requirement": ">=2.1",
+    "transformers_hub_requirement": ">=0.30.0,<1.0",
+    "transformers_tokenizers_requirement": ">=0.21,<0.22",
+    "transformers_safetensors_requirement": ">=0.4.3",
+    "declared_requirements_satisfied": true
+  },
   "runtime_policy": {
     "device": "cpu",
     "dtype": "float32",
@@ -81,12 +100,17 @@
   "sources": [
     {
       "source_type": "pypi_project_metadata",
-      "source_reference": "https://pypi.org/pypi/torch/2.7.1/json",
+      "source_reference": "https://pypi.org/pypi/torch/2.4.1/json",
       "queried_on": "2026-08-01"
     },
     {
-      "source_type": "pytorch_installation_compatibility_documentation",
+      "source_type": "pytorch_previous_versions_cpu_installation_documentation",
       "source_reference": "https://pytorch.org/get-started/previous-versions/",
+      "queried_on": "2026-08-01"
+    },
+    {
+      "source_type": "pypi_project_metadata",
+      "source_reference": "https://pypi.org/pypi/FlagEmbedding/1.3.5/json",
       "queried_on": "2026-08-01"
     },
     {
