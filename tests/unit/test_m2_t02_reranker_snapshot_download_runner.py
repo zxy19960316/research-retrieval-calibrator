@@ -405,12 +405,11 @@ def test_live_download_proves_offline_reuse_before_writing_evidence(
     assert events == expected_events
     expected_call_count = 2 if initial_status == "PUBLISHED" else 1
     assert len(preparation_calls) == expected_call_count
-    assert preparation_calls[0] == {
-        "selection_path": _REPO_ROOT / _SELECTION_PATH,
-        "snapshot_dir": _REPO_ROOT / _SNAPSHOT_DIR,
-        "download_file": fake_downloader,
-        "disk_usage": disk_usage,
-    }
+    assert preparation_calls[0]["selection_path"] == _REPO_ROOT / _SELECTION_PATH
+    assert preparation_calls[0]["snapshot_dir"] == _REPO_ROOT / _SNAPSHOT_DIR
+    assert preparation_calls[0]["disk_usage"] is disk_usage
+    assert preparation_calls[0]["download_file"] is not fake_downloader
+    assert callable(preparation_calls[0]["download_file"])
     if initial_status == "PUBLISHED":
         assert download_calls == [
             {
@@ -518,7 +517,7 @@ def test_live_failure_never_claims_success_or_mutates_immutable_artifacts(
     assert real_replace is None or module.os.replace is not real_replace
 
 
-def test_runner_retains_sanitized_preparation_diagnostic_only(
+def test_runner_keeps_legacy_preparation_diagnostic_out_of_default_output(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -545,7 +544,7 @@ def test_runner_retains_sanitized_preparation_diagnostic_only(
         module.run_download(execute_live_download=True)
 
     assert raised.value.code == "PREPARATION_FAILED"
-    assert raised.value.diagnostic == "TLS_OR_CERTIFICATE_FAILURE"
+    assert raised.value.diagnostic is None
     assert str(raised.value) == "PREPARATION_FAILED"
 
     def fail_run_download(*, execute_live_download: bool) -> dict[str, object]:
@@ -555,7 +554,7 @@ def test_runner_retains_sanitized_preparation_diagnostic_only(
     monkeypatch.setattr(module, "run_download", fail_run_download)
 
     assert module.main(["--execute-live-download"]) == 1
-    assert capsys.readouterr().err == "PREPARATION_FAILED:TLS_OR_CERTIFICATE_FAILURE\n"
+    assert capsys.readouterr().err == "PREPARATION_FAILED\n"
 
 
 @pytest.mark.parametrize(

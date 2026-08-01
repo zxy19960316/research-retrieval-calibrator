@@ -9,12 +9,14 @@ import os
 import platform
 import re
 import shutil
+import ssl
 import stat
 import sys
 import uuid
 from collections.abc import Callable, Mapping, Sequence
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Literal, cast
 
 _REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 
@@ -24,7 +26,6 @@ if __package__ in {None, ""}:
         sys.path.insert(0, repository_root_text)
 
 from scripts.prepare_m2_t02_reranker_snapshot import (
-    SnapshotDownloadDiagnostic,
     SnapshotPlan,
     SnapshotPreparationError,
     load_snapshot_plan,
@@ -80,16 +81,390 @@ DownloadRunnerErrorCode = Literal[
 ]
 
 
+FailureStage = Literal[
+    "hub_metadata",
+    "hub_import",
+    "file_download",
+    "snapshot_preparation",
+    "offline_reuse",
+    "evidence_validation",
+    "evidence_publication",
+    "unknown",
+]
+FileRole = Literal[
+    "readme",
+    "config",
+    "weights",
+    "tokenizer_model",
+    "special_tokens",
+    "tokenizer_json",
+    "tokenizer_config",
+    "unknown",
+]
+StorageType = Literal["git", "lfs", "unknown"]
+TransportBackend = Literal["xet", "http", "huggingface_hub", "unknown"]
+ExceptionFamily = Literal[
+    "certificate_verification",
+    "tls_handshake",
+    "tls_unexpected_eof",
+    "connection_reset",
+    "connection_aborted",
+    "connect_timeout",
+    "read_timeout",
+    "proxy_failure",
+    "dns_failure",
+    "xet_transport",
+    "http_transport",
+    "unknown_transport",
+]
+ExceptionModuleFamily = Literal[
+    "ssl",
+    "socket",
+    "requests",
+    "urllib3",
+    "httpx",
+    "huggingface_hub",
+    "hf_xet",
+    "builtin",
+    "unknown",
+]
+ExceptionTypeName = Literal[
+    "SSLCertVerificationError",
+    "SSLError",
+    "TimeoutError",
+    "ConnectionResetError",
+    "ConnectionAbortedError",
+    "ConnectionError",
+    "ProxyError",
+    "ConnectTimeout",
+    "ReadTimeout",
+    "RuntimeError",
+    "OSError",
+    "UnknownError",
+]
+
+_DIAGNOSTIC_VERSION: Literal["m2-t02-download-failure.v1"] = "m2-t02-download-failure.v1"
+_MAX_CAUSE_CHAIN_DEPTH = 8
+_EXCEPTION_TYPE_NAMES: frozenset[str] = frozenset(
+    {
+        "SSLCertVerificationError",
+        "SSLError",
+        "TimeoutError",
+        "ConnectionResetError",
+        "ConnectionAbortedError",
+        "ConnectionError",
+        "ProxyError",
+        "ConnectTimeout",
+        "ReadTimeout",
+        "RuntimeError",
+        "OSError",
+    }
+)
+
+
+@dataclass(frozen=True)
+class FileDiagnosticIdentity:
+    """Fixed, non-sensitive identity assigned to an approved snapshot file."""
+
+    file_ordinal: int | None
+    file_role: FileRole
+    storage_type: StorageType
+
+
+@dataclass(frozen=True)
+class DownloadFailureDiagnostic:
+    """Closed transport-failure detail safe to print only when requested."""
+
+    diagnostic_version: Literal["m2-t02-download-failure.v1"]
+    failure_stage: FailureStage
+    file_ordinal: int | None
+    file_role: FileRole
+    storage_type: StorageType
+    transport_backend: TransportBackend
+    exception_family: ExceptionFamily
+    exception_module_family: ExceptionModuleFamily
+    exception_type: ExceptionTypeName
+    ssl_verify_code: int | None
+    errno: int | None
+    winerror: int | None
+    cause_chain_types: tuple[ExceptionTypeName, ...]
+
+
+_UNKNOWN_FILE_IDENTITY = FileDiagnosticIdentity(None, "unknown", "unknown")
+_FILE_DIAGNOSTIC_IDENTITIES: dict[str, FileDiagnosticIdentity] = {
+    "README.md": FileDiagnosticIdentity(1, "readme", "git"),
+    "config.json": FileDiagnosticIdentity(2, "config", "git"),
+    "model.safetensors": FileDiagnosticIdentity(3, "weights", "lfs"),
+    "sentencepiece.bpe.model": FileDiagnosticIdentity(4, "tokenizer_model", "lfs"),
+    "special_tokens_map.json": FileDiagnosticIdentity(5, "special_tokens", "git"),
+    "tokenizer.json": FileDiagnosticIdentity(6, "tokenizer_json", "lfs"),
+    "tokenizer_config.json": FileDiagnosticIdentity(7, "tokenizer_config", "git"),
+}
+
+
+def safe_identity_from_filename(value: object) -> FileDiagnosticIdentity:
+    """Map only an approved fixed filename to its closed diagnostic identity."""
+
+    if type(value) is not str:
+        return _UNKNOWN_FILE_IDENTITY
+    return _FILE_DIAGNOSTIC_IDENTITIES.get(value, _UNKNOWN_FILE_IDENTITY)
+
+
+def _closed_exception_type(exception: BaseException) -> ExceptionTypeName:
+    type_name = type(exception).__name__
+    if type_name in _EXCEPTION_TYPE_NAMES:
+        return cast(ExceptionTypeName, type_name)
+    if isinstance(exception, ssl.SSLCertVerificationError):
+        return "SSLCertVerificationError"
+    if isinstance(exception, ssl.SSLError):
+        return "SSLError"
+    if isinstance(exception, ConnectionResetError):
+        return "ConnectionResetError"
+    if isinstance(exception, ConnectionAbortedError):
+        return "ConnectionAbortedError"
+    if isinstance(exception, TimeoutError):
+        return "TimeoutError"
+    if isinstance(exception, ConnectionError):
+        return "ConnectionError"
+    if isinstance(exception, OSError):
+        return "OSError"
+    if isinstance(exception, RuntimeError):
+        return "RuntimeError"
+    return "UnknownError"
+
+
+def _exception_module_family(exception: BaseException) -> ExceptionModuleFamily:
+    module_name = type(exception).__module__
+    if module_name == "ssl" or module_name.startswith("ssl."):
+        return "ssl"
+    if module_name == "socket" or module_name.startswith("socket."):
+        return "socket"
+    if module_name == "requests" or module_name.startswith("requests."):
+        return "requests"
+    if module_name == "urllib3" or module_name.startswith("urllib3."):
+        return "urllib3"
+    if module_name == "httpx" or module_name.startswith("httpx."):
+        return "httpx"
+    if module_name == "hf_xet" or module_name.startswith("hf_xet."):
+        return "hf_xet"
+    if module_name == "huggingface_hub" or module_name.startswith("huggingface_hub."):
+        return "huggingface_hub"
+    if module_name == "builtins":
+        return "builtin"
+    return "unknown"
+
+
+def _exception_chain(exception: BaseException) -> tuple[BaseException, ...]:
+    pending: list[BaseException] = [exception]
+    seen: set[int] = set()
+    chain: list[BaseException] = []
+    while pending and len(chain) < _MAX_CAUSE_CHAIN_DEPTH:
+        current = pending.pop(0)
+        current_identifier = id(current)
+        if current_identifier in seen:
+            continue
+        seen.add(current_identifier)
+        chain.append(current)
+        try:
+            cause = current.__cause__
+            context = current.__context__
+        except BaseException:  # noqa: BLE001, S112
+            continue
+        for linked_exception in (cause, context):
+            if isinstance(linked_exception, BaseException):
+                pending.append(linked_exception)
+    return tuple(chain)
+
+
+def _safe_integer_attribute(exception: BaseException, attribute: str) -> int | None:
+    try:
+        value = getattr(exception, attribute, None)
+    except BaseException:  # noqa: BLE001
+        return None
+    return value if type(value) is int else None
+
+
+def _transport_backend(
+    chain: Sequence[BaseException], *, allow_xet: bool
+) -> TransportBackend:
+    module_families = {_exception_module_family(exception) for exception in chain}
+    if allow_xet and "hf_xet" in module_families:
+        return "xet"
+    if "huggingface_hub" in module_families:
+        return "huggingface_hub"
+    if module_families & {"requests", "urllib3", "httpx"}:
+        return "http"
+    return "unknown"
+
+
+def _diagnostic(
+    *,
+    identity: FileDiagnosticIdentity,
+    chain: Sequence[BaseException],
+    exception: BaseException,
+    failure_stage: FailureStage,
+    exception_family: ExceptionFamily,
+    transport_backend: TransportBackend,
+) -> DownloadFailureDiagnostic:
+    return DownloadFailureDiagnostic(
+        diagnostic_version=_DIAGNOSTIC_VERSION,
+        failure_stage=failure_stage,
+        file_ordinal=identity.file_ordinal,
+        file_role=identity.file_role,
+        storage_type=identity.storage_type,
+        transport_backend=transport_backend,
+        exception_family=exception_family,
+        exception_module_family=_exception_module_family(exception),
+        exception_type=_closed_exception_type(exception),
+        ssl_verify_code=_safe_integer_attribute(exception, "verify_code"),
+        errno=_safe_integer_attribute(exception, "errno"),
+        winerror=_safe_integer_attribute(exception, "winerror"),
+        cause_chain_types=tuple(_closed_exception_type(item) for item in chain),
+    )
+
+
+def classify_download_failure(
+    exception: BaseException,
+    *,
+    failure_stage: FailureStage,
+    identity: FileDiagnosticIdentity,
+) -> DownloadFailureDiagnostic:
+    """Classify only fixed exception metadata; never retain exception text."""
+
+    chain = _exception_chain(exception)
+    for current in chain:
+        if isinstance(current, ssl.SSLCertVerificationError):
+            return _diagnostic(
+                identity=identity,
+                chain=chain,
+                exception=current,
+                failure_stage=failure_stage,
+                exception_family="certificate_verification",
+                transport_backend=_transport_backend(chain, allow_xet=False),
+            )
+    for current in chain:
+        if isinstance(current, ssl.SSLError):
+            return _diagnostic(
+                identity=identity,
+                chain=chain,
+                exception=current,
+                failure_stage=failure_stage,
+                exception_family="tls_handshake",
+                transport_backend=_transport_backend(chain, allow_xet=False),
+            )
+    for current in chain:
+        if isinstance(current, ConnectionResetError):
+            return _diagnostic(
+                identity=identity,
+                chain=chain,
+                exception=current,
+                failure_stage=failure_stage,
+                exception_family="connection_reset",
+                transport_backend=_transport_backend(chain, allow_xet=False),
+            )
+    for current in chain:
+        if isinstance(current, ConnectionAbortedError):
+            return _diagnostic(
+                identity=identity,
+                chain=chain,
+                exception=current,
+                failure_stage=failure_stage,
+                exception_family="connection_aborted",
+                transport_backend=_transport_backend(chain, allow_xet=False),
+            )
+    for current in chain:
+        if type(current).__name__ == "ConnectTimeout":
+            return _diagnostic(
+                identity=identity,
+                chain=chain,
+                exception=current,
+                failure_stage=failure_stage,
+                exception_family="connect_timeout",
+                transport_backend=_transport_backend(chain, allow_xet=False),
+            )
+    for current in chain:
+        if type(current).__name__ == "ReadTimeout" or isinstance(current, TimeoutError):
+            return _diagnostic(
+                identity=identity,
+                chain=chain,
+                exception=current,
+                failure_stage=failure_stage,
+                exception_family="read_timeout",
+                transport_backend=_transport_backend(chain, allow_xet=False),
+            )
+    for current in chain:
+        if type(current).__name__ == "ProxyError":
+            return _diagnostic(
+                identity=identity,
+                chain=chain,
+                exception=current,
+                failure_stage=failure_stage,
+                exception_family="proxy_failure",
+                transport_backend=_transport_backend(chain, allow_xet=False),
+            )
+    for current in chain:
+        if _exception_module_family(current) == "hf_xet":
+            return _diagnostic(
+                identity=identity,
+                chain=chain,
+                exception=current,
+                failure_stage=failure_stage,
+                exception_family="xet_transport",
+                transport_backend="xet",
+            )
+    for current in chain:
+        if _exception_module_family(current) in {
+            "huggingface_hub",
+            "requests",
+            "urllib3",
+            "httpx",
+        }:
+            return _diagnostic(
+                identity=identity,
+                chain=chain,
+                exception=current,
+                failure_stage=failure_stage,
+                exception_family="http_transport",
+                transport_backend=_transport_backend(chain, allow_xet=False),
+            )
+    return _diagnostic(
+        identity=identity,
+        chain=chain,
+        exception=exception,
+        failure_stage=failure_stage,
+        exception_family="unknown_transport",
+        transport_backend="unknown",
+    )
+
+
+def serialize_closed_failure_diagnostic(
+    diagnostic: DownloadFailureDiagnostic,
+) -> str:
+    """Serialize the fixed diagnostic structure without any optional payload."""
+
+    return json.dumps(asdict(diagnostic), ensure_ascii=True, separators=(",", ":"), sort_keys=True)
+
+
+class DiagnosedDownloadFailure(RuntimeError):
+    """Wrapper that exposes only a safe diagnostic to the outer runner."""
+
+    diagnostic: DownloadFailureDiagnostic
+
+    def __init__(self, diagnostic: DownloadFailureDiagnostic) -> None:
+        self.diagnostic = diagnostic
+        super().__init__("DIAGNOSED_DOWNLOAD_FAILURE")
+
+
 class DownloadRunnerError(RuntimeError):
     """Closed, non-sensitive failure reported by the controlled download runner."""
 
     code: DownloadRunnerErrorCode
-    diagnostic: SnapshotDownloadDiagnostic | None
+    diagnostic: DownloadFailureDiagnostic | None
 
     def __init__(
         self,
         code: DownloadRunnerErrorCode,
-        diagnostic: SnapshotDownloadDiagnostic | None = None,
+        diagnostic: DownloadFailureDiagnostic | None = None,
     ) -> None:
         self.code = code
         self.diagnostic = diagnostic
@@ -384,21 +759,37 @@ def run_download(
         os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
         try:
             hub_module = importlib.import_module("huggingface_hub")
-            download_file = hub_module.hf_hub_download
-            if not callable(download_file):
+            hub_download = hub_module.hf_hub_download
+            if not callable(hub_download):
                 raise TypeError
         except Exception:  # noqa: BLE001
             raise DownloadRunnerError("HUB_IMPORT_FAILED") from None
+
+        captured_diagnostic: DownloadFailureDiagnostic | None = None
+
+        def diagnostic_download(**kwargs: object) -> object:
+            nonlocal captured_diagnostic
+            try:
+                return hub_download(**kwargs)
+            except BaseException as exception:  # noqa: BLE001
+                captured_diagnostic = classify_download_failure(
+                    exception,
+                    failure_stage="file_download",
+                    identity=safe_identity_from_filename(kwargs.get("filename")),
+                )
+            if captured_diagnostic is None:
+                raise RuntimeError("DIAGNOSTIC_CAPTURE_FAILED")
+            raise DiagnosedDownloadFailure(captured_diagnostic)
 
         try:
             first_result = prepare_snapshot(
                 selection_path=operational_selection_path,
                 snapshot_dir=operational_snapshot_dir,
-                download_file=download_file,
+                download_file=diagnostic_download,
                 disk_usage=selected_disk_usage,
             )
-        except SnapshotPreparationError as exc:
-            raise DownloadRunnerError("PREPARATION_FAILED", exc.diagnostic) from None
+        except SnapshotPreparationError:
+            raise DownloadRunnerError("PREPARATION_FAILED", captured_diagnostic) from None
         except Exception:  # noqa: BLE001
             raise DownloadRunnerError("PREPARATION_FAILED") from None
 
@@ -454,18 +845,24 @@ def run_download(
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Run only when the sole explicit live-download switch is present."""
+    """Run only when an approved, explicit live-download command is present."""
 
     arguments = list(sys.argv[1:] if argv is None else argv)
-    if arguments != ["--execute-live-download"]:
+    if arguments == ["--execute-live-download"]:
+        emit_closed_failure_diagnostic = False
+    elif arguments == [
+        "--execute-live-download",
+        "--emit-closed-failure-diagnostic",
+    ]:
+        emit_closed_failure_diagnostic = True
+    else:
         return 2
     try:
         run_download(execute_live_download=True)
     except DownloadRunnerError as exc:
-        message: str = exc.code
-        if exc.diagnostic is not None:
-            message = f"{message}:{exc.diagnostic}"
-        print(message, file=sys.stderr)
+        print(exc.code, file=sys.stderr)
+        if emit_closed_failure_diagnostic and exc.diagnostic is not None:
+            print(serialize_closed_failure_diagnostic(exc.diagnostic), file=sys.stderr)
         return 1
     return 0
 

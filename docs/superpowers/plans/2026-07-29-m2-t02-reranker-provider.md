@@ -1011,3 +1011,60 @@ snapshot, and evidence paths must not depend on the caller's working directory.
   existing branch without rebase, amend, or force push, then update Draft PR
   #11 with exact results and the explicit statement that B2-L-F-Live, B2-P,
   and B3 have not started.
+
+#### B2-L-Diag Closed transport-failure diagnostics
+
+**Goal:** Add an opt-in, closed diagnostic for a controlled snapshot-download
+failure without retaining exception text, URLs, paths, credentials, or raw
+exception objects. This task is offline only; it does not invoke Hugging Face,
+download a model, alter CA configuration, or start B2-P or B3.
+
+**Files:**
+
+- Modify: `scripts/download_m2_t02_reranker_snapshot.py`
+- Modify: `tests/unit/test_m2_t02_reranker_snapshot_download_runner.py`
+- Modify: `tests/contract/test_m2_t02_reranker_snapshot_download.py`
+- Create: `tests/unit/test_m2_t02_reranker_download_failure_diagnostics.py`
+- Modify: `docs/superpowers/plans/2026-07-29-m2-t02-reranker-provider.md`
+
+- [x] **Step 1: Add red offline diagnostic contracts**
+
+  Test the fixed seven-file identity map, unknown-file fallback, safe
+  certificate integers, bounded cycle-safe cause/context traversal, sealed
+  type/module/family mapping, `hf_xet` classification, timeout/proxy/reset
+  mapping, and hostile exceptions whose `__str__`/`__repr__` fail if touched.
+  Cover a third-file wrapper failure and assert it reaches the runner as
+  `PREPARATION_FAILED` with ordinal `3`, `weights`, and `lfs` while the
+  preparation core remains unchanged. Assert default CLI stderr is only the
+  fixed code; the explicit diagnostic flag emits exactly one compact,
+  ASCII-safe JSON record with the closed schema and no forbidden text.
+
+- [x] **Step 2: Verify red tests fail**
+
+  Run `py -3.12 -m pytest -q
+  tests/unit/test_m2_t02_reranker_download_failure_diagnostics.py` and confirm
+  the missing closed diagnostic API is the failure cause.
+
+- [x] **Step 3: Implement sealed runner-only diagnostics**
+
+  Add frozen diagnostic and file-identity dataclasses, fixed literal unions,
+  safe integer extraction, and a maximum-eight-node cause/context walk. The
+  wrapper forwards downloader kwargs unchanged, retains only a closed
+  diagnostic in run-local state, and raises a fixed-code internal error. Do
+  not inspect exception text or mutate `prepare_snapshot`. Keep diagnostics
+  disabled unless `--emit-closed-failure-diagnostic` accompanies the exact
+  live switch.
+
+- [x] **Step 4: Verify offline behavior and repository gates**
+
+  Run the new diagnostic test plus the runner and download contracts, then the
+  full pytest, Ruff, production mypy, validators, and `pip check`. Confirm no
+  snapshot, evidence, failure-diagnostic file, cache, model artifact, or
+  immutable selection/installation/`STATUS.md` change exists.
+
+- [ ] **Step 5: Commit and publish the bounded diagnostic task**
+
+  Stage only the five declared files, commit as `feat: add closed reranker
+  download failure diagnostics`, push without amend/rebase/force, and update
+  Draft PR #11. Record that real download remains unresolved and that any live
+  diagnostic or Xet/CA adjustment requires separate authorization.
