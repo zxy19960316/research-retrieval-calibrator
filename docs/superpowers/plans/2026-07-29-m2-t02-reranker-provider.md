@@ -813,6 +813,33 @@ red root cause; do not use `skip` or `xfail`.
   cause, this offline-reuse and platform-provenance closure, and the explicit
   B2-L-F boundary.
 
+#### B2-L-R.2 Zero-attempt offline reuse closure
+
+**Files:**
+
+- Modify: `docs/superpowers/plans/2026-07-29-m2-t02-reranker-provider.md`
+- Modify: `tests/contract/test_m2_t02_reranker_snapshot_download.py`
+- Modify: `tests/unit/test_m2_t02_reranker_snapshot_download_runner.py`
+
+**Goal:** Remove the false green in which a successful fake `REUSED` path
+attempted forbidden callbacks and swallowed their failures.
+
+- [ ] In every successful first-`PUBLISHED` then second-`REUSED` fake flow,
+  retain the forbidden downloader and disk-space callbacks but make zero
+  callback attempts. Record and assert independent zero-attempt lists, two
+  preparation calls, `PUBLISHED` then `REUSED` results, one first-call Hub
+  download, one first-call disk check, and identical selection/snapshot paths.
+- [ ] Keep callback invocation exclusively in the parameterized failure
+  contracts. Record the attempted second-call callback before invoking it,
+  allow its `AssertionError("offline reuse ...")` to reach the future runner,
+  and require `OFFLINE_REUSE_FAILED` with no successful evidence, preserved
+  snapshot/artifacts/sentinel, and owned-temporary-file cleanup.
+- [ ] This remains a test/plan-only intentional-red task: do not create the
+  runner or a snapshot artifact, download a snapshot, load tokenizer/model, or
+  run inference/scores. B2-L-F-I alone implements the runner; B2-L-F-Live
+  alone performs a real download; B2-P alone loads tokenizer/model; B3 alone
+  reranks 33 papers. Keep `STATUS.md` at M2 `1/5`.
+
 #### B2-L-F Controlled pinned snapshot live download
 
 **Files:**

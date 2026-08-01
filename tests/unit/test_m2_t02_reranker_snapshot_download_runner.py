@@ -338,8 +338,11 @@ def test_live_download_proves_offline_reuse_before_writing_evidence(
 ) -> None:
     events: list[str] = []
     preparation_calls: list[dict[str, object]] = []
+    preparation_results: list[SimpleNamespace] = []
     download_calls: list[dict[str, object]] = []
     disk_usage_calls: list[object] = []
+    offline_download_attempts: list[object] = []
+    offline_disk_attempts: list[object] = []
 
     def disk_usage(_path: object) -> SimpleNamespace:
         disk_usage_calls.append(_path)
@@ -362,14 +365,14 @@ def test_live_download_proves_offline_reuse_before_writing_evidence(
                     token=False,
                 )
                 kwargs["disk_usage"](kwargs["snapshot_dir"])
-            return _success_result(initial_status, kwargs["snapshot_dir"])
+            result = _success_result(initial_status, kwargs["snapshot_dir"])
+            preparation_results.append(result)
+            return result
 
         assert initial_status == "PUBLISHED"
-        with pytest.raises(AssertionError, match="offline reuse"):
-            kwargs["download_file"]()
-        with pytest.raises(AssertionError, match="offline reuse"):
-            kwargs["disk_usage"](kwargs["snapshot_dir"])
-        return _success_result("REUSED", kwargs["snapshot_dir"])
+        result = _success_result("REUSED", kwargs["snapshot_dir"])
+        preparation_results.append(result)
+        return result
 
     _install_fake_preparation(monkeypatch, fake_preparation)
     module = _download_module()
@@ -420,6 +423,8 @@ def test_live_download_proves_offline_reuse_before_writing_evidence(
         assert evidence["decision_status"] == "downloaded_and_verified"
         assert evidence["execution_state"]["download_performed_this_run"] is True
         assert len(disk_usage_calls) == 1
+        assert [result.status for result in preparation_results] == ["PUBLISHED", "REUSED"]
+        assert preparation_results[1].status == "REUSED"
         assert preparation_calls[1]["selection_path"] == preparation_calls[0]["selection_path"]
         assert preparation_calls[1]["snapshot_dir"] == preparation_calls[0]["snapshot_dir"]
     else:
@@ -427,6 +432,9 @@ def test_live_download_proves_offline_reuse_before_writing_evidence(
         assert evidence["decision_status"] == "reused_and_verified"
         assert evidence["execution_state"]["download_performed_this_run"] is False
         assert disk_usage_calls == []
+        assert [result.status for result in preparation_results] == ["REUSED"]
+    assert offline_download_attempts == []
+    assert offline_disk_attempts == []
     assert evidence["snapshot"]["preparation_status"] == initial_status
     assert evidence["verification"]["offline_reuse_check"] == "passed"
     assert evidence["verification"]["downloader_called_during_offline_reuse"] is False
@@ -533,6 +541,8 @@ def test_offline_reuse_failures_preserve_the_published_snapshot_and_write_no_evi
     sentinel = evidence_path.parent / f".{evidence_path.name}.tmp-sentinel"
     sentinel.write_text("preserve", encoding="utf-8")
     preparation_calls: list[dict[str, object]] = []
+    offline_download_attempts: list[object] = []
+    offline_disk_attempts: list[object] = []
 
     def fake_preparation(**kwargs: object) -> object:
         preparation_calls.append(kwargs)
@@ -555,8 +565,10 @@ def test_offline_reuse_failures_preserve_the_published_snapshot_and_write_no_evi
         if failure == "wrong-snapshot-path":
             return _success_result("REUSED", tmp_path / "wrong-snapshot")
         if failure == "downloader-called":
+            offline_download_attempts.append(kwargs["download_file"])
             kwargs["download_file"]()
         if failure == "disk-usage-called":
+            offline_disk_attempts.append(kwargs["disk_usage"])
             kwargs["disk_usage"](kwargs["snapshot_dir"])
         if failure == "preparation-error":
             raise RuntimeError("simulated offline reuse failure")
@@ -582,6 +594,15 @@ def test_offline_reuse_failures_preserve_the_published_snapshot_and_write_no_evi
     assert not evidence_path.exists()
     assert sentinel.read_text(encoding="utf-8") == "preserve"
     assert _owned_evidence_temp_files(evidence_path, sentinel) == []
+    if failure == "downloader-called":
+        assert len(offline_download_attempts) == 1
+        assert offline_disk_attempts == []
+    elif failure == "disk-usage-called":
+        assert offline_download_attempts == []
+        assert len(offline_disk_attempts) == 1
+    else:
+        assert offline_download_attempts == []
+        assert offline_disk_attempts == []
 
 
 def test_evidence_validation_happens_before_replace_and_preserves_other_temp_files(

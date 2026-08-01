@@ -11,7 +11,7 @@ import re
 import sys
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
-from typing import Any
+from typing import Any, NamedTuple
 
 import pytest
 
@@ -90,6 +90,18 @@ _FORBIDDEN_TEXT = re.compile(
 )
 
 
+class _FakeLiveDownload(NamedTuple):
+    evidence: dict[str, object]
+    module: ModuleType
+    evidence_path: Path
+    preparation_calls: list[dict[str, object]]
+    preparation_results: list[SimpleNamespace]
+    first_download_calls: list[dict[str, object]]
+    first_disk_usage_calls: list[object]
+    offline_download_attempts: list[object]
+    offline_disk_attempts: list[object]
+
+
 @pytest.fixture(autouse=True)
 def _unload_future_runner() -> None:
     sys.modules.pop(_MODULE_NAME, None)
@@ -134,8 +146,13 @@ def _run_fake_live_download(
     *,
     initial_status: str = "PUBLISHED",
     runtime_platform: tuple[str, str, str] = ("Windows", "AMD64", "3.12.10"),
-) -> tuple[dict[str, object], ModuleType, Path, list[dict[str, object]]]:
+) -> _FakeLiveDownload:
     preparation_calls: list[dict[str, object]] = []
+    preparation_results: list[SimpleNamespace] = []
+    first_download_calls: list[dict[str, object]] = []
+    first_disk_usage_calls: list[object] = []
+    offline_download_attempts: list[object] = []
+    offline_disk_attempts: list[object] = []
 
     def fake_preparation(**kwargs: object) -> SimpleNamespace:
         preparation_calls.append(kwargs)
@@ -149,14 +166,14 @@ def _run_fake_live_download(
                     token=False,
                 )
                 kwargs["disk_usage"](kwargs["snapshot_dir"])
-            return SimpleNamespace(status=initial_status, snapshot_dir=kwargs["snapshot_dir"])
+            result = SimpleNamespace(status=initial_status, snapshot_dir=kwargs["snapshot_dir"])
+            preparation_results.append(result)
+            return result
 
         assert initial_status == "PUBLISHED"
-        with pytest.raises(AssertionError, match="offline reuse"):
-            kwargs["download_file"]()
-        with pytest.raises(AssertionError, match="offline reuse"):
-            kwargs["disk_usage"](kwargs["snapshot_dir"])
-        return SimpleNamespace(status="REUSED", snapshot_dir=kwargs["snapshot_dir"])
+        result = SimpleNamespace(status="REUSED", snapshot_dir=kwargs["snapshot_dir"])
+        preparation_results.append(result)
+        return result
 
     preparation = importlib.import_module(_PREPARATION_MODULE)
     monkeypatch.setattr(preparation, "prepare_snapshot", fake_preparation)
@@ -172,8 +189,13 @@ def _run_fake_live_download(
         assert distribution == "huggingface-hub"
         return "0.34.3"
 
-    def fake_download(**_kwargs: object) -> str:
+    def fake_download(**kwargs: object) -> str:
+        first_download_calls.append(kwargs)
         return "fake-download-result"
+
+    def first_disk_usage(path: object) -> SimpleNamespace:
+        first_disk_usage_calls.append(path)
+        return SimpleNamespace(free=10_000_000_000)
 
     real_import_module = importlib.import_module
 
@@ -191,10 +213,22 @@ def _run_fake_live_download(
     monkeypatch.setattr(importlib, "import_module", fake_import_module)
     result = module.run_download(
         execute_live_download=True,
-        disk_usage=lambda _path: SimpleNamespace(free=10_000_000_000),
+        disk_usage=first_disk_usage,
     )
     assert isinstance(result, dict)
-    return result, module, evidence_path, preparation_calls
+    assert offline_download_attempts == []
+    assert offline_disk_attempts == []
+    return _FakeLiveDownload(
+        evidence=result,
+        module=module,
+        evidence_path=evidence_path,
+        preparation_calls=preparation_calls,
+        preparation_results=preparation_results,
+        first_download_calls=first_download_calls,
+        first_disk_usage_calls=first_disk_usage_calls,
+        offline_download_attempts=offline_download_attempts,
+        offline_disk_attempts=offline_disk_attempts,
+    )
 
 
 def _mutate_evidence(evidence: dict[str, Any], mutation: str) -> None:
@@ -283,11 +317,14 @@ def test_download_evidence_is_closed_atomic_safe_and_exact(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     runtime_platform = ("Windows", "AMD64", "3.12.10")
-    evidence, module, evidence_path, preparation_calls = _run_fake_live_download(
+    run = _run_fake_live_download(
         tmp_path,
         monkeypatch,
         runtime_platform=runtime_platform,
     )
+    evidence = run.evidence
+    module = run.module
+    evidence_path = run.evidence_path
     module.validate_download_evidence(evidence)
 
     assert json.loads(evidence_path.read_text(encoding="utf-8")) == evidence
@@ -367,7 +404,13 @@ def test_download_evidence_is_closed_atomic_safe_and_exact(
     for value in _string_values(evidence):
         assert not _LOCAL_ABSOLUTE_PATH.search(value)
         assert not _FORBIDDEN_TEXT.search(value)
-    assert len(preparation_calls) == 2
+    assert len(run.preparation_calls) == 2
+    assert [result.status for result in run.preparation_results] == ["PUBLISHED", "REUSED"]
+    assert run.preparation_results[1].status == "REUSED"
+    assert len(run.first_download_calls) == 1
+    assert len(run.first_disk_usage_calls) == 1
+    assert run.offline_download_attempts == []
+    assert run.offline_disk_attempts == []
 
 
 @pytest.mark.parametrize(
@@ -383,11 +426,13 @@ def test_download_evidence_records_the_injected_runtime_platform(
     monkeypatch: pytest.MonkeyPatch,
     runtime_platform: tuple[str, str, str],
 ) -> None:
-    evidence, module, _evidence_path, _preparation_calls = _run_fake_live_download(
+    run = _run_fake_live_download(
         tmp_path,
         monkeypatch,
         runtime_platform=runtime_platform,
     )
+    evidence = run.evidence
+    module = run.module
 
     module.validate_download_evidence(evidence)
     assert evidence["platform"] == {
@@ -401,15 +446,22 @@ def test_reused_evidence_never_claims_a_download_in_this_run(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    evidence, module, _evidence_path, preparation_calls = _run_fake_live_download(
+    run = _run_fake_live_download(
         tmp_path,
         monkeypatch,
         initial_status="REUSED",
         runtime_platform=("Linux", "x86_64", "3.12.13"),
     )
+    evidence = run.evidence
+    module = run.module
 
     module.validate_download_evidence(evidence)
-    assert len(preparation_calls) == 1
+    assert len(run.preparation_calls) == 1
+    assert [result.status for result in run.preparation_results] == ["REUSED"]
+    assert run.first_download_calls == []
+    assert run.first_disk_usage_calls == []
+    assert run.offline_download_attempts == []
+    assert run.offline_disk_attempts == []
     assert evidence["decision_status"] == "reused_and_verified"
     assert evidence["snapshot"]["preparation_status"] == "REUSED"
     assert evidence["execution_state"]["snapshot_present_and_verified"] is True
@@ -452,10 +504,9 @@ def test_download_evidence_validator_rejects_privacy_integrity_and_scope_violati
     monkeypatch: pytest.MonkeyPatch,
     mutation: str,
 ) -> None:
-    evidence, module, _evidence_path, _preparation_calls = _run_fake_live_download(
-        tmp_path,
-        monkeypatch,
-    )
+    run = _run_fake_live_download(tmp_path, monkeypatch)
+    evidence = run.evidence
+    module = run.module
     mutated = copy.deepcopy(evidence)
     _mutate_evidence(mutated, mutation)
 
