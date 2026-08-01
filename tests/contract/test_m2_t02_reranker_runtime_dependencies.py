@@ -133,6 +133,13 @@ _EXPECTED_COMPATIBILITY_POLICY = {
     "transformers_safetensors_requirement": ">=0.4.3",
     "declared_requirements_satisfied": True,
 }
+_EXPECTED_RERANKER_REQUIREMENTS = [
+    "torch==2.4.1",
+    "transformers==4.53.2",
+    "huggingface-hub==0.34.3",
+    "safetensors==0.5.3",
+    "tokenizers==0.21.2",
+]
 _EXPECTED_SOURCES = {
     ("pypi_project_metadata", "https://pypi.org/pypi/torch/2.4.1/json"),
     (
@@ -203,16 +210,16 @@ def _embedding_torch_version(requirements: list[object]) -> str:
     return torch_requirements[0].removeprefix("torch==")
 
 
-def test_m2_t02_runtime_dependency_lock_is_closed_shared_and_not_run() -> None:
+def test_m2_t02_runtime_dependency_lock_is_closed_shared_and_clean_verified() -> None:
     artifact = json.loads(_ARTIFACT_PATH.read_text(encoding="utf-8"))
     pyproject = tomllib.loads(_PYPROJECT_PATH.read_text(encoding="utf-8"))
 
     assert set(artifact) == _TOP_LEVEL_FIELDS
-    assert artifact["report_version"] == "m2-t02-reranker-runtime-dependencies.v1.1"
+    assert artifact["report_version"] == "m2-t02-reranker-runtime-dependencies.v1.2"
     assert artifact["phase"] == "M2"
     assert artifact["task_id"] == "M2-T02"
-    assert artifact["baseline_commit"] == "9a5518665ccc2ae6b7fb7d385206362a13bf3b93"
-    assert artifact["decision_status"] == "selected_not_installed"
+    assert artifact["baseline_commit"] == "00a323d89bbca08d21e13322da3a9b7c25e3ffa5"
+    assert artifact["decision_status"] == "selected_and_clean_environment_verified"
 
     python = artifact["python"]
     assert set(python) == _PYTHON_FIELDS
@@ -248,6 +255,7 @@ def test_m2_t02_runtime_dependency_lock_is_closed_shared_and_not_run() -> None:
     assert "FlagEmbedding==1.3.5" in embedding_requirements
     embedding_torch_version = _embedding_torch_version(embedding_requirements)
     assert embedding_torch_version == "2.4.1"
+    assert pyproject["project"]["optional-dependencies"]["reranker"] == _EXPECTED_RERANKER_REQUIREMENTS
     assert selected_packages["torch"]["version"] == embedding_torch_version
     assert environment_policy["torch_version"] == embedding_torch_version
 
@@ -269,7 +277,14 @@ def test_m2_t02_runtime_dependency_lock_is_closed_shared_and_not_run() -> None:
 
     verification_state = artifact["verification_state"]
     assert set(verification_state) == _VERIFICATION_STATE_FIELDS
-    assert verification_state == dict.fromkeys(_VERIFICATION_STATE_FIELDS, False)
+    assert verification_state == {
+        "dependencies_installed_in_clean_environment": True,
+        "model_downloaded": False,
+        "tokenizer_loaded": False,
+        "model_loaded": False,
+        "inference_run": False,
+        "real_scores_generated": False,
+    }
 
     sources = artifact["sources"]
     source_pairs = [(source["source_type"], source["source_reference"]) for source in sources]

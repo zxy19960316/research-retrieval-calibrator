@@ -568,9 +568,90 @@ Only C may consolidate completion evidence and consider `STATUS.md`; until C, M2
 
 ### B2-D-F Exact optional dependency group and clean-environment verification
 
-**Goal:** In a later, separately authorized task, add the locked five-package group to `pyproject.toml` and verify installation in a clean environment. B2-D-F is the first task allowed to install runtime dependencies.
+**Goal:** Add the exact reranker optional-dependency group and prove that `.[embedding,reranker]` installs in one clean Windows Python 3.12 temporary virtual environment with the official CPU-only Torch 2.4.1 wheel.
 
-**Boundary:** B2-D-F may modify `pyproject.toml` and create installation evidence only. It must not download a model/tokenizer, read model weights, construct a provider, load a tokenizer/model, run inference, create a score, modify `STATUS.md`, or begin B2-L, B2-P, B3, M2-T03, or M3.
+**Files:**
+
+- Modify: `pyproject.toml`
+- Modify: `docs/superpowers/plans/2026-07-29-m2-t02-reranker-provider.md`
+- Modify: `evaluation/source-artifacts/m2-t02-reranker-runtime-dependencies.json`
+- Modify: `tests/contract/test_m2_t02_reranker_runtime_dependencies.py`
+- Create: `evaluation/source-artifacts/m2-t02-reranker-runtime-installation.json`
+- Create: `tests/contract/test_m2_t02_reranker_runtime_installation.py`
+
+**Interfaces:**
+
+- Consumes: the `embedding` group with `FlagEmbedding==1.3.5` and `torch==2.4.1`, plus the B2-D-R.1 five-package selection lock.
+- Produces: a `reranker` extra containing the same Torch exact pin, clean-environment installation evidence, and offline contracts which distinguish dependency installation from all prohibited model operations.
+
+**Boundary:** B2-D-F is the first task allowed to install runtime dependencies. It may modify only the files listed above. It must not download a model or tokenizer; read model weights; construct `BgeRerankerProvider`; load a tokenizer or model; run inference; create scores, timings, or benchmarks; modify `STATUS.md`; or begin B2-L, B2-P, B3, M2-T03, or M3. The temporary environment must be deleted after evidence is recorded.
+
+- [ ] **Step 1: Add the offline installation-evidence red contract**
+
+  Create `tests/contract/test_m2_t02_reranker_runtime_installation.py`. It must read only the committed JSON artifact, require exactly the top-level fields `report_version`, `phase`, `task_id`, `baseline_commit`, `decision_status`, `platform`, `installation_policy`, `installed_packages`, `verification`, and `execution_state`, and reject local absolute paths, usernames, credentials, model actions, scores, benchmarks, and timing claims. Require Windows, Python 3.12, a `clean_temporary_venv`, exactly `embedding` and `reranker` extras, CPU-only Torch base version `2.4.1`, `torch_cuda_version: null`, `torch_cuda_available: false`, the six direct packages, passing `pip check`, passing imports, and a true installation flag with every model-operation flag false.
+
+  Run:
+
+  ```powershell
+  py -3.12 -m pytest -q tests/contract/test_m2_t02_reranker_runtime_installation.py
+  ```
+
+  Expected: FAIL only because `evaluation/source-artifacts/m2-t02-reranker-runtime-installation.json` does not yet exist. The test must never create a virtual environment or access the network.
+
+- [ ] **Step 2: Declare the exact reranker group and synchronize selection evidence**
+
+  Add this group without changing the base dependencies or the embedding pins:
+
+  ```toml
+  reranker = [
+    "torch==2.4.1",
+    "transformers==4.53.2",
+    "huggingface-hub==0.34.3",
+    "safetensors==0.5.3",
+    "tokenizers==0.21.2",
+  ]
+  ```
+
+  If the clean PEP 660 editable build reports multiple top-level packages, add only `[tool.setuptools.packages.find]` with `include = ["app*", "evaluation*"]` so the already committed Python package boundary is explicit. Do not add a runtime dependency or change the base dependency list to resolve that build configuration error.
+
+  Update the dependency artifact and its existing offline contract to version `m2-t02-reranker-runtime-dependencies.v1.2`, baseline `00a323d89bbca08d21e13322da3a9b7c25e3ffa5`, decision status `selected_and_clean_environment_verified`, and `dependencies_installed_in_clean_environment: true`. Keep `model_downloaded`, `tokenizer_loaded`, `model_loaded`, `inference_run`, and `real_scores_generated` false.
+
+- [ ] **Step 3: Install in one clean temporary environment**
+
+  Set `HF_HUB_DISABLE_IMPLICIT_TOKEN=1` and `HF_HUB_DISABLE_TELEMETRY=1` only for the controlled command session. Create a new venv under `%TEMP%` with `py -3.12 -m venv`, record `python -VV`, `pip --version`, and `pip list`, and prove no Torch, Transformers, FlagEmbedding, or Hugging Face runtime package is preinstalled. Install Torch exactly from the official CPU index:
+
+  ```powershell
+  & $Python -m pip install "torch==2.4.1" --index-url "https://download.pytorch.org/whl/cpu"
+  ```
+
+  Immediately assert the base version is `2.4.1`, `torch.version.cuda is None`, and `torch.cuda.is_available() is False`. From the repository root, install the combined extras without `--no-deps`:
+
+  ```powershell
+  & $Python -m pip install -e ".[embedding,reranker]"
+  & $Python -m pip check
+  ```
+
+  Assert the final metadata versions, import only `torch`, `transformers`, `huggingface_hub`, `safetensors`, `tokenizers`, and `FlagEmbedding`, and record only safe platform, dependency, and verification facts. Do not use a Hugging Face token or call a model or Hub API.
+
+- [ ] **Step 4: Commit offline installation evidence and clean the environment**
+
+  Add `evaluation/source-artifacts/m2-t02-reranker-runtime-installation.json` with the closed top-level schema from Step 1. Its `installed_packages` entries must each contain `name`, `expected_version`, `installed_version`, and `matched`; it must show the six required packages, CPU-only Torch, null CUDA version, unavailable CUDA, passed `pip check`, and passed imports. Its execution state must record only a true clean-install flag and false model download/load/inference/score flags. Delete the temporary venv with `Remove-Item -LiteralPath $Venv -Recurse -Force` and confirm it no longer exists.
+
+- [ ] **Step 5: Verify the repository without excluding Windows symlink coverage**
+
+  Run the two focused dependency contracts, `tests/unit/test_m2_t02_reranker_snapshot.py`, the full pytest suite, Ruff, mypy, project-documentation and M0/M1/M2-T01 validators, and `py -3.12 -m pip check`. Require all checks to pass; do not skip or exclude the Windows symlink tests.
+
+- [ ] **Step 6: Publish only B2-D-F**
+
+  ```powershell
+  git add pyproject.toml docs/superpowers/plans/2026-07-29-m2-t02-reranker-provider.md evaluation/source-artifacts/m2-t02-reranker-runtime-dependencies.json evaluation/source-artifacts/m2-t02-reranker-runtime-installation.json tests/contract/test_m2_t02_reranker_runtime_dependencies.py tests/contract/test_m2_t02_reranker_runtime_installation.py
+  git diff --cached --name-only
+  git diff --cached --check
+  git commit -m "build: verify shared reranker runtime installation"
+  git push origin agent/m2-t02-reranker-provider
+  ```
+
+  Update Draft PR #11 with the B2-D-F commit, clean Windows Python 3.12 environment, CPU-only Torch command and CUDA assertions, combined extras, actual six-package versions, all validation outcomes, the remote Actions result, and the explicit statement that no model download, loading, inference, or scores occurred. Keep `STATUS.md` at M2 `1/5` and stop before B2-L.
 
 ### B2-L Controlled pinned snapshot download
 

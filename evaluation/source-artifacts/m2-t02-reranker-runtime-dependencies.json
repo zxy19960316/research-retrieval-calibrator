@@ -1,9 +1,9 @@
 {
-  "report_version": "m2-t02-reranker-runtime-dependencies.v1.1",
+  "report_version": "m2-t02-reranker-runtime-dependencies.v1.2",
   "phase": "M2",
   "task_id": "M2-T02",
-  "baseline_commit": "9a5518665ccc2ae6b7fb7d385206362a13bf3b93",
-  "decision_status": "selected_not_installed",
+  "baseline_commit": "00a323d89bbca08d21e13322da3a9b7c25e3ffa5",
+  "decision_status": "selected_and_clean_environment_verified",
   "python": {
     "requires_python": ">=3.12,<3.13",
     "tested_minor": "3.12"
@@ -90,7 +90,7 @@
     "network_during_preflight": "forbidden"
   },
   "verification_state": {
-    "dependencies_installed_in_clean_environment": false,
+    "dependencies_installed_in_clean_environment": true,
     "model_downloaded": false,
     "tokenizer_loaded": false,
     "model_loaded": false,
