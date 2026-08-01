@@ -474,7 +474,7 @@ def test_live_failure_never_claims_success_or_mutates_immutable_artifacts(
             return _success_result("UNKNOWN", kwargs["snapshot_dir"])
         if failure == "wrong-snapshot-path":
             return _success_result("PUBLISHED", tmp_path / "wrong-snapshot")
-        Path(kwargs["snapshot_dir"]).mkdir(parents=True)
+        Path(kwargs["snapshot_dir"]).mkdir(parents=True, exist_ok=True)
         status = "PUBLISHED" if preparation_call_count == 1 else "REUSED"
         return _success_result(status, kwargs["snapshot_dir"])
 
