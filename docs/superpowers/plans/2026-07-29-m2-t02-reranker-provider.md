@@ -712,6 +712,107 @@ snapshot, loading a tokenizer/model, or running inference.
   only the plan and these red tests as
   `test: define controlled reranker snapshot download contract`.
 
+#### B2-L-R.1 Offline reuse and runtime-platform provenance closure
+
+**Files:**
+
+- Modify: `docs/superpowers/plans/2026-07-29-m2-t02-reranker-provider.md`
+- Modify: `tests/contract/test_m2_t02_reranker_snapshot_download.py`
+- Modify: `tests/unit/test_m2_t02_reranker_snapshot_download_runner.py`
+
+**Goal:** Close false-green gaps in the future controlled-download contract:
+evidence must prove a genuinely offline second preparation after a newly
+published snapshot, and must identify the actual download execution platform
+without leaking host, user, credential, or path data.
+
+**Boundary:** B2-L-R.1 remains an intentional-red test/plan task. Do not
+create `scripts/download_m2_t02_reranker_snapshot.py` or
+`evaluation/source-artifacts/m2-t02-reranker-snapshot-download.json`; do not
+contact Hugging Face, import the real Hub client, download a model/tokenizer,
+create a formal snapshot, load a model, run inference, generate scores, change
+the immutable selection/installation artifacts, modify `STATUS.md`, or begin
+B2-L-F, B2-P, or B3. Dynamic import must retain the absent runner as the only
+red root cause; do not use `skip` or `xfail`.
+
+- [ ] Add fake-live runner contracts that monkeypatch `platform.system`,
+  `platform.machine`, and `platform.python_version` before `run_download`.
+  Require evidence to match injected `Windows` / `AMD64` / `3.12.10` and
+  `Linux` / `x86_64` / `3.12.13` values exactly. The future runner must query
+  its current execution environment; it must neither hard-code Windows nor
+  copy platform fields from runtime-installation evidence.
+
+- [ ] Make `validate_download_evidence()` close the exact `platform` object:
+  non-empty safe `system` and `machine` strings and a Python `3.12.x` version
+  only. Reject empty fields, non-3.12 Python, absolute paths, credential-like
+  strings, extra fields, and missing fields. Accept ordinary architecture
+  strings including `AMD64`, `x86_64`, and `arm64`; do not classify every
+  machine string as a host name.
+
+- [ ] Replace ambiguous `weights_downloaded` and `tokenizer_downloaded`
+  evidence with the closed execution-state fields
+  `snapshot_present_and_verified`, `download_performed_this_run`,
+  `model_loaded`, `inference_run`, and `real_scores_generated`. Preserve
+  `snapshot.preparation_status` as the original preparation result. Require
+  `PUBLISHED` to report `downloaded_and_verified` and
+  `download_performed_this_run: true`; require `REUSED` to report
+  `reused_and_verified` and `download_performed_this_run: false`. Model
+  loading, inference, and real scores remain false in both states.
+
+- [ ] Require a first `PUBLISHED` preparation to invoke the real injected Hub
+  downloader and disk-space callback once, followed by a second preparation
+  with the identical selection path and snapshot directory. The second call
+  receives forbidden downloader and `disk_usage` callbacks that fail if used,
+  must return `REUSED`, and must leave the snapshot directory unchanged. Only
+  after that second call may evidence set `offline_reuse_check: "passed"` and
+  `downloader_called_during_offline_reuse: false`.
+
+- [ ] Add the already-`REUSED` first-call case: run preparation exactly once,
+  use neither downloader nor disk-space callback, return `REUSED`, and emit
+  the reuse decision without fabricating a preceding `PUBLISHED` event.
+
+- [ ] Add parameterized second-call failures for repeated `PUBLISHED`,
+  `UNKNOWN`, wrong snapshot path, downloader use, disk-space callback use, and
+  preparation exceptions. Each must create no successful evidence, preserve
+  the immutable selection and installation artifact bytes, preserve the
+  first-published snapshot, clean only this invocation's evidence temporary
+  file, and raise `OFFLINE_REUSE_FAILED` or
+  `PREPARATION_RESULT_INVALID` as appropriate.
+
+- [ ] Add `HF_HUB_OFFLINE=1` coverage. Before package-version lookup, Hub
+  import, or preparation, the future runner must fail closed with
+  `HUB_OFFLINE_MODE_ENABLED`, leave the user's environment variable unchanged,
+  and create neither a snapshot nor evidence.
+
+- [ ] Retain one uniquely named sibling evidence temporary file and a single
+  `os.replace`. Validate the complete evidence before `os.replace`; a
+  validation failure must raise `EVIDENCE_VALIDATION_FAILED`, call no replace,
+  and remove only the invocation-owned temporary file. A pre-existing
+  `.m2-t02-reranker-snapshot-download.json.tmp-sentinel` must survive every
+  successful and failure path.
+
+- [ ] Run and record the focused intentional-red baseline:
+
+  ```powershell
+  py -3.12 -m pytest -q `
+    tests/contract/test_m2_t02_reranker_snapshot_download.py `
+    tests/unit/test_m2_t02_reranker_snapshot_download_runner.py
+  py -3.12 -m ruff check `
+    tests/contract/test_m2_t02_reranker_snapshot_download.py `
+    tests/unit/test_m2_t02_reranker_snapshot_download_runner.py
+  ```
+
+  Expected: the two immutable-artifact characterizations pass; every remaining
+  future-runner/evidence test fails solely because the runner module is absent.
+  Ruff passes. Do not claim a real download, formal snapshot, model load, or
+  inference from this test-only result.
+
+- [ ] Commit only these three files as
+  `test: harden reranker download evidence provenance`, push the existing
+  branch without rebasing or force-pushing, and update Draft PR #11 with the
+  actual intentional-red pass/fail counts, the single missing-runner root
+  cause, this offline-reuse and platform-provenance closure, and the explicit
+  B2-L-F boundary.
+
 #### B2-L-F Controlled pinned snapshot live download
 
 **Files:**

@@ -76,8 +76,8 @@ _VERIFICATION_FIELDS = {
     "git_index_contains_snapshot_files",
 }
 _EXECUTION_STATE_FIELDS = {
-    "weights_downloaded",
-    "tokenizer_downloaded",
+    "snapshot_present_and_verified",
+    "download_performed_this_run",
     "model_loaded",
     "inference_run",
     "real_scores_generated",
@@ -100,8 +100,10 @@ def _unload_future_runner() -> None:
 def _download_module() -> ModuleType:
     try:
         return importlib.import_module("scripts.download_m2_t02_reranker_snapshot")
-    except ModuleNotFoundError:
-        pytest.fail("download_m2_t02_reranker_snapshot has not been implemented")
+    except ModuleNotFoundError as exc:
+        if exc.name == _MODULE_NAME:
+            pytest.fail("download_m2_t02_reranker_snapshot has not been implemented")
+        raise
 
 
 def _string_values(value: object) -> list[str]:
@@ -129,9 +131,32 @@ def _source_file_projection() -> list[dict[str, object]]:
 def _run_fake_live_download(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
-) -> tuple[dict[str, object], ModuleType, Path]:
+    *,
+    initial_status: str = "PUBLISHED",
+    runtime_platform: tuple[str, str, str] = ("Windows", "AMD64", "3.12.10"),
+) -> tuple[dict[str, object], ModuleType, Path, list[dict[str, object]]]:
+    preparation_calls: list[dict[str, object]] = []
+
     def fake_preparation(**kwargs: object) -> SimpleNamespace:
-        return SimpleNamespace(status="PUBLISHED", snapshot_dir=kwargs["snapshot_dir"])
+        preparation_calls.append(kwargs)
+        if len(preparation_calls) == 1:
+            if initial_status == "PUBLISHED":
+                kwargs["download_file"](
+                    repo_id=_MODEL_ID,
+                    filename="README.md",
+                    revision=_REVISION,
+                    repo_type="model",
+                    token=False,
+                )
+                kwargs["disk_usage"](kwargs["snapshot_dir"])
+            return SimpleNamespace(status=initial_status, snapshot_dir=kwargs["snapshot_dir"])
+
+        assert initial_status == "PUBLISHED"
+        with pytest.raises(AssertionError, match="offline reuse"):
+            kwargs["download_file"]()
+        with pytest.raises(AssertionError, match="offline reuse"):
+            kwargs["disk_usage"](kwargs["snapshot_dir"])
+        return SimpleNamespace(status="REUSED", snapshot_dir=kwargs["snapshot_dir"])
 
     preparation = importlib.import_module(_PREPARATION_MODULE)
     monkeypatch.setattr(preparation, "prepare_snapshot", fake_preparation)
@@ -139,6 +164,9 @@ def _run_fake_live_download(
     evidence_path = tmp_path / "m2-t02-reranker-snapshot-download.json"
     monkeypatch.setattr(module, "EVIDENCE_PATH", evidence_path)
     monkeypatch.delenv("HF_HUB_OFFLINE", raising=False)
+    monkeypatch.setattr(module.platform, "system", lambda: runtime_platform[0])
+    monkeypatch.setattr(module.platform, "machine", lambda: runtime_platform[1])
+    monkeypatch.setattr(module.platform, "python_version", lambda: runtime_platform[2])
 
     def fake_version(distribution: str) -> str:
         assert distribution == "huggingface-hub"
@@ -161,18 +189,33 @@ def _run_fake_live_download(
 
     monkeypatch.setattr(importlib.metadata, "version", fake_version)
     monkeypatch.setattr(importlib, "import_module", fake_import_module)
-    result = module.run_download(execute_live_download=True)
+    result = module.run_download(
+        execute_live_download=True,
+        disk_usage=lambda _path: SimpleNamespace(free=10_000_000_000),
+    )
     assert isinstance(result, dict)
-    return result, module, evidence_path
+    return result, module, evidence_path, preparation_calls
 
 
 def _mutate_evidence(evidence: dict[str, Any], mutation: str) -> None:
     if mutation == "absolute-path":
         evidence["download_policy"]["snapshot_path"] = "C:/Users/example/snapshot"
-    elif mutation == "username":
+    elif mutation == "empty-system":
+        evidence["platform"]["system"] = ""
+    elif mutation == "empty-machine":
+        evidence["platform"]["machine"] = ""
+    elif mutation == "python-not-3.12":
+        evidence["platform"]["python_version"] = "3.13.0"
+    elif mutation == "system-absolute-path":
+        evidence["platform"]["system"] = "C:/Users/example"
+    elif mutation == "machine-credential":
+        evidence["platform"]["machine"] = "token=secret"
+    elif mutation == "machine-hostname":
+        evidence["platform"]["machine"] = "hostname=builder-host-17"
+    elif mutation == "platform-extra-field":
         evidence["platform"]["username"] = "example-user"
-    elif mutation == "machine-name":
-        evidence["platform"]["machine"] = "builder-host-17"
+    elif mutation == "platform-missing-field":
+        del evidence["platform"]["machine"]
     elif mutation == "token":
         evidence["download_policy"]["token"] = "secret"
     elif mutation in {"cookie", "authorization", "bearer"}:
@@ -239,7 +282,12 @@ def test_download_evidence_is_closed_atomic_safe_and_exact(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    evidence, module, evidence_path = _run_fake_live_download(tmp_path, monkeypatch)
+    runtime_platform = ("Windows", "AMD64", "3.12.10")
+    evidence, module, evidence_path, preparation_calls = _run_fake_live_download(
+        tmp_path,
+        monkeypatch,
+        runtime_platform=runtime_platform,
+    )
     module.validate_download_evidence(evidence)
 
     assert json.loads(evidence_path.read_text(encoding="utf-8")) == evidence
@@ -254,9 +302,9 @@ def test_download_evidence_is_closed_atomic_safe_and_exact(
     platform = evidence["platform"]
     assert set(platform) == _PLATFORM_FIELDS
     assert platform == {
-        "system": "Windows",
-        "machine": "AMD64",
-        "python_version": platform["python_version"],
+        "system": runtime_platform[0],
+        "machine": runtime_platform[1],
+        "python_version": runtime_platform[2],
     }
     assert re.fullmatch(r"3\.12\.\d+", platform["python_version"])
 
@@ -309,8 +357,8 @@ def test_download_evidence_is_closed_atomic_safe_and_exact(
     }
     assert set(evidence["execution_state"]) == _EXECUTION_STATE_FIELDS
     assert evidence["execution_state"] == {
-        "weights_downloaded": True,
-        "tokenizer_downloaded": True,
+        "snapshot_present_and_verified": True,
+        "download_performed_this_run": True,
         "model_loaded": False,
         "inference_run": False,
         "real_scores_generated": False,
@@ -319,14 +367,67 @@ def test_download_evidence_is_closed_atomic_safe_and_exact(
     for value in _string_values(evidence):
         assert not _LOCAL_ABSOLUTE_PATH.search(value)
         assert not _FORBIDDEN_TEXT.search(value)
+    assert len(preparation_calls) == 2
+
+
+@pytest.mark.parametrize(
+    "runtime_platform",
+    (
+        ("Windows", "AMD64", "3.12.10"),
+        ("Linux", "x86_64", "3.12.13"),
+        ("Linux", "arm64", "3.12.0"),
+    ),
+)
+def test_download_evidence_records_the_injected_runtime_platform(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    runtime_platform: tuple[str, str, str],
+) -> None:
+    evidence, module, _evidence_path, _preparation_calls = _run_fake_live_download(
+        tmp_path,
+        monkeypatch,
+        runtime_platform=runtime_platform,
+    )
+
+    module.validate_download_evidence(evidence)
+    assert evidence["platform"] == {
+        "system": runtime_platform[0],
+        "machine": runtime_platform[1],
+        "python_version": runtime_platform[2],
+    }
+
+
+def test_reused_evidence_never_claims_a_download_in_this_run(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    evidence, module, _evidence_path, preparation_calls = _run_fake_live_download(
+        tmp_path,
+        monkeypatch,
+        initial_status="REUSED",
+        runtime_platform=("Linux", "x86_64", "3.12.13"),
+    )
+
+    module.validate_download_evidence(evidence)
+    assert len(preparation_calls) == 1
+    assert evidence["decision_status"] == "reused_and_verified"
+    assert evidence["snapshot"]["preparation_status"] == "REUSED"
+    assert evidence["execution_state"]["snapshot_present_and_verified"] is True
+    assert evidence["execution_state"]["download_performed_this_run"] is False
 
 
 @pytest.mark.parametrize(
     "mutation",
     (
         "absolute-path",
-        "username",
-        "machine-name",
+        "empty-system",
+        "empty-machine",
+        "python-not-3.12",
+        "system-absolute-path",
+        "machine-credential",
+        "machine-hostname",
+        "platform-extra-field",
+        "platform-missing-field",
         "token",
         "cookie",
         "authorization",
@@ -351,7 +452,10 @@ def test_download_evidence_validator_rejects_privacy_integrity_and_scope_violati
     monkeypatch: pytest.MonkeyPatch,
     mutation: str,
 ) -> None:
-    evidence, module, _evidence_path = _run_fake_live_download(tmp_path, monkeypatch)
+    evidence, module, _evidence_path, _preparation_calls = _run_fake_live_download(
+        tmp_path,
+        monkeypatch,
+    )
     mutated = copy.deepcopy(evidence)
     _mutate_evidence(mutated, mutation)
 
