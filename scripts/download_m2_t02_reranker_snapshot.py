@@ -9,15 +9,28 @@ import os
 import platform
 import re
 import shutil
+import stat
 import sys
 import uuid
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
-from typing import Literal, TypeGuard
+from typing import Literal
 
-from scripts.prepare_m2_t02_reranker_snapshot import prepare_snapshot
+_REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+
+if __package__ in {None, ""}:
+    repository_root_text = str(_REPOSITORY_ROOT)
+    if repository_root_text not in sys.path:
+        sys.path.insert(0, repository_root_text)
+
+from scripts.prepare_m2_t02_reranker_snapshot import (
+    SnapshotPlan,
+    load_snapshot_plan,
+    prepare_snapshot,
+)
 
 SELECTION_PATH = Path("evaluation/source-artifacts/m2-t02-reranker-selection.json")
+_FIXED_SELECTION_PATH = SELECTION_PATH
 _FIXED_SNAPSHOT_DIR = Path(
     "models/m2-t02/bge-reranker-v2-m3/953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e"
 )
@@ -58,8 +71,10 @@ DownloadRunnerErrorCode = Literal[
     "PREPARATION_FAILED",
     "PREPARATION_RESULT_INVALID",
     "OFFLINE_REUSE_FAILED",
+    "SELECTION_VALIDATION_FAILED",
     "EVIDENCE_VALIDATION_FAILED",
     "EVIDENCE_WRITE_FAILED",
+    "EVIDENCE_CONFLICT",
 ]
 
 
@@ -120,52 +135,39 @@ def _safe_platform_value(value: object) -> str:
     return value
 
 
-def _is_strict_int(value: object) -> TypeGuard[int]:
-    return isinstance(value, int) and not isinstance(value, bool)
+def _operational_path(path: Path) -> Path:
+    if path.is_absolute():
+        return path
+    return _REPOSITORY_ROOT / path
 
 
-def _load_selection() -> dict[str, object]:
+def _hub_offline_mode_enabled() -> bool:
+    value = os.environ.get("HF_HUB_OFFLINE")
+    return value is not None and value.strip().upper() in {"1", "TRUE", "ON", "YES"}
+
+
+def _load_verified_snapshot_plan() -> SnapshotPlan:
     try:
-        raw: object = json.loads(SELECTION_PATH.read_text(encoding="utf-8"))
-    except Exception as exc:
-        raise ValueError from exc
-    return _as_mapping(raw)
+        return load_snapshot_plan(_operational_path(SELECTION_PATH))
+    except Exception:  # noqa: BLE001
+        raise DownloadRunnerError("SELECTION_VALIDATION_FAILED") from None
 
 
-def _selection_snapshot_projection() -> tuple[list[dict[str, object]], int, int, int]:
-    selection = _load_selection()
-    selected_model = _as_mapping(selection.get("selected_model"))
-    source_files = selection.get("source_files")
-    if not isinstance(source_files, list):
-        raise ValueError  # noqa: TRY004
-
-    files: list[dict[str, object]] = []
-    for entry in source_files:
-        source = _as_mapping(entry)
-        files.append(
-            {
-                "path": source.get("path"),
-                "size_bytes": source.get("size_bytes"),
-                "digest": source.get("digest"),
-                "digest_type": source.get("digest_type"),
-                "verified": True,
-            }
-        )
-
-    total_size = selected_model.get("pinned_source_files_size_bytes")
-    runtime_size = selected_model.get("required_runtime_files_size_bytes")
-    weight_size = selected_model.get("weight_size_bytes")
-    if not _is_strict_int(total_size):
-        raise ValueError
-    if not _is_strict_int(runtime_size):
-        raise ValueError
-    if not _is_strict_int(weight_size):
-        raise ValueError
-    return files, total_size, runtime_size, weight_size
-
-
-def _expected_evidence(preparation_status: str) -> dict[str, object]:
-    files, total_size, runtime_size, weight_size = _selection_snapshot_projection()
+def _expected_evidence(
+    preparation_status: str,
+    snapshot_plan: SnapshotPlan | None = None,
+) -> dict[str, object]:
+    plan = snapshot_plan or _load_verified_snapshot_plan()
+    files = [
+        {
+            "path": file.path,
+            "size_bytes": file.size_bytes,
+            "digest": file.digest,
+            "digest_type": file.digest_type,
+            "verified": True,
+        }
+        for file in plan.files
+    ]
     if preparation_status == "PUBLISHED":
         decision_status = "downloaded_and_verified"
         downloaded_this_run = True
@@ -198,16 +200,16 @@ def _expected_evidence(preparation_status: str) -> dict[str, object]:
             "token": False,
             "implicit_token_disabled": True,
             "telemetry_disabled": True,
-            "selection_path": SELECTION_PATH.as_posix(),
+            "selection_path": _FIXED_SELECTION_PATH.as_posix(),
             "snapshot_path": _FIXED_SNAPSHOT_DIR.as_posix(),
             "network_scope": "pinned_huggingface_model_files_only",
         },
         "snapshot": {
             "preparation_status": preparation_status,
             "file_count": len(files),
-            "total_size_bytes": total_size,
-            "required_runtime_size_bytes": runtime_size,
-            "weight_size_bytes": weight_size,
+            "total_size_bytes": plan.total_size_bytes,
+            "required_runtime_size_bytes": plan.required_runtime_size_bytes,
+            "weight_size_bytes": plan.weight_size_bytes,
             "exact_file_closure": True,
             "local_hub_metadata_removed": True,
             "git_ignored": True,
@@ -232,7 +234,10 @@ def _expected_evidence(preparation_status: str) -> dict[str, object]:
     }
 
 
-def validate_download_evidence(evidence: object) -> None:
+def validate_download_evidence(
+    evidence: object,
+    snapshot_plan: SnapshotPlan | None = None,
+) -> None:
     """Validate the complete closed, privacy-safe download evidence schema."""
 
     actual = _as_mapping(evidence)
@@ -255,7 +260,7 @@ def validate_download_evidence(evidence: object) -> None:
     preparation_status = snapshot_data.get("preparation_status")
     if preparation_status not in {"PUBLISHED", "REUSED"}:
         raise ValueError
-    expected = _expected_evidence(preparation_status)
+    expected = _expected_evidence(preparation_status, snapshot_plan)
     _require_exact(actual, expected)
 
 
@@ -267,10 +272,14 @@ def _restore_privacy_environment(previous: Mapping[str, str | None]) -> None:
             os.environ[key] = value
 
 
-def _validate_preparation_result(result: object, expected_status: str) -> None:
+def _validate_preparation_result(
+    result: object,
+    expected_status: str,
+    expected_snapshot_dir: Path,
+) -> None:
     status = getattr(result, "status", None)
     snapshot_dir = getattr(result, "snapshot_dir", None)
-    if status != expected_status or snapshot_dir != SNAPSHOT_DIR:
+    if status != expected_status or snapshot_dir != expected_snapshot_dir:
         raise ValueError
 
 
@@ -282,16 +291,46 @@ def _forbidden_offline_disk_usage(*_args: object, **_kwargs: object) -> object:
     raise RuntimeError("offline reuse attempted a disk-space check")
 
 
-def _publish_evidence(evidence: dict[str, object]) -> None:
+def _serialized_evidence(evidence: dict[str, object]) -> bytes:
+    return (json.dumps(evidence, ensure_ascii=True, indent=2) + "\n").encode("utf-8")
+
+
+def _existing_evidence_bytes(evidence_path: Path) -> bytes | None:
+    try:
+        metadata = evidence_path.lstat()
+    except FileNotFoundError:
+        return None
+    except OSError:
+        raise DownloadRunnerError("EVIDENCE_CONFLICT") from None
+
+    if evidence_path.is_symlink() or not stat.S_ISREG(metadata.st_mode):
+        raise DownloadRunnerError("EVIDENCE_CONFLICT")
+    try:
+        return evidence_path.read_bytes()
+    except OSError:
+        raise DownloadRunnerError("EVIDENCE_CONFLICT") from None
+
+
+def _publish_evidence(
+    evidence: dict[str, object],
+    evidence_path: Path | None = None,
+) -> None:
+    final_path = _operational_path(EVIDENCE_PATH) if evidence_path is None else evidence_path
+    serialized = _serialized_evidence(evidence)
+    existing = _existing_evidence_bytes(final_path)
+    if existing is not None:
+        if existing == serialized:
+            return
+        raise DownloadRunnerError("EVIDENCE_CONFLICT")
+
     temporary_path: Path | None = None
     try:
-        EVIDENCE_PATH.parent.mkdir(parents=True, exist_ok=True)
-        temporary_path = EVIDENCE_PATH.parent / f".{EVIDENCE_PATH.name}.tmp-{uuid.uuid4().hex}"
-        temporary_path.write_text(
-            json.dumps(evidence, ensure_ascii=True, indent=2) + "\n",
-            encoding="utf-8",
-        )
-        os.replace(temporary_path, EVIDENCE_PATH)
+        final_path.parent.mkdir(parents=True, exist_ok=True)
+        temporary_path = final_path.parent / f".{final_path.name}.tmp-{uuid.uuid4().hex}"
+        temporary_path.write_bytes(serialized)
+        if _existing_evidence_bytes(final_path) is not None:
+            raise DownloadRunnerError("EVIDENCE_CONFLICT")
+        os.replace(temporary_path, final_path)
         temporary_path = None
     finally:
         if temporary_path is not None:
@@ -307,8 +346,13 @@ def run_download(
 
     if execute_live_download is not True:
         raise DownloadRunnerError("LIVE_DOWNLOAD_NOT_ENABLED")
-    if os.environ.get("HF_HUB_OFFLINE") == "1":
+    if _hub_offline_mode_enabled():
         raise DownloadRunnerError("HUB_OFFLINE_MODE_ENABLED")
+
+    snapshot_plan = _load_verified_snapshot_plan()
+    operational_selection_path = _operational_path(SELECTION_PATH)
+    operational_snapshot_dir = _operational_path(SNAPSHOT_DIR)
+    operational_evidence_path = _operational_path(EVIDENCE_PATH)
 
     try:
         installed_version = importlib.metadata.version("huggingface-hub")
@@ -340,8 +384,8 @@ def run_download(
 
         try:
             first_result = prepare_snapshot(
-                selection_path=SELECTION_PATH,
-                snapshot_dir=SNAPSHOT_DIR,
+                selection_path=operational_selection_path,
+                snapshot_dir=operational_snapshot_dir,
                 download_file=download_file,
                 disk_usage=selected_disk_usage,
             )
@@ -352,15 +396,19 @@ def run_download(
         try:
             if first_status not in {"PUBLISHED", "REUSED"}:
                 raise ValueError
-            _validate_preparation_result(first_result, first_status)
+            _validate_preparation_result(
+                first_result,
+                first_status,
+                operational_snapshot_dir,
+            )
         except Exception:  # noqa: BLE001
             raise DownloadRunnerError("PREPARATION_RESULT_INVALID") from None
 
         if first_status == "PUBLISHED":
             try:
                 reuse_result = prepare_snapshot(
-                    selection_path=SELECTION_PATH,
-                    snapshot_dir=SNAPSHOT_DIR,
+                    selection_path=operational_selection_path,
+                    snapshot_dir=operational_snapshot_dir,
                     download_file=_forbidden_offline_download,
                     disk_usage=_forbidden_offline_disk_usage,
                 )
@@ -371,17 +419,23 @@ def run_download(
             if reuse_status == "PUBLISHED":
                 raise DownloadRunnerError("OFFLINE_REUSE_FAILED")
             try:
-                _validate_preparation_result(reuse_result, "REUSED")
+                _validate_preparation_result(
+                    reuse_result,
+                    "REUSED",
+                    operational_snapshot_dir,
+                )
             except Exception:  # noqa: BLE001
                 raise DownloadRunnerError("PREPARATION_RESULT_INVALID") from None
 
         try:
-            evidence = _expected_evidence(first_status)
-            validate_download_evidence(evidence)
+            evidence = _expected_evidence(first_status, snapshot_plan)
+            validate_download_evidence(evidence, snapshot_plan)
         except Exception:  # noqa: BLE001
             raise DownloadRunnerError("EVIDENCE_VALIDATION_FAILED") from None
         try:
-            _publish_evidence(evidence)
+            _publish_evidence(evidence, operational_evidence_path)
+        except DownloadRunnerError:
+            raise
         except Exception:  # noqa: BLE001
             raise DownloadRunnerError("EVIDENCE_WRITE_FAILED") from None
         return evidence

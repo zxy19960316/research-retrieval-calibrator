@@ -6,6 +6,7 @@ import importlib
 import importlib.metadata
 import json
 import os
+import subprocess
 import sys
 from collections.abc import Callable
 from pathlib import Path
@@ -405,8 +406,8 @@ def test_live_download_proves_offline_reuse_before_writing_evidence(
     expected_call_count = 2 if initial_status == "PUBLISHED" else 1
     assert len(preparation_calls) == expected_call_count
     assert preparation_calls[0] == {
-        "selection_path": _SELECTION_PATH,
-        "snapshot_dir": _SNAPSHOT_DIR,
+        "selection_path": _REPO_ROOT / _SELECTION_PATH,
+        "snapshot_dir": _REPO_ROOT / _SNAPSHOT_DIR,
         "download_file": fake_downloader,
         "disk_usage": disk_usage,
     }
@@ -640,3 +641,298 @@ def test_evidence_validation_happens_before_replace_and_preserves_other_temp_fil
     assert not evidence_path.exists()
     assert sentinel.read_text(encoding="utf-8") == "preserve"
     assert _owned_evidence_temp_files(evidence_path, sentinel) == []
+
+
+@pytest.mark.parametrize("invocation", ("module", "script"))
+def test_cli_smoke_from_non_repository_cwd_needs_no_live_flag_or_side_effects(
+    tmp_path: Path,
+    invocation: str,
+) -> None:
+    outside_cwd = tmp_path / "outside-cwd"
+    outside_cwd.mkdir()
+    environment = dict(os.environ)
+    if invocation == "module":
+        existing_python_path = environment.get("PYTHONPATH")
+        environment["PYTHONPATH"] = (
+            str(_REPO_ROOT)
+            if not existing_python_path
+            else f"{_REPO_ROOT}{os.pathsep}{existing_python_path}"
+        )
+        command = [sys.executable, "-m", _MODULE_NAME]
+    else:
+        command = [
+            sys.executable,
+            str(_REPO_ROOT / "scripts" / "download_m2_t02_reranker_snapshot.py"),
+        ]
+
+    completed = subprocess.run(
+        command,
+        cwd=outside_cwd,
+        env=environment,
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+
+    assert completed.returncode == 2
+    assert not (outside_cwd / "models").exists()
+    assert not (outside_cwd / "evaluation").exists()
+
+
+@pytest.mark.parametrize(
+    "offline_value",
+    ("1", "true", "TRUE", "on", "ON", "yes", "YES", "  TrUe  "),
+)
+def test_truthy_hub_offline_values_fail_before_plan_metadata_import_or_writes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    offline_value: str,
+) -> None:
+    module = _download_module()
+    evidence_path = tmp_path / "evidence.json"
+    snapshot_dir = tmp_path / "models" / "snapshot"
+    events: list[str] = []
+    monkeypatch.setattr(module, "EVIDENCE_PATH", evidence_path)
+    monkeypatch.setattr(module, "SNAPSHOT_DIR", snapshot_dir)
+    monkeypatch.setenv("HF_HUB_OFFLINE", offline_value)
+
+    def forbidden_plan(_path: Path) -> object:
+        events.append("plan")
+        raise AssertionError("offline mode must not load a SnapshotPlan")
+
+    def forbidden_version(_distribution: str) -> str:
+        events.append("metadata")
+        raise AssertionError("offline mode must not read Hub package metadata")
+
+    def forbidden_import(_name: str, _package: str | None = None) -> ModuleType:
+        events.append("hub-import")
+        raise AssertionError("offline mode must not import the Hub client")
+
+    monkeypatch.setattr(module, "load_snapshot_plan", forbidden_plan, raising=False)
+    monkeypatch.setattr(importlib.metadata, "version", forbidden_version)
+    monkeypatch.setattr(importlib, "import_module", forbidden_import)
+
+    with pytest.raises(RuntimeError) as raised:
+        module.run_download(execute_live_download=True)
+
+    _assert_error_code(raised, "HUB_OFFLINE_MODE_ENABLED")
+    assert events == []
+    assert os.environ["HF_HUB_OFFLINE"] == offline_value
+    assert not snapshot_dir.exists()
+    assert not evidence_path.exists()
+
+
+def test_invalid_selection_fails_before_hub_metadata_import_preparation_or_writes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _download_module()
+    selection_path = tmp_path / "invalid-selection.json"
+    selection_path.write_text("{", encoding="utf-8")
+    evidence_path = tmp_path / "evidence.json"
+    snapshot_dir = tmp_path / "models" / "snapshot"
+    events: list[str] = []
+    preparation_calls: list[dict[str, object]] = []
+    monkeypatch.setattr(module, "SELECTION_PATH", selection_path)
+    monkeypatch.setattr(module, "SNAPSHOT_DIR", snapshot_dir)
+    monkeypatch.setattr(module, "EVIDENCE_PATH", evidence_path)
+    monkeypatch.delenv("HF_HUB_OFFLINE", raising=False)
+
+    def forbidden_version(_distribution: str) -> str:
+        events.append("metadata")
+        raise AssertionError("invalid selection must stop before package metadata")
+
+    def forbidden_import(_name: str, _package: str | None = None) -> ModuleType:
+        events.append("hub-import")
+        raise AssertionError("invalid selection must stop before Hub import")
+
+    def forbidden_preparation(**kwargs: object) -> object:
+        preparation_calls.append(kwargs)
+        raise AssertionError("invalid selection must stop before preparation")
+
+    _install_fake_preparation(monkeypatch, forbidden_preparation)
+    monkeypatch.setattr(importlib.metadata, "version", forbidden_version)
+    monkeypatch.setattr(importlib, "import_module", forbidden_import)
+
+    with pytest.raises(RuntimeError) as raised:
+        module.run_download(execute_live_download=True)
+
+    _assert_error_code(raised, "SELECTION_VALIDATION_FAILED")
+    assert events == []
+    assert preparation_calls == []
+    assert not snapshot_dir.exists()
+    assert not evidence_path.exists()
+
+
+def test_operational_paths_are_repository_anchored_but_evidence_paths_stay_relative(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    outside_cwd = tmp_path / "outside-cwd"
+    outside_cwd.mkdir()
+    evidence_path = tmp_path / "injected-evidence.json"
+    preparation_calls: list[dict[str, object]] = []
+
+    def fake_preparation(**kwargs: object) -> object:
+        preparation_calls.append(kwargs)
+        assert kwargs["selection_path"] == _REPO_ROOT / _SELECTION_PATH
+        assert kwargs["snapshot_dir"] == _REPO_ROOT / _SNAPSHOT_DIR
+        return _success_result("REUSED", kwargs["snapshot_dir"])
+
+    _install_fake_preparation(monkeypatch, fake_preparation)
+    module = _download_module()
+    monkeypatch.setattr(module, "EVIDENCE_PATH", evidence_path)
+    monkeypatch.delenv("HF_HUB_OFFLINE", raising=False)
+    _configure_fake_hub(monkeypatch, module)
+    monkeypatch.chdir(outside_cwd)
+
+    evidence = module.run_download(execute_live_download=True)
+
+    assert module._operational_path(_SELECTION_PATH) == _REPO_ROOT / _SELECTION_PATH
+    assert module._operational_path(_SNAPSHOT_DIR) == _REPO_ROOT / _SNAPSHOT_DIR
+    assert module._operational_path(evidence_path) == evidence_path
+    assert len(preparation_calls) == 1
+    assert evidence["download_policy"]["selection_path"] == _SELECTION_PATH.as_posix()
+    assert evidence["download_policy"]["snapshot_path"] == _SNAPSHOT_DIR.as_posix()
+    assert evidence_path.is_file()
+    assert not (outside_cwd / "models").exists()
+    assert not (outside_cwd / "evaluation").exists()
+
+
+def test_evidence_uses_the_verified_snapshot_plan_not_a_later_selection_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    selection_path = tmp_path / "selection.json"
+    selection_path.write_bytes(_SELECTION_ARTIFACT.read_bytes())
+    original_selection = json.loads(selection_path.read_text(encoding="utf-8"))
+    evidence_path = tmp_path / "evidence.json"
+    snapshot_dir = tmp_path / "models" / "snapshot"
+
+    def fake_preparation(**kwargs: object) -> object:
+        mutated_selection = json.loads(selection_path.read_text(encoding="utf-8"))
+        mutated_selection["source_files"].reverse()
+        selection_path.write_text(
+            json.dumps(mutated_selection, ensure_ascii=True, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        return _success_result("REUSED", kwargs["snapshot_dir"])
+
+    _install_fake_preparation(monkeypatch, fake_preparation)
+    module = _download_module()
+    monkeypatch.setattr(module, "SELECTION_PATH", selection_path)
+    monkeypatch.setattr(module, "SNAPSHOT_DIR", snapshot_dir)
+    monkeypatch.setattr(module, "EVIDENCE_PATH", evidence_path)
+    monkeypatch.delenv("HF_HUB_OFFLINE", raising=False)
+    _configure_fake_hub(monkeypatch, module)
+
+    evidence = module.run_download(execute_live_download=True)
+
+    assert evidence["snapshot"]["files"] == [
+        {
+            "path": entry["path"],
+            "size_bytes": entry["size_bytes"],
+            "digest": entry["digest"],
+            "digest_type": entry["digest_type"],
+            "verified": True,
+        }
+        for entry in original_selection["source_files"]
+    ]
+    assert evidence["snapshot"]["total_size_bytes"] == original_selection["selected_model"][
+        "pinned_source_files_size_bytes"
+    ]
+
+
+@pytest.mark.parametrize(
+    "existing_kind",
+    ("published", "reused", "malformed", "directory", "symlink"),
+)
+def test_conflicting_existing_evidence_is_never_overwritten(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    existing_kind: str,
+) -> None:
+    module = _download_module()
+    evidence_path = tmp_path / "evidence.json"
+    snapshot_dir = tmp_path / "snapshot"
+    snapshot_dir.mkdir()
+    snapshot_sentinel = snapshot_dir / "preserve.txt"
+    snapshot_sentinel.write_text("preserve", encoding="utf-8")
+    selection_before = _SELECTION_ARTIFACT.read_bytes()
+    installation_before = _INSTALLATION_PATH.read_bytes()
+    monkeypatch.setattr(module, "EVIDENCE_PATH", evidence_path)
+    candidate_status = "REUSED" if existing_kind == "published" else "PUBLISHED"
+    candidate = module._expected_evidence(candidate_status)
+
+    if existing_kind == "published":
+        evidence_path.write_text(
+            json.dumps(module._expected_evidence("PUBLISHED"), ensure_ascii=True, indent=2) + "\n",
+            encoding="utf-8",
+        )
+    elif existing_kind == "reused":
+        evidence_path.write_text(
+            json.dumps(module._expected_evidence("REUSED"), ensure_ascii=True, indent=2) + "\n",
+            encoding="utf-8",
+        )
+    elif existing_kind == "malformed":
+        evidence_path.write_text("{", encoding="utf-8")
+    elif existing_kind == "directory":
+        evidence_path.mkdir()
+    else:
+        target = tmp_path / "existing-evidence.json"
+        target.write_text("preserve", encoding="utf-8")
+        try:
+            evidence_path.symlink_to(target)
+        except OSError as exc:
+            pytest.skip(f"symlinks are unavailable in this test environment: {exc}")
+
+    before_mtime = evidence_path.lstat().st_mtime_ns
+    before_bytes = None if evidence_path.is_symlink() or evidence_path.is_dir() else evidence_path.read_bytes()
+    replace_calls: list[tuple[Path, Path]] = []
+    real_replace = module.os.replace
+
+    def record_replace(source: object, target: object) -> None:
+        replace_calls.append((Path(source), Path(target)))
+        real_replace(source, target)
+
+    monkeypatch.setattr(module.os, "replace", record_replace)
+
+    with pytest.raises(RuntimeError) as raised:
+        module._publish_evidence(candidate)
+
+    _assert_error_code(raised, "EVIDENCE_CONFLICT")
+    assert evidence_path.lstat().st_mtime_ns == before_mtime
+    if before_bytes is not None:
+        assert evidence_path.read_bytes() == before_bytes
+    assert replace_calls == []
+    assert not list(evidence_path.parent.glob(f".{evidence_path.name}.tmp-*"))
+    assert snapshot_sentinel.read_text(encoding="utf-8") == "preserve"
+    assert _SELECTION_ARTIFACT.read_bytes() == selection_before
+    assert _INSTALLATION_PATH.read_bytes() == installation_before
+
+
+def test_identical_existing_evidence_is_idempotent_without_replace_or_mtime_change(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _download_module()
+    evidence_path = tmp_path / "evidence.json"
+    monkeypatch.setattr(module, "EVIDENCE_PATH", evidence_path)
+    candidate = module._expected_evidence("REUSED")
+    candidate_bytes = json.dumps(candidate, ensure_ascii=True, indent=2).encode("utf-8") + b"\n"
+    evidence_path.write_bytes(candidate_bytes)
+    before_mtime = evidence_path.stat().st_mtime_ns
+    replace_calls: list[tuple[object, object]] = []
+
+    def forbidden_replace(source: object, target: object) -> None:
+        replace_calls.append((source, target))
+        raise AssertionError("identical evidence must not be replaced")
+
+    monkeypatch.setattr(module.os, "replace", forbidden_replace)
+
+    module._publish_evidence(candidate)
+
+    assert replace_calls == []
+    assert evidence_path.read_bytes() == candidate_bytes
+    assert evidence_path.stat().st_mtime_ns == before_mtime
+    assert not list(evidence_path.parent.glob(f".{evidence_path.name}.tmp-*"))

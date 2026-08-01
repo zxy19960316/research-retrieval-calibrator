@@ -469,6 +469,59 @@ def test_reused_evidence_never_claims_a_download_in_this_run(
 
 
 @pytest.mark.parametrize(
+    ("existing_status", "next_status"),
+    (("PUBLISHED", "REUSED"), ("REUSED", "PUBLISHED")),
+)
+def test_formal_evidence_is_never_replaced_by_a_different_preparation_status(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    existing_status: str,
+    next_status: str,
+) -> None:
+    preparation_calls: list[dict[str, object]] = []
+    snapshot_dir = tmp_path / "models" / "snapshot"
+    evidence_path = tmp_path / "m2-t02-reranker-snapshot-download.json"
+
+    def fake_preparation(**kwargs: object) -> SimpleNamespace:
+        preparation_calls.append(kwargs)
+        if len(preparation_calls) == 1:
+            return SimpleNamespace(status=next_status, snapshot_dir=kwargs["snapshot_dir"])
+        return SimpleNamespace(status="REUSED", snapshot_dir=kwargs["snapshot_dir"])
+
+    preparation = importlib.import_module(_PREPARATION_MODULE)
+    monkeypatch.setattr(preparation, "prepare_snapshot", fake_preparation)
+    module = _download_module()
+    monkeypatch.setattr(module, "SNAPSHOT_DIR", snapshot_dir)
+    monkeypatch.setattr(module, "EVIDENCE_PATH", evidence_path)
+    monkeypatch.delenv("HF_HUB_OFFLINE", raising=False)
+    existing = module._expected_evidence(existing_status)
+    existing_bytes = json.dumps(existing, ensure_ascii=True, indent=2).encode("utf-8") + b"\n"
+    evidence_path.write_bytes(existing_bytes)
+    before_mtime = evidence_path.stat().st_mtime_ns
+
+    real_import_module = importlib.import_module
+
+    def fake_import_module(name: str, package: str | None = None) -> ModuleType:
+        if name != "huggingface_hub":
+            return real_import_module(name, package)
+        fake_hub = ModuleType("huggingface_hub")
+        fake_hub.hf_hub_download = lambda **_kwargs: "fake-download"  # type: ignore[attr-defined]
+        return fake_hub
+
+    monkeypatch.setattr(importlib.metadata, "version", lambda _name: "0.34.3")
+    monkeypatch.setattr(importlib, "import_module", fake_import_module)
+
+    with pytest.raises(RuntimeError) as raised:
+        module.run_download(execute_live_download=True)
+
+    assert getattr(raised.value, "code", None) == "EVIDENCE_CONFLICT"
+    assert evidence_path.read_bytes() == existing_bytes
+    assert evidence_path.stat().st_mtime_ns == before_mtime
+    assert not list(evidence_path.parent.glob(f".{evidence_path.name}.tmp-*"))
+    assert len(preparation_calls) == (2 if next_status == "PUBLISHED" else 1)
+
+
+@pytest.mark.parametrize(
     "mutation",
     (
         "absolute-path",

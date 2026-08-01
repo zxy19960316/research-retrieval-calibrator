@@ -881,3 +881,133 @@ It may record tokenizer/model loading evidence but must not score the full
 33-candidate set, modify `STATUS.md`, or begin B3, M2-T03, or M3. Until the
 later C closure task, M2 remains `1/5`; B3 alone may run the complete 33-paper
 candidate set.
+
+#### B2-L-F-I.1 Runner startup, repository paths, evidence idempotence, and mypy boundary
+
+**Files:**
+
+- Modify: `pyproject.toml`
+- Modify: `scripts/download_m2_t02_reranker_snapshot.py`
+- Modify: `tests/unit/test_m2_t02_reranker_snapshot_download_runner.py`
+- Modify: `tests/contract/test_m2_t02_reranker_snapshot_download.py`
+- Modify: `docs/superpowers/plans/2026-07-29-m2-t02-reranker-provider.md`
+
+**Goal:** Harden the already implemented controlled runner without carrying
+out a real download. The canonical entry point must be
+`py -3.12 -m scripts.download_m2_t02_reranker_snapshot`; direct execution may
+bootstrap only the `__file__`-derived repository root. Operational selection,
+snapshot, and evidence paths must not depend on the caller's working directory.
+
+**Interfaces:**
+
+- Consumes: `load_snapshot_plan(path: Path) -> SnapshotPlan` and
+  `prepare_snapshot(selection_path: Path, snapshot_dir: Path, ...)` from
+  `scripts.prepare_m2_t02_reranker_snapshot`.
+- Produces: `_operational_path(path: Path) -> Path`, verified-plan evidence
+  construction, stable runner errors `SELECTION_VALIDATION_FAILED` and
+  `EVIDENCE_CONFLICT`, and atomic idempotent evidence publication.
+
+- [ ] **Step 1: Add the red startup, root-path, plan, offline, and evidence tests**
+
+  Add subprocess smoke coverage for both module and direct-script invocation
+  without `--execute-live-download`; each must return non-zero before Hub
+  metadata/import/preparation and leave a non-repository CWD without `models/`
+  or `evaluation/`. Add fake-Hub tests that prove all trimmed truthy
+  `HF_HUB_OFFLINE` values (`1`, `TRUE`, `ON`, and `YES`, with the supplied case
+  variants) fail before plan loading, metadata lookup, Hub import, preparation,
+  or writes while preserving the caller environment. Add a malformed selection
+  test that fails before Hub work and writes. Add an absolute-path monkeypatch
+  test that receives repository-root operational paths at preparation and uses
+  only repository-relative paths in evidence.
+
+  Add plan-immutability coverage: copy the selection artifact, let
+  `load_snapshot_plan()` validate it, mutate that file in the fake preparation
+  callback, and assert the generated evidence retains the original plan's
+  files, sizes, digests, and aggregate sizes. Add publication cases for:
+
+  ```python
+  existing_published + new_reused == DownloadRunnerError("EVIDENCE_CONFLICT")
+  existing_reused + new_published == DownloadRunnerError("EVIDENCE_CONFLICT")
+  malformed_json_or_symlink_or_directory == DownloadRunnerError("EVIDENCE_CONFLICT")
+  existing_bytes == candidate_bytes  # no temp file, os.replace, byte, or mtime change
+  ```
+
+  For every conflict case, assert the snapshot and immutable selection and
+  installation artifacts are unchanged and invocation-owned temporary files are
+  removed. Run the two focused files and record their intentional red failures
+  before implementation. No test may call a real Hub client or download a model
+  or tokenizer.
+
+- [ ] **Step 2: Restore the project mypy scope**
+
+  Replace the current mypy configuration with exactly:
+
+  ```toml
+  [tool.mypy]
+  python_version = "3.12"
+  strict = true
+  plugins = ["pydantic.mypy"]
+  ```
+
+  Do not replace it with another global test exclusion or make `mypy .` an
+  acceptance command. The required production checks are
+  `py -3.12 -m mypy app evaluation scripts` and
+  `py -3.12 -m mypy scripts/download_m2_t02_reranker_snapshot.py`.
+
+- [ ] **Step 3: Make the runner location-independent and verified-plan based**
+
+  Define the fixed root as:
+
+  ```python
+  _REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+
+  def _operational_path(path: Path) -> Path:
+      if path.is_absolute():
+          return path
+      return _REPOSITORY_ROOT / path
+  ```
+
+  Before a direct script import, insert only this resolved root into `sys.path`
+  when `__package__` is empty. Load one `SnapshotPlan` after the offline guard
+  and before package metadata, Hub import, or preparation; map any selection
+  parser failure to `SELECTION_VALIDATION_FAILED` without exposing its original
+  exception. Use that one plan for `_expected_evidence()` and
+  `validate_download_evidence()`. The preparation call and evidence file write
+  must use operational paths, while serialized evidence retains the fixed
+  repository-relative selection and snapshot identifiers.
+
+- [ ] **Step 4: Publish evidence only if it is absent or byte-identical**
+
+  Encode and validate the candidate JSON before a write. If the final evidence
+  target is an existing regular file with identical bytes, return it without
+  creating a temporary file or calling `os.replace`. If it is a different file,
+  malformed JSON, symlink, directory, or another non-regular target, raise
+  `EVIDENCE_CONFLICT`; preserve bytes and `mtime`, preserve the snapshot and
+  immutable artifacts, and clean only the invocation's temporary file. When
+  absent, keep one uniquely named sibling temporary file and one `os.replace`.
+
+- [ ] **Step 5: Verify and publish the bounded task**
+
+  Run:
+
+  ```powershell
+  py -3.12 -m pytest -q `
+    tests/contract/test_m2_t02_reranker_snapshot_download.py `
+    tests/unit/test_m2_t02_reranker_snapshot_download_runner.py
+  py -3.12 -m pytest -q
+  py -3.12 -m ruff check app evaluation scripts tests
+  py -3.12 -m mypy app evaluation scripts
+  py -3.12 -m mypy scripts/download_m2_t02_reranker_snapshot.py
+  py -3.12 scripts/validate_project_docs.py
+  py -3.12 scripts/validate_phase.py M0
+  py -3.12 scripts/validate_m1_evidence.py
+  py -3.12 scripts/validate_m2_t01_evidence.py
+  ```
+
+  Confirm no model files, formal download evidence, Hugging Face cache, or
+  forbidden immutable-artifact/`STATUS.md` changes exist. Stage exactly the
+  five authorized files, commit as
+  `fix: harden reranker download runner execution boundaries`, push the
+  existing branch without rebase, amend, or force push, then update Draft PR
+  #11 with exact results and the explicit statement that B2-L-F-Live, B2-P,
+  and B3 have not started.
