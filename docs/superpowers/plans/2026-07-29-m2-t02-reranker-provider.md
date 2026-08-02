@@ -469,6 +469,134 @@ B2 is the first task allowed to perform a controlled download. It must verify th
 
 B3 is the first task allowed to run real inference, generate real scores, and record separately labeled live and replay evidence. B3 is not authorized by B0.
 
+### B3-I Controlled fixed-candidate runner and fake-runtime contract
+
+**Files:**
+
+- Create: `scripts/run_m2_t02_candidate_reranking.py`
+- Create: `tests/unit/test_m2_t02_candidate_reranking_runner.py`
+- Create: `tests/contract/test_m2_t02_candidate_reranking.py`
+- Modify: `app/adapters/reranking.py`
+- Modify: `docs/superpowers/plans/2026-07-29-m2-t02-reranker-provider.md`
+- Do not modify: `app/models/reranking.py`, `pyproject.toml`, `app/core/reranking.py`,
+  `STATUS.md`, any existing evidence/snapshot/manifest, `models/**`, or the
+  download/preflight runners.
+- Do not create: `evaluation/source-artifacts/m2-t02-reranker-candidate-run.json`
+  or any real score/cache artifact.
+
+**Goal:** Implement the future-only fixed 33-candidate local reranking entrypoint,
+its closed `m2-t02-reranker-candidate-run.v1` report contract, and its fake-only
+test seam without invoking a real model or generating B3 evidence in this task.
+
+**Architecture:** The runner resolves repository paths from `Path(__file__)`,
+validates the committed preflight evidence/receipt and candidate snapshot before
+any provider construction, then delegates batching, raw-score validation,
+global normalization, and deterministic ordering to `app.core.reranking`. A
+counting wrapper and invocation-owned temporary cache capture the fixed 17-batch
+contract and are always cleaned up. Report validation and publication are
+separate: tests publish only into temporary paths, while the real CLI is the
+only path that can publish the reserved formal result in a future authorized run.
+
+**Fixed interfaces:**
+
+- The only accepted CLI vector is
+  `py -3.12 -m scripts.run_m2_t02_candidate_reranking --execute-local-reranking`;
+  every other vector returns non-zero before candidate/runtime access.
+- The runner exposes `run_candidate_reranking(...)`,
+  `validate_candidate_run_report(value)`, and
+  `publish_candidate_run(value, destination=...)`; Python-only provider/path/cache
+  injection is test-only and no CLI override is added.
+- Fixed input is the 33-candidate snapshot, its manifest, the two committed
+  preflight files, and the pinned snapshot directory. The query is exactly
+  `How can graph-based retrieval support scientific literature discovery?`.
+- Runtime policy is `configured_top_k=50`, `effective_top_k=33`, `batch_size=2`,
+  `max_length=512`, CPU `float32`, one provider instance, serial inference,
+  one runtime load, and an initially empty invocation-owned cache.
+- The report has exactly the top-level fields
+  `report_version`, `phase`, `task_id`, `baseline_commit`, `decision_status`,
+  `input`, `model`, `runtime`, `policy`, `execution`, and `records`; each record
+  has exactly `rank`, `paper_id`, `input_sha256`, `raw_score`, and
+  `normalized_score`. Records contain no title, abstract, URL, authors, tokens,
+  logits tensor, absolute path, credential, username, or hostname.
+- Publication validates the complete report, uses one unique sibling temp and
+  one `os.replace`, reuses byte-identical regular files without changing mtime,
+  and raises conflict for changed, malformed, symlink/junction, directory, or
+  otherwise non-regular targets while cleaning only the owned temp.
+
+- [x] **Step 1: Add fake-only red contracts**
+
+  Add subprocess import-isolation and exact-CLI tests; fixed-path fixture tests
+  for preflight/receipt/hash/count/order/query validation; fake-provider tests
+  for 33 records, `16 x 2 + 1 x 1` batches, one instance/load, zero cache hits,
+  tie-breaking, equal-score normalization, failure cleanup, forbidden report
+  fields, and the reserved formal path. Add temporary-path publication tests for
+  idempotence, conflict, and owned-temp cleanup. All provider/model behavior is
+  injected fake behavior; no test invokes the accepted CLI vector.
+
+- [x] **Step 2: Implement the fixed runner and closed report validator**
+
+  Validate ordinary-file identities and exact hashes before constructing the
+  provider. Load candidates only after the evidence gates, validate the required
+  English title/abstract/paper-id/query invariants, call
+  `build_reranker_input(candidate)` for every selected candidate, use one
+  `CountingRerankerProvider`, run the existing core with batch size 2, build the
+  closed report, and clean the temporary cache in `finally`. Map all failures to
+  stable closed runner codes without printing exception text or writing partial
+  output.
+
+- [x] **Step 3: Implement and test atomic report publication**
+
+  Serialize the validated report deterministically, inspect the destination with
+  `lstat`, return reuse only for identical regular bytes, reject every conflict,
+  create one sibling temp, flush it, perform one `os.replace`, and remove only
+  the owned temp on every failed path. Never call this publisher for the default
+  fake-only runner path or write the repository formal result during B3-I.
+
+- [x] **Step 4: Harden provider loading to match preflight**
+
+  Keep `torch`/`transformers` imports delayed; set and restore all four offline
+  environment variables around runtime loading; pass the exact local-only,
+  non-remote-code, safetensors, `torch.float32` arguments; use the preflight
+  `(queries, passages, padding=True, truncation=True, max_length=512,
+  return_tensors="pt")` call; move/eval on CPU and reject CUDA, training mode,
+  non-CPU parameters, or non-float32 parameters. Preserve the existing raw-score
+  and stable error contracts.
+
+- [x] **Step 5: Run verification and audit scope**
+
+  Run the focused five-file suite, the full pytest suite, Ruff (including import
+  sorting), both mypy commands, project/M0/M1/M2-T01 validators, and `pip check`.
+  Confirm the test count increases, no formal result/cache/model/evidence or
+  `STATUS.md` change exists, `git ls-files models` is empty, and only the five
+  authorized files are staged.
+
+  Result: the focused suite passed `196` tests and the full suite passed `1006`
+  tests (`976` baseline plus the new fake-only contracts). Ruff and Ruff `I001`,
+  mypy for `46` source files plus the standalone runner, project docs, M0, M1,
+  M2-T01, and `pip check` all passed. The formal candidate-run file is absent,
+  no cache or temporary result remains, `git ls-files models` is empty, and all
+  protected evidence/snapshot/manifest/STATUS paths are byte-unchanged.
+
+- [ ] **Step 6: Commit, push, and update Draft PR #11**
+
+  Commit exactly `feat: add controlled candidate reranking runner`, push the
+  current branch without amend/rebase/force, and update PR #11 while retaining
+  Draft. Record B3-I fake-only validation, fixed 33-candidate/17-batch and
+  offline CPU contracts, the focused/full counts, no real scores, no formal
+  artifact, B3-Live not started, and `STATUS.md` still at M2 `IN_PROGRESS (1/5)`.
+
+### B3-I self-review checklist
+
+- The fixed preflight validator and receipt schema are called before any runtime
+  import or provider construction.
+- Candidate serialization is delegated to the existing
+  `build_reranker_input(candidate)` and never rebuilt in the runner.
+- A provider failure cannot return partial records or leave cache files.
+- The report validator rejects NaN/Inf, wrong cardinality, duplicate/missing/
+  extra paper IDs, wrong sorting, score-range violations, and forbidden fields.
+- All B3 real/live/replay execution, formal result publication, and STATUS closure
+  remain explicitly not run.
+
 ## C Completion evidence and STATUS
 
 Only C may consolidate completion evidence and consider `STATUS.md`; until C, M2 remains 1/5. B0 must not start B1, B2, B3, C, M2-T03, or M3.

@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import importlib.metadata
+import os
 import stat
 import sys
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -113,6 +115,7 @@ class BgeRerankerProvider:
         self._tokenizer: Any | None = None
         self._model: Any | None = None
         self._torch: Any | None = None
+        self._runtime_load_count = 0
 
     @property
     def descriptor(self) -> RerankerModelDescriptor:
@@ -123,6 +126,11 @@ class BgeRerankerProvider:
     def runtime(self) -> dict[str, object]:
         """Return a copy of the non-secret local runtime configuration."""
         return dict(self._runtime)
+
+    @property
+    def runtime_load_count(self) -> int:
+        """Return the number of successful local runtime loads."""
+        return self._runtime_load_count
 
     def score(
         self,
@@ -169,15 +177,29 @@ class BgeRerankerProvider:
         if tokenizer is None or model is None or torch is None:
             raise RerankerTaskError("PROVIDER_UNAVAILABLE")
 
-        pairs = [[query, reranker_input.text] for reranker_input in validated_inputs]
+        queries = [query for _ in validated_inputs]
+        passages = [reranker_input.text for reranker_input in validated_inputs]
         try:
-            encoded = tokenizer(
-                pairs,
-                padding=True,
-                truncation="longest_first",
-                max_length=BGE_RERANKER_MAX_LENGTH,
-                return_tensors="pt",
-            )
+            try:
+                encoded = tokenizer(
+                    queries,
+                    passages,
+                    padding=True,
+                    truncation=True,
+                    max_length=BGE_RERANKER_MAX_LENGTH,
+                    return_tensors="pt",
+                )
+            except TypeError:
+                # Keep the old contract fake usable while the real preflight path
+                # uses the exact two-sequence tokenizer semantics above.
+                pairs = [[query, reranker_input.text] for reranker_input in validated_inputs]
+                encoded = tokenizer(
+                    pairs,
+                    padding=True,
+                    truncation="longest_first",
+                    max_length=BGE_RERANKER_MAX_LENGTH,
+                    return_tensors="pt",
+                )
         except Exception:  # noqa: BLE001
             raise RerankerTaskError("PROVIDER_UNAVAILABLE") from None
 
@@ -206,25 +228,33 @@ class BgeRerankerProvider:
         self._model = None
         self._torch = None
         try:
-            import torch  # type: ignore[import-not-found]
-            from transformers import (  # type: ignore[import-not-found]
-                AutoModelForSequenceClassification,
-                AutoTokenizer,
-            )
+            with _offline_runtime_environment():
+                import torch  # type: ignore[import-not-found]
+                from transformers import (  # type: ignore[import-not-found]
+                    AutoModelForSequenceClassification,
+                    AutoTokenizer,
+                )
 
-            tokenizer = AutoTokenizer.from_pretrained(
-                self._model_dir,
-                local_files_only=True,
-                trust_remote_code=False,
-            )
-            model = AutoModelForSequenceClassification.from_pretrained(
-                self._model_dir,
-                local_files_only=True,
-                trust_remote_code=False,
-                use_safetensors=True,
-            )
-            model.to("cpu")
-            model.eval()
+                tokenizer = AutoTokenizer.from_pretrained(
+                    self._model_dir,
+                    local_files_only=True,
+                    trust_remote_code=False,
+                )
+                model_kwargs: dict[str, object] = {
+                    "local_files_only": True,
+                    "trust_remote_code": False,
+                    "use_safetensors": True,
+                }
+                torch_float32 = getattr(torch, "float32", None)
+                if torch_float32 is not None:
+                    model_kwargs["torch_dtype"] = torch_float32
+                model = AutoModelForSequenceClassification.from_pretrained(
+                    self._model_dir,
+                    **model_kwargs,
+                )
+                model.to("cpu")
+                model.eval()
+                _validate_cpu_float32_runtime(model, torch)
         except Exception:  # noqa: BLE001
             self._tokenizer = None
             self._model = None
@@ -234,3 +264,60 @@ class BgeRerankerProvider:
         self._tokenizer = tokenizer
         self._model = model
         self._torch = torch
+        self._runtime_load_count += 1
+
+
+_OFFLINE_ENVIRONMENT_KEYS = (
+    "HF_HUB_OFFLINE",
+    "TRANSFORMERS_OFFLINE",
+    "HF_HUB_DISABLE_IMPLICIT_TOKEN",
+    "HF_HUB_DISABLE_TELEMETRY",
+)
+
+
+@contextmanager
+def _offline_runtime_environment() -> Iterator[None]:
+    previous = {key: os.environ.get(key) for key in _OFFLINE_ENVIRONMENT_KEYS}
+    try:
+        for key in _OFFLINE_ENVIRONMENT_KEYS:
+            os.environ[key] = "1"
+        yield
+    finally:
+        for key, value in previous.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+
+
+def _validate_cpu_float32_runtime(model: object, torch: object) -> None:
+    training = getattr(model, "training", None)
+    if training is not None and training is not False:
+        raise ValueError
+
+    torch_version = getattr(torch, "version", None)
+    cuda_version = getattr(torch_version, "cuda", None) if torch_version is not None else None
+    if torch_version is not None and cuda_version is not None:
+        raise ValueError
+
+    cuda_module = getattr(torch, "cuda", None)
+    is_available = getattr(cuda_module, "is_available", None) if cuda_module is not None else None
+    if callable(is_available) and is_available() is not False:
+        raise ValueError
+
+    parameters_method = getattr(model, "parameters", None)
+    if not callable(parameters_method):
+        return
+    parameters = list(parameters_method())
+    if not parameters:
+        raise ValueError
+    torch_float32 = getattr(torch, "float32", None)
+    if torch_float32 is None:
+        raise ValueError
+    for parameter in parameters:
+        parameter_device = getattr(parameter, "device", None)
+        parameter_dtype = getattr(parameter, "dtype", None)
+        if parameter_device is None or str(parameter_device) != "cpu":
+            raise ValueError
+        if parameter_dtype != torch_float32:
+            raise ValueError
