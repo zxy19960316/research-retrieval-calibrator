@@ -1045,13 +1045,17 @@ preflight-evidence publication.
   installation SHA-256 remains
   `feb79ad507afb4bb7027e5aa49765b941414fe6e9a9e3ac024e7eba6d2ced831`.
 
-- [ ] **Step 7: Commit and update Draft PR #11**
+- [x] **Step 7: Commit and update Draft PR #11**
 
   Stage only the runner, two offline contract files, and this plan; commit as
   `feat: add controlled local reranker preflight`, push without amend/rebase/
   force, and record the exact focused/full counts, fake-only evidence type,
   no-real-load/no-real-inference boundary, B2-P-Live and B3 not started, and
   `STATUS.md` still at M2 `IN_PROGRESS (1/5)`.
+
+  Result: implementation commit `c0d8baf78ff3ad26be47429fed289402e32300a5`
+  was pushed to `agent/m2-t02-reranker-provider`. PR #11 remains open and
+  Draft; this plan-status update is limited to the same authorized plan file.
 
 #### B2-L-F-I.1 Runner startup, repository paths, evidence idempotence, and mypy boundary
 
