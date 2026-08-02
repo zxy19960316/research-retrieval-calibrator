@@ -913,6 +913,146 @@ It may record tokenizer/model loading evidence but must not score the full
 later C closure task, M2 remains `1/5`; B3 alone may run the complete 33-paper
 candidate set.
 
+#### B2-P-I Controlled local CPU float32 preflight implementation
+
+**Files:**
+
+- Create: `scripts/run_m2_t02_reranker_preflight.py`
+- Create: `tests/unit/test_m2_t02_reranker_preflight_runner.py`
+- Create: `tests/contract/test_m2_t02_reranker_preflight.py`
+- Modify: `docs/superpowers/plans/2026-07-29-m2-t02-reranker-provider.md`
+- Do not create: `evaluation/source-artifacts/m2-t02-reranker-preflight.json`
+
+**Goal:** Implement only the offline-controlled runner and fake-runtime
+contracts for a future CPU `float32` preflight. This task performs no real
+tokenizer/model import, no real inference, no network operation, and no formal
+preflight-evidence publication.
+
+**Fixed interfaces and boundaries:**
+
+- The only successful CLI argument vector is
+  `py -3.12 -m scripts.run_m2_t02_reranker_preflight --execute-local-preflight`.
+  `main(argv)` returns `2` for every other vector before runtime imports or
+  writes.
+- The runner exposes `run_preflight(*, execute_local_preflight=False,
+  memory_probe=None)`, `validate_preflight_evidence(value)`, and the fixed
+  `PREFLIGHT_EVIDENCE_PATH`; tests may monkeypatch fixed paths and fake modules
+  only through Python injection, never through CLI overrides.
+- Module import may use standard library plus the existing pure-standard
+  `scripts.prepare_m2_t02_reranker_snapshot` and download-evidence validator;
+  `torch`, `transformers`, `huggingface_hub`, `safetensors`, `tokenizers`, and
+  `FlagEmbedding` remain delayed imports.
+- Before delayed runtime imports, set `HF_HUB_OFFLINE=1`,
+  `TRANSFORMERS_OFFLINE=1`, `HF_HUB_DISABLE_IMPLICIT_TOKEN=1`, and
+  `HF_HUB_DISABLE_TELEMETRY=1`; restore every caller value in `finally`.
+- Revalidate the fixed selection and committed download evidence with
+  `load_snapshot_plan(...)` and `validate_download_evidence(...)`, using the
+  evidence-recorded platform values for the historical evidence check. Call
+  `prepare_snapshot(...)` with forbidden downloader and disk callbacks and
+  require `REUSED`; any callback attempt maps to
+  `SNAPSHOT_REUSE_VERIFICATION_FAILED`.
+- Gate exact versions before runtime imports: torch distribution
+  `2.4.1+cpu` with base `2.4.1`, transformers `4.53.2`, huggingface-hub
+  `0.34.3`, safetensors `0.5.3`, and tokenizers `0.21.2`. Reject missing,
+  drifted, CUDA, or unknown-local torch builds with closed error codes.
+- Use exactly `AutoTokenizer.from_pretrained(snapshot_path,
+  local_files_only=True, trust_remote_code=False)` and
+  `AutoModelForSequenceClassification.from_pretrained(snapshot_path,
+  local_files_only=True, trust_remote_code=False, use_safetensors=True,
+  torch_dtype=torch.float32)`, then `model.to("cpu")` and `model.eval()`.
+- Use the two fixed synthetic pairs, `batch_size=2`, `max_length=512`,
+  `padding=True`, `truncation=True`, and `return_tensors="pt"`. Serialize the
+  pair tuple as compact UTF-8 JSON and record only its SHA-256.
+- Run one `torch.inference_mode()` call and validate only CPU placement,
+  batch dimension `2`, pair-compatible logits count, `float32` dtype, and
+  finite logits. Never normalize, rank, print, persist, or return raw logits.
+- Inject a standard-library Windows memory probe and require strict
+  non-negative integers for total/available system memory, process working
+  set before load, and process peak working set after load/inference. Probe
+  failure is `MEMORY_PROBE_FAILED` and cannot produce success evidence.
+- Build and validate the closed `m2-t02-reranker-preflight.v1` schema with
+  `decision_status=cpu_float32_preflight_passed`, fixed runtime/load policy,
+  fixture hash, logits shape/dtype/finite facts, memory facts, and explicit
+  false flags for persisted logits, full-candidate reranking, and real scores.
+  Reject absolute paths, URLs, credentials, host/user data, raw logits, scores,
+  candidate identifiers, and extra fields.
+- Publish only through candidate validation, one uniquely named sibling temp,
+  one `os.replace`, and cleanup of that invocation's temp. Identical existing
+  regular evidence is idempotent; different, malformed, symlink, junction, or
+  directory targets return `PREFLIGHT_EVIDENCE_CONFLICT`.
+
+- [x] **Step 1: Add red import, CLI, identity, and delayed-runtime contracts**
+
+  Assert that importing the runner loads none of the runtime packages, that
+  missing/unknown/repeated/override arguments return `2` without reading
+  artifacts or writing evidence, and that the only accepted flag is
+  `--execute-local-preflight`.
+
+- [x] **Step 2: Add red evidence, REUSED, and package-gate contracts**
+
+  Inject the production preparation and download validators, assert the
+  evidence platform is used for validation, require `REUSED`, record zero
+  downloader/disk callback attempts, and cover evidence drift plus missing or
+  drifted runtime package metadata with the named closed codes.
+
+- [x] **Step 3: Add red fake-runtime and memory contracts**
+
+  Supply fake torch/transformers modules through `sys.modules` or delayed
+  import injection. Assert exact tokenizer/model kwargs, offline environment
+  ordering and restoration, CPU/float32 gates, one inference-mode call,
+  fixed-pair hash, shape/dtype/finite validation, no raw-logit persistence,
+  and memory probe success/failure paths.
+
+- [x] **Step 4: Add red closed-schema and atomic-publication contracts**
+
+  Validate the exact nested schema and forbidden-value closure. Exercise
+  identical-file idempotence without mtime change, conflict for changed or
+  malformed files and symlink/junction/directory targets, one sibling temp,
+  one `os.replace`, and cleanup limited to the owned temp. Use only temporary
+  test paths; never create the formal repository evidence path.
+
+- [x] **Step 5: Implement the minimal runner and pass focused tests**
+
+  Implement the fixed-path flow, delayed imports, package/memory gates,
+  fake-compatible runtime adapter, closed errors, evidence validator, and
+  atomic publisher without changing any existing production download,
+  preparation, dependency, app, selection, installation, snapshot-download
+  evidence, `STATUS.md`, or validator file.
+
+  ```powershell
+  py -3.12 -m pytest -q `
+    tests/unit/test_m2_t02_reranker_preflight_runner.py `
+    tests/contract/test_m2_t02_reranker_preflight.py
+  ```
+
+  Result: `29 passed`; the fake-only success path writes only under pytest's
+  temporary directory and does not create the formal preflight evidence.
+
+- [x] **Step 6: Run all offline gates and audit side effects**
+
+  Run the full pytest, Ruff, both mypy commands, project/M0/M1/M2-T01
+  validators, and `pip check`. Confirm the result exceeds the `907`-test
+  baseline, the selection/installation/snapshot-download evidence bytes and
+  `STATUS.md` are unchanged, no preflight evidence or cache exists, and
+  `git ls-files models` is empty.
+
+  Result: full pytest `936 passed`; Ruff, mypy (`45` source files plus the
+  standalone runner), project docs, M0/M1/M2-T01 validators, and `pip check`
+  passed. The formal preflight evidence is absent, the seven-file snapshot is
+  unchanged and ignored, no staging sibling or active runner exists, and
+  `git ls-files models` is empty. Selection SHA-256 remains
+  `19e86cf2176969236e70ff9770ac086a5555d40892c0bfa913ac768eb752604b` and
+  installation SHA-256 remains
+  `feb79ad507afb4bb7027e5aa49765b941414fe6e9a9e3ac024e7eba6d2ced831`.
+
+- [ ] **Step 7: Commit and update Draft PR #11**
+
+  Stage only the runner, two offline contract files, and this plan; commit as
+  `feat: add controlled local reranker preflight`, push without amend/rebase/
+  force, and record the exact focused/full counts, fake-only evidence type,
+  no-real-load/no-real-inference boundary, B2-P-Live and B3 not started, and
+  `STATUS.md` still at M2 `IN_PROGRESS (1/5)`.
+
 #### B2-L-F-I.1 Runner startup, repository paths, evidence idempotence, and mypy boundary
 
 **Files:**
