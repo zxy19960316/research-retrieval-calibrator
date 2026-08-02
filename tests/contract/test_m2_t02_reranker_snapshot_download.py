@@ -301,6 +301,22 @@ def test_selection_artifact_remains_immutable_not_downloaded() -> None:
     }
 
 
+def test_formal_evidence_file_projection_keeps_selection_order() -> None:
+    selection = json.loads(_SELECTION_ARTIFACT.read_text(encoding="utf-8"))
+    selection_paths = [entry["path"] for entry in selection["source_files"]]
+    evidence_paths = [entry["path"] for entry in _source_file_projection()]
+
+    assert selection_paths == evidence_paths == [
+        "README.md",
+        "config.json",
+        "model.safetensors",
+        "sentencepiece.bpe.model",
+        "special_tokens_map.json",
+        "tokenizer.json",
+        "tokenizer_config.json",
+    ]
+
+
 def test_runtime_installation_evidence_still_proves_exact_clean_dependencies() -> None:
     installation = json.loads(_INSTALLATION_ARTIFACT.read_text(encoding="utf-8"))
     packages = {entry["name"]: entry for entry in installation["installed_packages"]}

@@ -9,6 +9,7 @@ import os
 import re
 import subprocess
 import sys
+from dataclasses import replace
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 from typing import Any
@@ -33,6 +34,10 @@ _EXPECTED_FILES = (
     ("special_tokens_map.json", "git_blob_sha1", "git", True),
     ("tokenizer.json", "sha256", "lfs", True),
     ("tokenizer_config.json", "git_blob_sha1", "git", True),
+)
+_EXPECTED_EXECUTION_FILES = (
+    tuple(entry for entry in _EXPECTED_FILES if entry[0] != "model.safetensors")
+    + (next(entry for entry in _EXPECTED_FILES if entry[0] == "model.safetensors"),)
 )
 _EXECUTION_STATE = {
     "weights_downloaded": False,
@@ -316,6 +321,48 @@ def test_load_snapshot_plan_reads_the_exact_selected_model_and_seven_files() -> 
     assert len(plan.files) == 7
 
 
+def test_execution_file_order_moves_only_weight_to_the_end_without_mutating_plan() -> None:
+    module = _snapshot_module()
+    plan = module.load_snapshot_plan(_SELECTION_ARTIFACT)
+    original_files = plan.files
+
+    execution_files = module._execution_file_order(plan.files)
+
+    assert [entry.path for entry in execution_files] == [
+        entry[0] for entry in _EXPECTED_EXECUTION_FILES
+    ]
+    assert len(execution_files) == len(plan.files) == 7
+    assert {id(entry) for entry in execution_files} == {
+        id(entry) for entry in plan.files
+    }
+    assert plan.files is original_files
+    assert plan.files == original_files
+
+
+@pytest.mark.parametrize("invalid_kind", ("unknown", "duplicate", "missing-weight"))
+def test_execution_file_order_rejects_unknown_duplicate_or_missing_weight(
+    invalid_kind: str,
+) -> None:
+    module = _snapshot_module()
+    plan = module.load_snapshot_plan(_SELECTION_ARTIFACT)
+    if invalid_kind == "unknown":
+        invalid_files = (
+            replace(plan.files[0], path="unknown.bin"),
+            *plan.files[1:],
+        )
+    elif invalid_kind == "duplicate":
+        invalid_files = (plan.files[0], plan.files[0], *plan.files[1:-1])
+    else:
+        invalid_files = tuple(
+            file_plan
+            for file_plan in plan.files
+            if file_plan.path != "model.safetensors"
+        )
+
+    with pytest.raises(ValueError):
+        module._execution_file_order(invalid_files)
+
+
 @pytest.mark.parametrize("mutation", _INVALID_SELECTION_MUTATIONS)
 def test_load_snapshot_plan_rejects_closed_selection_mutations(
     tmp_path: Path, mutation: str
@@ -363,7 +410,7 @@ def test_disk_boundary_allows_download_when_free_equals_required(tmp_path: Path)
     )
 
     assert result.status == "PUBLISHED"
-    assert calls == [entry[0] for entry in _EXPECTED_FILES]
+    assert calls == [entry[0] for entry in _EXPECTED_EXECUTION_FILES]
     _assert_exact_snapshot(snapshot_dir, payloads)
     _assert_no_staging(snapshot_dir)
 
@@ -569,8 +616,9 @@ def test_prepare_snapshot_uses_safe_parameters_and_one_atomic_replace(
     assert result.snapshot_dir == snapshot_dir
     assert len(replace_calls) == 1
     assert [call["filename"] for call in download_calls] == [
-        entry[0] for entry in _EXPECTED_FILES
+        entry[0] for entry in _EXPECTED_EXECUTION_FILES
     ]
+    assert len(download_calls) == len({call["filename"] for call in download_calls}) == 7
     staging_dirs = {Path(str(call["local_dir"])) for call in download_calls}
     assert len(staging_dirs) == 1
     assert staging_dirs == {replace_calls[0][0]}
@@ -801,7 +849,7 @@ def test_staging_content_is_closed_before_publication(
 
     def downloader(**kwargs: object) -> str:
         destination = _write_downloaded_file(kwargs, payloads)
-        if str(kwargs["filename"]) == _EXPECTED_FILES[-1][0]:
+        if str(kwargs["filename"]) == _EXPECTED_EXECUTION_FILES[-1][0]:
             staging = Path(str(kwargs["local_dir"]))
             if staging_mutation == "extra-file":
                 (staging / "unexpected.bin").write_bytes(b"unexpected")
@@ -897,6 +945,75 @@ def test_download_failures_at_every_stage_clean_all_partial_state(
     assert _tree_state(unrelated) == unrelated_before
     assert _tree_state(staging_sentinel) == sentinel_before
     assert set(snapshot_dir.parent.glob(".snapshot.staging-*")) == {staging_sentinel}
+
+
+def test_supporting_file_failure_never_calls_weight_downloader(tmp_path: Path) -> None:
+    module = _snapshot_module()
+    selection_path, payloads = _write_small_selection(tmp_path)
+    snapshot_dir = tmp_path / "snapshot"
+    attempts: list[str] = []
+
+    def downloader(**kwargs: object) -> str:
+        filename = str(kwargs["filename"])
+        attempts.append(filename)
+        if filename == "sentencepiece.bpe.model":
+            raise OSError("supporting file failure")
+        return str(_write_downloaded_file(kwargs, payloads))
+
+    with pytest.raises(module.SnapshotPreparationError) as raised:
+        module.prepare_snapshot(
+            selection_path=selection_path,
+            snapshot_dir=snapshot_dir,
+            download_file=downloader,
+            disk_usage=_ample_disk,
+        )
+
+    assert raised.value.code == "DOWNLOAD_FAILED"
+    assert attempts == [
+        "README.md",
+        "config.json",
+        "sentencepiece.bpe.model",
+    ]
+    assert "model.safetensors" not in attempts
+    assert not snapshot_dir.exists()
+    _assert_no_staging(snapshot_dir)
+
+
+def test_weight_failure_cleans_owned_staging_after_supporting_files(
+    tmp_path: Path,
+) -> None:
+    module = _snapshot_module()
+    selection_path, payloads = _write_small_selection(tmp_path)
+    snapshot_dir = tmp_path / "snapshot"
+    staging_sentinel = tmp_path / ".snapshot.staging-do-not-touch"
+    staging_sentinel.mkdir()
+    (staging_sentinel / "marker").write_bytes(b"preserve-staging-sentinel")
+    sentinel_before = _tree_state(staging_sentinel)
+    attempts: list[str] = []
+
+    def downloader(**kwargs: object) -> str:
+        filename = str(kwargs["filename"])
+        attempts.append(filename)
+        if filename == "model.safetensors":
+            _write_downloaded_file(kwargs, payloads)
+            raise OSError("weight failure")
+        return str(_write_downloaded_file(kwargs, payloads))
+
+    with pytest.raises(module.SnapshotPreparationError) as raised:
+        module.prepare_snapshot(
+            selection_path=selection_path,
+            snapshot_dir=snapshot_dir,
+            download_file=downloader,
+            disk_usage=_ample_disk,
+        )
+
+    assert raised.value.code == "DOWNLOAD_FAILED"
+    assert attempts == [entry[0] for entry in _EXPECTED_EXECUTION_FILES]
+    assert not snapshot_dir.exists()
+    assert _tree_state(staging_sentinel) == sentinel_before
+    assert set(snapshot_dir.parent.glob(".snapshot.staging-*")) == {
+        staging_sentinel
+    }
 
 
 def test_staging_creation_failure_is_mapped_and_leaves_no_partial_state(

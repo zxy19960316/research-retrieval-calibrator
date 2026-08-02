@@ -109,6 +109,31 @@ class SnapshotPreparationResult:
     snapshot_dir: Path
 
 
+def _execution_file_order(
+    files: tuple[SnapshotFilePlan, ...],
+) -> tuple[SnapshotFilePlan, ...]:
+    """Return supporting files first without changing the canonical plan."""
+
+    expected_paths = tuple(spec[0] for spec in _FILE_SPECS)
+    paths = tuple(file_plan.path for file_plan in files)
+    if (
+        len(paths) != len(expected_paths)
+        or len(set(paths)) != len(paths)
+        or set(paths) != set(expected_paths)
+    ):
+        raise ValueError
+
+    weights = tuple(
+        file_plan for file_plan in files if file_plan.path == "model.safetensors"
+    )
+    if len(weights) != 1:
+        raise ValueError
+
+    return tuple(
+        file_plan for file_plan in files if file_plan.path != "model.safetensors"
+    ) + weights
+
+
 def _integrity_error() -> SnapshotPreparationError:
     return SnapshotPreparationError("INTEGRITY_CHECK_FAILED")
 
@@ -763,7 +788,7 @@ def prepare_snapshot(
 
         if staging_identity is None:
             raise _download_error() from None
-        for file_plan in plan.files:
+        for file_plan in _execution_file_order(plan.files):
             try:
                 result = download_file(
                     repo_id=plan.model_id,

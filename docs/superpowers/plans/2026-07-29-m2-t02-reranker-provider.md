@@ -1114,3 +1114,93 @@ live diagnostic nor downloads any snapshot artifact.
   classification, while an explicit cause does and wins over a simultaneous
   context. No live diagnostic has run in this stage. Any future live
   diagnostic remains separately authorized; B2-P and B3 have not started.
+
+#### B2-L-F-I.2 Supporting-file-first execution order
+
+**Goal:** Change only the internal download execution order so the six
+supporting files are fetched in their existing relative order before
+`model.safetensors`, while preserving the immutable selection order, the
+validated `SnapshotPlan.files` order, the formal evidence order, and all
+fixed file identities. This is an offline implementation and contract task;
+it must not invoke Hugging Face, create a real snapshot/evidence artifact, or
+load a model.
+
+**Files:**
+
+- Modify: `scripts/prepare_m2_t02_reranker_snapshot.py`
+- Modify: `tests/unit/test_m2_t02_reranker_snapshot.py`
+- Modify: `tests/unit/test_m2_t02_reranker_download_failure_diagnostics.py`
+- Modify: `tests/contract/test_m2_t02_reranker_snapshot_download.py`
+- Modify: `docs/superpowers/plans/2026-07-29-m2-t02-reranker-provider.md`
+
+**Interfaces:**
+
+- Add `_execution_file_order(files: tuple[SnapshotFilePlan, ...]) -> tuple[SnapshotFilePlan, ...]`.
+- Reject unknown, duplicate, missing, or multiple weight paths; valid output
+  contains the same seven objects with non-weight entries in input order and
+  `model.safetensors` last.
+- Use this tuple only in the downloader loop. Plan parsing, snapshot
+  verification, evidence construction, and diagnostic file ordinals continue
+  to use the original canonical order.
+
+- [x] **Step 1: Add failing offline contracts**
+
+  Assert the exact execution order
+  `README.md`, `config.json`, `sentencepiece.bpe.model`,
+  `special_tokens_map.json`, `tokenizer.json`, `tokenizer_config.json`,
+  `model.safetensors`; the original `SnapshotPlan.files` and selection/evidence
+  order remain unchanged; all seven objects download exactly once; supporting
+  failure never calls the weight downloader; weight failure cleans only owned
+  staging; and REUSED calls no downloader. Add invalid-path, duplicate-path,
+  and missing-weight fail-closed cases. Retain diagnostic ordinals 3 for the
+  weight and 4 for `sentencepiece.bpe.model`.
+
+- [x] **Step 2: Run red contracts**
+
+  ```powershell
+  py -3.12 -m pytest -q tests/unit/test_m2_t02_reranker_snapshot.py tests/unit/test_m2_t02_reranker_download_failure_diagnostics.py tests/contract/test_m2_t02_reranker_snapshot_download.py
+  ```
+
+  Expected: the new order assertions fail because the current loop iterates
+  `plan.files` directly. No network or model runtime is permitted.
+
+- [x] **Step 3: Implement the minimal order-only change**
+
+  Implement the pure helper with exact path-set and uniqueness validation,
+  preserve the input order of non-weight entries, append the single weight
+  object, and replace only the preparation loop's iteration source. Do not
+  alter `_FILE_SPECS`, selection parsing, digests, sizes, model/revision/path
+  constants, cleanup, retry behavior, CA/proxy/timeout/Xet settings, evidence,
+  STATUS, or the runner diagnostic map.
+
+- [x] **Step 4: Run offline validation**
+
+  ```powershell
+  py -3.12 -m pytest -q
+  py -3.12 -m ruff check app evaluation scripts tests
+  py -3.12 -m mypy app evaluation scripts
+  py -3.12 -m mypy scripts/download_m2_t02_reranker_snapshot.py
+  py -3.12 scripts/validate_project_docs.py
+  py -3.12 scripts/validate_phase.py M0
+  py -3.12 scripts/validate_m1_evidence.py
+  py -3.12 scripts/validate_m2_t01_evidence.py
+  py -3.12 -m pip check
+  ```
+
+  Confirm no live download, model/tokenizer load, snapshot/evidence artifact,
+  selection/installation byte change, or STATUS change occurred.
+
+- [ ] **Step 5: Commit and publish**
+
+  Stage only the five declared files, audit the diff, then use:
+
+  ```powershell
+  git commit -m "fix: download reranker weight after supporting files"
+  git push origin agent/m2-t02-reranker-provider
+  ```
+
+  Update Draft PR #11 with the prior ordinal-4 live failure and
+  100%-transferred-but-unpublished weight context, the supporting-first
+  scheduling change, unchanged canonical/evidence order, unchanged network
+  configuration and retry policy, offline-only validation, and the statement
+  that B2-P and B3 have not started.
