@@ -60,9 +60,9 @@ def _load_temp_download_evidence(
     return module
 
 
-def test_fixed_download_evidence_is_present_but_formal_preflight_evidence_is_absent() -> None:
+def test_fixed_download_and_formal_preflight_evidence_are_present() -> None:
     assert _DOWNLOAD_EVIDENCE.is_file()
-    assert not _FORMAL_EVIDENCE.exists()
+    assert _FORMAL_EVIDENCE.is_file()
 
 
 def test_download_evidence_decision_status_drift_fails_closed(
@@ -176,11 +176,12 @@ def test_schema_rejects_extra_or_sensitive_values(
 
 
 def test_cli_without_flag_does_not_import_runtime_or_write_formal_evidence() -> None:
+    before_bytes = _FORMAL_EVIDENCE.read_bytes()
+    before_mtime = _FORMAL_EVIDENCE.stat().st_mtime_ns
     code = (
         "import pathlib,sys; "
         "import scripts.run_m2_t02_reranker_preflight as runner; "
         "assert runner.main([])==2; "
-        "assert not pathlib.Path('evaluation/source-artifacts/m2-t02-reranker-preflight.json').exists(); "
         "assert not any(name.split('.')[0] in {'torch','transformers','huggingface_hub','safetensors','tokenizers','FlagEmbedding'} for name in sys.modules)"
     )
     completed = subprocess.run(
@@ -192,6 +193,8 @@ def test_cli_without_flag_does_not_import_runtime_or_write_formal_evidence() -> 
         env=os.environ.copy(),
     )
     assert completed.returncode == 0, completed.stderr
+    assert _FORMAL_EVIDENCE.read_bytes() == before_bytes
+    assert _FORMAL_EVIDENCE.stat().st_mtime_ns == before_mtime
 
 
 def test_atomic_publish_rejects_malformed_existing_target(

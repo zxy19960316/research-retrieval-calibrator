@@ -1487,7 +1487,7 @@ revision/path/runtime policy, or producing formal preflight evidence.
   used fake modules and temporary paths; no real tokenizer/model load or
   inference ran.
 
-- [ ] **Step 5: Commit, push, and update Draft PR #11**
+- [x] **Step 5: Commit, push, and update Draft PR #11**
 
   Stage only these four authorized files and commit exactly as:
 
@@ -1501,3 +1501,83 @@ revision/path/runtime policy, or producing formal preflight evidence.
   formal preflight evidence, B2-P-Live not started, B3 not started, and
   `STATUS.md` still `M2 IN_PROGRESS (1/5)`. Keep PR #11 open and Draft; stop
   immediately after the PR record is updated.
+
+  Completion record: commit `a50f1b9f5467c318dbbabe8807df6ede47d79b14`
+  closed the B2-P-I.1 fake-only safety contracts. Its formal evidence path
+  was intentionally absent at that commit; the later B2-P-Live execution is
+  recorded below without rewriting that historical result.
+
+#### B2-P-Live: Real local CPU float32 preflight PASS
+
+**Execution boundary:**
+
+- Execution HEAD: `a50f1b9f5467c318dbbabe8807df6ede47d79b14`.
+- The fixed runner was invoked exactly once with
+  `--execute-local-preflight`; exit code was `0`.
+- The execution used Windows AMD64, Python `3.12.10`, torch `2.4.1+cpu`,
+  transformers `4.53.2`, huggingface-hub `0.34.3`, safetensors `0.5.3`, and
+  tokenizers `0.21.2`.
+- Snapshot preparation was `REUSED`, with zero downloader and disk-usage
+  callback attempts.
+- Model loading was CPU float32, eval mode, local-only, no remote code, and
+  safetensors-enabled. The minimal inference result had shape `[2, 1]`,
+  dtype `float32`, and all finite values; logits were not persisted.
+- `full_candidate_reranking_run` and `real_candidate_scores_generated` are
+  both `false`. No 33-candidate run, ranking, score artifact, or raw logits
+  were produced.
+
+**Memory record:**
+
+- `system_total_physical_memory_bytes = 16873545728`
+- `system_available_physical_memory_before_bytes = 8793714688`
+- `process_working_set_before_bytes = 121421824`
+- `process_peak_working_set_after_load_bytes = 452280320`
+- `process_peak_working_set_after_inference_bytes = 1676398592`
+
+The process peak is approximately 1.56 GiB and does not equal complete model
+RAM or commit usage; safetensors mapping and demand paging can keep the
+post-load working set lower. Any later B3 run starts with batch size `2` and
+must not place all 33 candidates in one batch.
+
+**Evidence boundary:**
+
+The preflight evidence retains its runner-published `baseline_commit` of
+`7a234ff2684f24030dde91b3df6fe8483aa92688`, which is the stage baseline.
+The execution receipt is the separate proof of the real execution HEAD
+`a50f1b9f5467c318dbbabe8807df6ede47d79b14`. B2-P-Live is `PASS`; B3 has not
+started; `STATUS.md` remains `M2 IN_PROGRESS (1/5)`.
+
+#### B2-P-Evidence: Offline receipt and CI evidence contract PASS
+
+**Files:**
+
+- Preserve byte-identical:
+  `evaluation/source-artifacts/m2-t02-reranker-preflight.json`
+- Create:
+  `evaluation/source-artifacts/m2-t02-reranker-preflight-run-receipt.json`
+- Create:
+  `tests/contract/test_m2_t02_reranker_preflight_evidence.py`
+- Modify the historical pre-live contract only to preserve existing formal
+  evidence bytes/mtime when the CLI is invoked without its execution flag:
+  `tests/contract/test_m2_t02_reranker_preflight.py`
+- Modify this plan only for the evidence and execution record.
+
+The execution receipt is a closed, privacy-safe schema with `run_count = 1`,
+`exit_code = 0`, `decision_status = cpu_float32_preflight_passed`, and
+SHA-256 bindings for the formal evidence, runner, selection artifact, runtime
+installation artifact, and snapshot-download evidence. It contains no
+absolute paths, host/user/venv details, timestamps, URLs, credentials, raw
+logits, candidate content, scores, or rankings.
+
+The CI contract validates the formal evidence through production
+`validate_preflight_evidence`, checks strict closed schemas and byte hashes,
+and runs in an isolated temporary directory without a local `models/**`
+snapshot. It imports no torch, transformers, tokenizers, or safetensors and
+does not load a tokenizer/model or execute inference. The existing historical
+pre-live contract is updated only for the now-materialized evidence file: its
+no-flag CLI test verifies byte and mtime preservation rather than absence.
+
+The formal evidence SHA-256 is
+`103a73cc82674c2c1f1139a72a7a3d1a880029a7c01d292f52de24d6dc781b06`; the
+runner SHA-256 is
+`38ec370acd26a315fdb57bd405e9348081e37ea5f26bebb362cfcd3febd930d7`.

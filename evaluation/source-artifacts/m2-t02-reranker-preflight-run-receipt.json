@@ -1,0 +1,22 @@
+{
+  "report_version": "m2-t02-reranker-preflight-run-receipt.v1",
+  "phase": "M2",
+  "task_id": "M2-T02",
+  "execution_commit": "a50f1b9f5467c318dbbabe8807df6ede47d79b14",
+  "evidence_path": "evaluation/source-artifacts/m2-t02-reranker-preflight.json",
+  "evidence_sha256": "103a73cc82674c2c1f1139a72a7a3d1a880029a7c01d292f52de24d6dc781b06",
+  "runner_path": "scripts/run_m2_t02_reranker_preflight.py",
+  "runner_sha256": "38ec370acd26a315fdb57bd405e9348081e37ea5f26bebb362cfcd3febd930d7",
+  "selection_path": "evaluation/source-artifacts/m2-t02-reranker-selection.json",
+  "selection_sha256": "19e86cf2176969236e70ff9770ac086a5555d40892c0bfa913ac768eb752604b",
+  "runtime_installation_path": "evaluation/source-artifacts/m2-t02-reranker-runtime-installation.json",
+  "runtime_installation_sha256": "feb79ad507afb4bb7027e5aa49765b941414fe6e9a9e3ac024e7eba6d2ced831",
+  "snapshot_download_evidence_path": "evaluation/source-artifacts/m2-t02-reranker-snapshot-download.json",
+  "snapshot_download_evidence_sha256": "5114ce6ef2ca637f950e1683bfc7003029daff4f0f228ca6b909d0c97fb84bf8",
+  "exit_code": 0,
+  "run_count": 1,
+  "decision_status": "cpu_float32_preflight_passed",
+  "formal_evidence_created": true,
+  "model_rerun_performed": false,
+  "full_candidate_reranking_run": false
+}
