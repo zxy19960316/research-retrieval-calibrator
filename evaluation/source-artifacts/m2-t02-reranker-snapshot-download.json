@@ -1,0 +1,105 @@
+{
+  "report_version": "m2-t02-reranker-snapshot-download.v1",
+  "phase": "M2",
+  "task_id": "M2-T02",
+  "baseline_commit": "47587230c9bb02307c3a68807f149fa13df51e3d",
+  "decision_status": "downloaded_and_verified",
+  "platform": {
+    "system": "Windows",
+    "machine": "AMD64",
+    "python_version": "3.12.10"
+  },
+  "model": {
+    "provider_name": "bge_reranker_v2_m3",
+    "model_id": "BAAI/bge-reranker-v2-m3",
+    "revision": "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e"
+  },
+  "download_policy": {
+    "client": "huggingface_hub.hf_hub_download",
+    "client_version": "0.34.3",
+    "repo_type": "model",
+    "token": false,
+    "implicit_token_disabled": true,
+    "telemetry_disabled": true,
+    "selection_path": "evaluation/source-artifacts/m2-t02-reranker-selection.json",
+    "snapshot_path": "models/m2-t02/bge-reranker-v2-m3/953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e",
+    "network_scope": "pinned_huggingface_model_files_only"
+  },
+  "snapshot": {
+    "preparation_status": "PUBLISHED",
+    "file_count": 7,
+    "total_size_bytes": 2293259337,
+    "required_runtime_size_bytes": 2293242108,
+    "weight_size_bytes": 2271071852,
+    "exact_file_closure": true,
+    "local_hub_metadata_removed": true,
+    "git_ignored": true,
+    "files": [
+      {
+        "path": "README.md",
+        "size_bytes": 17229,
+        "digest": "553540879ec61aea21df00434c984c0f760a3fcc",
+        "digest_type": "git_blob_sha1",
+        "verified": true
+      },
+      {
+        "path": "config.json",
+        "size_bytes": 795,
+        "digest": "9f62673cb00ec41dcec8947b9ed16f6f2eb23ba2",
+        "digest_type": "git_blob_sha1",
+        "verified": true
+      },
+      {
+        "path": "model.safetensors",
+        "size_bytes": 2271071852,
+        "digest": "d9e3e081faff1eefb84019509b2f5558fd74c1a05a2c7db22f74174fcedb5286",
+        "digest_type": "sha256",
+        "verified": true
+      },
+      {
+        "path": "sentencepiece.bpe.model",
+        "size_bytes": 5069051,
+        "digest": "cfc8146abe2a0488e9e2a0c56de7952f7c11ab059eca145a0a727afce0db2865",
+        "digest_type": "sha256",
+        "verified": true
+      },
+      {
+        "path": "special_tokens_map.json",
+        "size_bytes": 964,
+        "digest": "b1879d702821e753ffe4245048eee415d54a9385",
+        "digest_type": "git_blob_sha1",
+        "verified": true
+      },
+      {
+        "path": "tokenizer.json",
+        "size_bytes": 17098273,
+        "digest": "69564b696052886ed0ac63fa393e928384e0f8caada38c1f4864a9bfbf379c15",
+        "digest_type": "sha256",
+        "verified": true
+      },
+      {
+        "path": "tokenizer_config.json",
+        "size_bytes": 1173,
+        "digest": "328a00a9a560aadcf2a3064f917517359eb3cc26",
+        "digest_type": "git_blob_sha1",
+        "verified": true
+      }
+    ]
+  },
+  "verification": {
+    "disk_space_gate": "passed",
+    "size_verification": "passed",
+    "digest_verification": "passed",
+    "atomic_publication": "passed",
+    "offline_reuse_check": "passed",
+    "downloader_called_during_offline_reuse": false,
+    "git_index_contains_snapshot_files": false
+  },
+  "execution_state": {
+    "snapshot_present_and_verified": true,
+    "download_performed_this_run": true,
+    "model_loaded": false,
+    "inference_run": false,
+    "real_scores_generated": false
+  }
+}

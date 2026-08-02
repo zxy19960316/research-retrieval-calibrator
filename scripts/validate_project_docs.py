@@ -5,6 +5,9 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+# Model snapshots are external artifacts. Their model-card links may point to
+# assets that are intentionally not part of the repository documentation set.
+EXTERNAL_MARKDOWN_ROOTS = (ROOT / "models",)
 EXPECTED_TASKS = {
     "M0": 4,
     "M1": 4,
@@ -76,6 +79,8 @@ def validate_phase_tasks(errors: list[str]) -> None:
 def validate_local_links(errors: list[str]) -> None:
     link_pattern = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
     for path in ROOT.rglob("*.md"):
+        if any(path.is_relative_to(root) for root in EXTERNAL_MARKDOWN_ROOTS):
+            continue
         text = path.read_text(encoding="utf-8")
         for target in link_pattern.findall(text):
             if target.startswith(("http://", "https://", "#")):

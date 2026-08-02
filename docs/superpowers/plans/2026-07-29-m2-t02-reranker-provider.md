@@ -871,6 +871,37 @@ allowlist for `BAAI/bge-reranker-v2-m3` revision
   inference, generate scores, modify the selection or installation evidence,
   modify `STATUS.md`, or begin B2-P, B3, M2-T03, or M3.
 
+#### B2-L-F-Live Successful controlled download
+
+This separately authorized live closure was executed exactly once on Windows
+with the existing temporary environment. It used `Python 3.12.10`,
+`huggingface-hub==0.34.3`, no `hf-xet`, and the Hub regular HTTP fallback.
+
+- [x] **Supporting-file-first download:** The actual completion order was
+  `README.md`, `config.json`, `sentencepiece.bpe.model`,
+  `special_tokens_map.json`, `tokenizer.json`, `tokenizer_config.json`, then
+  `model.safetensors`. Diagnostic ordinals remain canonical: ordinal `4` for
+  `sentencepiece.bpe.model` and ordinal `3` for `model.safetensors`.
+- [x] **Publication and verification:** All seven allowlisted files completed;
+  `preparation_status` was `PUBLISHED`, `decision_status` was
+  `downloaded_and_verified`, the aggregate snapshot size was
+  `2,293,259,337` bytes, digest verification passed, atomic publication
+  passed, and the internal offline `REUSED` check passed.
+- [x] **Evidence and artifact boundary:** The closed evidence JSON was written
+  and self-validated; staging is absent, the snapshot is not tracked by Git,
+  and the selection and installation SHA-256 values are unchanged.
+- [x] **Runtime boundary:** No tokenizer or model was loaded; inference,
+  scores, and benchmarks were not run. B2-P and B3 have not started, and no
+  further live runner invocation is permitted for this closure.
+- [x] **Project-doc validation repair:** The project documentation validator
+  now excludes ignored external `models/**` snapshot Markdown from repository
+  local-link checks, so model-card asset links do not invalidate project docs.
+  No snapshot content was changed.
+- [x] **Offline gates:** The evidence contract passed (`2` tests), the related
+  M2-T02 focused suite passed (`175` tests), the full suite passed (`907`
+  tests), and Ruff, both mypy checks, all project/evidence validators, and
+  `pip check` passed.
+
 ### B2-P CPU float32 preflight
 
 **Goal:** In a later, separately authorized task, run the first local-only CPU `float32` tokenizer/model preflight against the verified B2-L snapshot.
@@ -1190,17 +1221,17 @@ load a model.
   Confirm no live download, model/tokenizer load, snapshot/evidence artifact,
   selection/installation byte change, or STATUS change occurred.
 
-- [ ] **Step 5: Commit and publish**
+- [x] **Step 5: Commit and publish**
 
-  Stage only the five declared files, audit the diff, then use:
+  Stage only the three B2-L-Evidence files plus the minimal project-doc
+  validator repair, audit the diff, then use:
 
   ```powershell
-  git commit -m "fix: download reranker weight after supporting files"
+  git commit -m "chore: record verified reranker snapshot download"
   git push origin agent/m2-t02-reranker-provider
   ```
 
-  Update Draft PR #11 with the prior ordinal-4 live failure and
-  100%-transferred-but-unpublished weight context, the supporting-first
-  scheduling change, unchanged canonical/evidence order, unchanged network
-  configuration and retry policy, offline-only validation, and the statement
-  that B2-P and B3 have not started.
+  Update Draft PR #11 with the successful supporting-file-first live result,
+  unchanged canonical/evidence order and network configuration, closed
+  evidence and validation results, the minimal project-doc validator repair,
+  and the statement that B2-P and B3 have not started.
