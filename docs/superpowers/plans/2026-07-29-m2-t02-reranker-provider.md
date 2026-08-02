@@ -1379,3 +1379,125 @@ load a model.
   unchanged canonical/evidence order and network configuration, closed
   evidence and validation results, the minimal project-doc validator repair,
   and the statement that B2-P and B3 have not started.
+
+#### B2-P-I.1 Windows memory probe, eval-mode, and preflight failure-contract closure
+
+**Files:**
+
+- Modify: `scripts/run_m2_t02_reranker_preflight.py`
+- Modify: `tests/unit/test_m2_t02_reranker_preflight_runner.py`
+- Modify: `tests/contract/test_m2_t02_reranker_preflight.py`
+- Modify: `docs/superpowers/plans/2026-07-29-m2-t02-reranker-provider.md`
+- Do not create: `evaluation/source-artifacts/m2-t02-reranker-preflight.json`
+
+**Goal:** Close the local-only preflight safety contracts without loading a
+real tokenizer/model, running real inference, changing the fixed CLI/model/
+revision/path/runtime policy, or producing formal preflight evidence.
+
+**Interfaces and fixed boundaries:**
+
+- `_windows_memory_probe()` remains standard-library-only and returns exactly
+  four strict non-negative integers. It explicitly declares
+  `GlobalMemoryStatusEx`, `GetCurrentProcess`, and `GetProcessMemoryInfo`
+  `argtypes`/`restype`; `GetCurrentProcess.restype` is `wintypes.HANDLE` so a
+  64-bit handle cannot be truncated. Non-Windows and every API failure map to
+  `MEMORY_PROBE_FAILED`.
+- `model.eval()` is followed by direct observation of
+  `model.training is False`. A missing attribute, no-op eval, or any other
+  observed value maps to `MODEL_LOAD_FAILED`; evidence does not infer eval
+  mode from the method call alone.
+- Download evidence remains fixed to the committed PUBLISHED,
+  `downloaded_and_verified` artifact and the pinned model/revision/seven-file
+  projection. Runtime version absence maps to `RUNTIME_VERSION_UNAVAILABLE`;
+  any version drift maps to `RUNTIME_VERSION_MISMATCH`; CUDA builds and CUDA
+  availability map to `NON_CPU_TORCH_BUILD`.
+- The fake runtime must receive exactly the two fixed synthetic pairs,
+  tokenizer kwargs `{padding: True, truncation: True, max_length: 512,
+  return_tensors: "pt"}`, one model forward call, CPU float32 tensors and
+  logits, and no 33-candidate M1 input. Raw logits never enter evidence.
+- Evidence publication remains closed and atomic: symlink, junction,
+  directory, malformed target, or different regular-file targets conflict;
+  byte-identical regular evidence is reused without mtime/replace changes;
+  an absent target gets one sibling temp and exactly one `os.replace`; only
+  the invocation-owned temp is cleaned after a write failure.
+
+- [x] **Step 1: Add fake WinDLL, eval, runtime, evidence, and publication contracts**
+
+  Add fake WinDLL coverage for strict integer results, both Windows API
+  failures, non-Windows rejection, explicit ctypes signatures, and a
+  64-bit-handle round trip. Add fake-model coverage for training state,
+  tokenizer/model/parameter/CPU/float32/logit failures, exact pair and
+  tokenizer arguments, one forward call, no M1 candidate expansion, and no
+  raw-logit evidence. Add temporary-copy evidence mutations for decision
+  status, PUBLISHED preparation status, and model/revision/file projection.
+  Add package-not-found and every-runtime-version drift cases, CUDA cases,
+  and temporary-directory publication cases for link/junction/directory/
+  conflict/idempotence/single-temp/single-replace/owned-cleanup behavior.
+
+- [x] **Step 2: Implement the minimal closed runner changes**
+
+  Set the Windows declarations before the first API call:
+
+  ```python
+  kernel32.GlobalMemoryStatusEx.argtypes = [ctypes.POINTER(_MemoryStatusEx)]
+  kernel32.GlobalMemoryStatusEx.restype = wintypes.BOOL
+  kernel32.GetCurrentProcess.argtypes = []
+  kernel32.GetCurrentProcess.restype = wintypes.HANDLE
+  psapi.GetProcessMemoryInfo.argtypes = [
+      wintypes.HANDLE,
+      ctypes.POINTER(_ProcessMemoryCountersEx),
+      wintypes.DWORD,
+  ]
+  psapi.GetProcessMemoryInfo.restype = wintypes.BOOL
+  ```
+
+  Map probe failures to `MEMORY_PROBE_FAILED` and reject eval mode unless
+  `getattr(model, "training", sentinel) is False` after applying `eval()`.
+  Keep all existing fixed paths, privacy environment restoration, local-only
+  load kwargs, CPU float32 gates, fixed fixture hash, closed schema, and
+  atomic publisher behavior unchanged.
+
+- [x] **Step 3: Run focused offline validation**
+
+  ```powershell
+  py -3.12 -m pytest -q `
+    tests/unit/test_m2_t02_reranker_preflight_runner.py `
+    tests/contract/test_m2_t02_reranker_preflight.py
+  ```
+
+  Result: `65 passed`; all runtime/model behavior is fake-only and all
+  evidence writes use pytest temporary directories.
+
+- [x] **Step 4: Run complete offline gates and side-effect audit**
+
+  Run full pytest, Ruff, both requested mypy commands, project/M0/M1/M2-T01
+  validators, and `pip check`. Confirm full pytest is greater than the prior
+  `936 passed` baseline; formal preflight evidence, new model/cache files,
+  real tokenizer/model load, real inference, STATUS changes, and immutable
+  selection/installation/snapshot-download artifact changes are absent; and
+  `git ls-files models` remains empty.
+
+  Result: full pytest `972 passed in 121.17s`; focused contracts `65 passed`;
+  Ruff and explicit `I001` check passed; mypy passed for 45 production source
+  files and the standalone runner; project docs, M0, M1, M2-T01 validators,
+  and `pip check` passed. `STATUS.md` and all three immutable M2-T02 source
+  artifacts match their HEAD blobs byte-for-byte, the formal preflight
+  evidence path is absent, no Hugging Face or Transformers cache path was
+  created, and `git ls-files models` is empty. All preflight runtime tests
+  used fake modules and temporary paths; no real tokenizer/model load or
+  inference ran.
+
+- [ ] **Step 5: Commit, push, and update Draft PR #11**
+
+  Stage only these four authorized files and commit exactly as:
+
+  ```powershell
+  git commit -m "test: close local reranker preflight safety contracts"
+  git push origin agent/m2-t02-reranker-provider
+  ```
+
+  Record the B2-P-I.1 commit SHA, Windows API signature closure, observed
+  eval mode, focused/full/static-validator counts, fake-only boundary, no
+  formal preflight evidence, B2-P-Live not started, B3 not started, and
+  `STATUS.md` still `M2 IN_PROGRESS (1/5)`. Keep PR #11 open and Draft; stop
+  immediately after the PR record is updated.

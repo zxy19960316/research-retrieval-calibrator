@@ -355,7 +355,7 @@ def _windows_memory_probe() -> Mapping[str, object]:
     """Read memory through Windows APIs without importing a runtime package."""
 
     if platform.system() != "Windows":
-        raise OSError
+        raise PreflightRunnerError("MEMORY_PROBE_FAILED")
 
     try:
         win_dll_factory = cast(Any, ctypes).WinDLL
@@ -391,6 +391,16 @@ def _windows_memory_probe() -> Mapping[str, object]:
 
         kernel32: Any = win_dll_factory("kernel32", use_last_error=True)
         psapi: Any = win_dll_factory("psapi", use_last_error=True)
+        kernel32.GlobalMemoryStatusEx.argtypes = [ctypes.POINTER(_MemoryStatusEx)]
+        kernel32.GlobalMemoryStatusEx.restype = wintypes.BOOL
+        kernel32.GetCurrentProcess.argtypes = []
+        kernel32.GetCurrentProcess.restype = wintypes.HANDLE
+        psapi.GetProcessMemoryInfo.argtypes = [
+            wintypes.HANDLE,
+            ctypes.POINTER(_ProcessMemoryCountersEx),
+            wintypes.DWORD,
+        ]
+        psapi.GetProcessMemoryInfo.restype = wintypes.BOOL
         system_status = _MemoryStatusEx()
         system_status.dwLength = ctypes.sizeof(system_status)
         if not kernel32.GlobalMemoryStatusEx(ctypes.byref(system_status)):
@@ -410,8 +420,10 @@ def _windows_memory_probe() -> Mapping[str, object]:
             "process_working_set_bytes": int(process_counters.WorkingSetSize),
             "process_peak_working_set_bytes": int(process_counters.PeakWorkingSetSize),
         }
+    except PreflightRunnerError:
+        raise
     except Exception:  # noqa: BLE001
-        raise OSError from None
+        raise PreflightRunnerError("MEMORY_PROBE_FAILED") from None
 
 
 _MEMORY_FIELDS = {
@@ -993,6 +1005,8 @@ def _run_runtime_preflight(
             evaluated_model = model.eval()
             if evaluated_model is not None:
                 model = evaluated_model
+            if getattr(model, "training", object()) is not False:
+                raise PreflightRunnerError("MODEL_LOAD_FAILED")
             _validate_model_state(model, torch_module)
         except PreflightRunnerError:
             raise

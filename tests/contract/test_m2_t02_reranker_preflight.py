@@ -15,6 +15,7 @@ import pytest
 _MODULE_NAME = "scripts.run_m2_t02_reranker_preflight"
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _FORMAL_EVIDENCE = _REPO_ROOT / "evaluation/source-artifacts/m2-t02-reranker-preflight.json"
+_SELECTION = _REPO_ROOT / "evaluation/source-artifacts/m2-t02-reranker-selection.json"
 _DOWNLOAD_EVIDENCE = _REPO_ROOT / "evaluation/source-artifacts/m2-t02-reranker-snapshot-download.json"
 
 
@@ -42,9 +43,73 @@ def _run_fake_success(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> dict[s
     )
 
 
+def _load_temp_download_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    mutate: object,
+) -> ModuleType:
+    module = _runner()
+    selection_path = tmp_path / "selection.json"
+    selection_path.write_bytes(_SELECTION.read_bytes())
+    evidence_path = tmp_path / "download.json"
+    evidence = json.loads(_DOWNLOAD_EVIDENCE.read_text(encoding="utf-8"))
+    mutate(evidence)  # type: ignore[operator]
+    evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
+    monkeypatch.setattr(module, "SELECTION_PATH", selection_path)
+    monkeypatch.setattr(module, "DOWNLOAD_EVIDENCE_PATH", evidence_path)
+    return module
+
+
 def test_fixed_download_evidence_is_present_but_formal_preflight_evidence_is_absent() -> None:
     assert _DOWNLOAD_EVIDENCE.is_file()
     assert not _FORMAL_EVIDENCE.exists()
+
+
+def test_download_evidence_decision_status_drift_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    module = _load_temp_download_evidence(
+        monkeypatch,
+        tmp_path,
+        lambda value: value.update({"decision_status": "reused_and_verified"}),
+    )
+    with pytest.raises(RuntimeError) as raised:
+        module._load_download_evidence()  # type: ignore[attr-defined]
+    assert getattr(raised.value, "code", None) == "DOWNLOAD_EVIDENCE_INVALID"
+
+
+def test_download_evidence_preparation_status_must_be_published(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    module = _load_temp_download_evidence(
+        monkeypatch,
+        tmp_path,
+        lambda value: value["snapshot"].update({"preparation_status": "REUSED"}),  # type: ignore[index]
+    )
+    with pytest.raises(RuntimeError) as raised:
+        module._load_download_evidence()  # type: ignore[attr-defined]
+    assert getattr(raised.value, "code", None) == "DOWNLOAD_EVIDENCE_INVALID"
+
+
+@pytest.mark.parametrize(
+    "projection_mutation",
+    [
+        lambda value: value["model"].update({"model_id": "BAAI/other"}),  # type: ignore[index]
+        lambda value: value["model"].update({"revision": "0" * 40}),  # type: ignore[index]
+        lambda value: value["snapshot"]["files"][0].update({"path": "other.json"}),  # type: ignore[index]
+    ],
+)
+def test_download_evidence_model_revision_file_projection_is_pinned(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    projection_mutation: object,
+) -> None:
+    module = _load_temp_download_evidence(monkeypatch, tmp_path, projection_mutation)
+    with pytest.raises(RuntimeError) as raised:
+        module._load_download_evidence()  # type: ignore[attr-defined]
+    assert getattr(raised.value, "code", None) == "DOWNLOAD_EVIDENCE_INVALID"
 
 
 def test_success_schema_is_closed_and_privacy_safe(
@@ -79,6 +144,8 @@ def test_success_schema_is_closed_and_privacy_safe(
     assert evidence["execution_state"]["real_candidate_scores_generated"] is False  # type: ignore[index]
     assert evidence["inference"]["logits_persisted"] is False  # type: ignore[index]
     serialized = json.dumps(evidence, ensure_ascii=False)
+    assert "raw_logits" not in serialized
+    assert "candidate_id" not in serialized
     assert "人工智能" not in serialized
     assert "logits" in serialized
     assert "https://" not in serialized
