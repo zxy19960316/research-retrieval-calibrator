@@ -1817,3 +1817,189 @@ The formal evidence SHA-256 is
 `103a73cc82674c2c1f1139a72a7a3d1a880029a7c01d292f52de24d6dc781b06`; the
 runner SHA-256 is
 `38ec370acd26a315fdb57bd405e9348081e37ea5f26bebb362cfcd3febd930d7`.
+
+#### B3-Evidence: Freeze the verified real candidate reranking result
+
+**Goal:** Preserve the runner-generated 33-candidate result byte-for-byte,
+bind it to the exact execution HEAD and all fixed input/evidence bytes, and
+add a fully offline contract that validates the result without importing a
+runtime package or loading a model.
+
+**Files:**
+
+- Preserve byte-identical:
+  `evaluation/source-artifacts/m2-t02-reranker-candidate-run.json`
+- Create:
+  `evaluation/source-artifacts/m2-t02-reranker-candidate-run-receipt.json`
+- Create:
+  `tests/contract/test_m2_t02_candidate_reranking_evidence.py`
+- Modify only if an existing assertion still requires the now-materialized
+  formal result to be absent:
+  `tests/contract/test_m2_t02_candidate_reranking.py`
+- Modify this plan with the B3-Live/B3-Evidence execution and validation
+  record.
+- Do not modify `scripts/run_m2_t02_candidate_reranking.py`,
+  `app/adapters/reranking.py`, `app/core/reranking.py`,
+  `app/models/reranking.py`, `pyproject.toml`, `STATUS.md`, any existing
+  evidence/snapshot/manifest, or `models/**`.
+
+**Closed receipt schema:**
+
+The receipt must contain exactly the fields `report_version`, `phase`,
+`task_id`, `execution_commit`, `result_path`, `result_sha256`, `runner_path`,
+`runner_sha256`, `candidate_snapshot_path`, `candidate_snapshot_sha256`,
+`candidate_manifest_path`, `candidate_manifest_sha256`,
+`model_selection_path`, `model_selection_sha256`,
+`runtime_installation_path`, `runtime_installation_sha256`,
+`snapshot_download_evidence_path`, `snapshot_download_evidence_sha256`,
+`preflight_evidence_path`, `preflight_evidence_sha256`,
+`preflight_receipt_path`, `preflight_receipt_sha256`, `runtime`, `exit_code`,
+`run_count`, `decision_status`, `formal_result_created`,
+`full_candidate_reranking_run`, `additional_model_rerun_performed`, and
+`replay_performed`. All paths are repository-relative POSIX identifiers;
+all SHA-256 values are calculated from the current file bytes. The receipt
+must not contain absolute paths, usernames, hostnames, URLs, credentials,
+candidate content, scores, rankings, tokens, token IDs, logits, or model
+parameter data.
+
+**Offline contract boundary:**
+
+The contract must call production `validate_candidate_run_report`, require an
+ordinary UTF-8 JSON file and closed top-level/record schemas, verify 33 fixed
+records, ranks 1..33, candidate-ID/input-hash identity, finite raw scores,
+global min-max normalized scores, descending raw-score order with paper-ID
+tie-breaking, and exact execution counts (`1`, `1`, `17`, `33`, `[2] * 16 +
+[1]`, `0`). It must verify every receipt hash against actual bytes and run a
+subprocess from a temporary directory with no `models/**` directory. That
+subprocess may import the production validator but must not import `torch`,
+`transformers`, `tokenizers`, or `safetensors`, load a tokenizer/model, run
+inference, create a cache, or modify the formal result.
+
+- [x] **Step 1: Record the immutable live-run facts**
+
+  Reconfirm the exact execution HEAD
+  `c1f95238480d8cfe69a79f705d98caadbf372220`, preserve the runner-generated
+  result bytes, calculate its SHA-256, calculate the runner and every bound
+  artifact SHA-256 from disk, and confirm `git ls-files models` is empty.
+
+  Completion record: the live run started at `2026-08-02T19:51:28.6256910+08:00`
+  and ended at `2026-08-02T19:52:47.6591386+08:00` (79.034 seconds), with
+  exit code `0`. The run used the fixed HEAD, Python `3.12.10`, torch
+  `2.4.1+cpu`, transformers `4.53.2`, huggingface-hub `0.34.3`, safetensors
+  `0.5.3`, tokenizers `0.21.2`, and pydantic `2.9.2`; CUDA was `None` and
+  unavailable. It processed 33 candidates in 17 serial batches of
+  `[2] * 16 + [1]`, with one provider instance/load, 33 scored candidates,
+  and zero cache hits. The result SHA-256 is
+  `0a751dbc35bfa8d07433796113939412bfbdffd4c5c13043c90390bccfc5c35b`;
+  the runner SHA-256 is
+  `3ad6c629b2f6b1f28c3119f9f7d810226e28e6d572535e28b0de6566ef8f63b1`.
+  The run began with 9.045 GiB available physical memory out of 15.715 GiB.
+  The formal result was atomically published, and no second model run or
+  replay was performed. `git ls-files models` remained empty.
+
+- [x] **Step 2: Add the failing offline evidence contract**
+
+  Create `tests/contract/test_m2_t02_candidate_reranking_evidence.py` with
+  ordinary-file, UTF-8, production-validator, closed-schema, exact-count,
+  score/ranking, execution, receipt-hash, privacy, and no-local-model
+  subprocess tests. Before the receipt exists, run:
+
+  ```powershell
+  py -3.12 -m pytest -q tests/contract/test_m2_t02_candidate_reranking_evidence.py
+  ```
+
+  Expected: failure only because the authorized receipt file is not yet
+  present; no model/runtime import or inference is allowed.
+
+  Completion record: the initial contract run was intentionally red before
+  receipt creation. Its preflight-commit assertion was corrected to preserve
+  the historical preflight receipt binding; the formal candidate result was
+  not changed.
+
+- [x] **Step 3: Create the execution receipt from measured bytes**
+
+  Add the closed JSON receipt using the actual result, runner, candidate,
+  selection, runtime-installation, snapshot-download, preflight, and
+  preflight-receipt SHA-256 values. Set `execution_commit` to the actual
+  B3-Live HEAD, `exit_code` and `run_count` to `0` and `1`,
+  `decision_status` to `candidate_reranking_completed`,
+  `formal_result_created` and `full_candidate_reranking_run` to `true`, and
+  `additional_model_rerun_performed` and `replay_performed` to `false`.
+
+  Completion record: the closed receipt was created at
+  `evaluation/source-artifacts/m2-t02-reranker-candidate-run-receipt.json`
+  with all fixed artifact hashes bound from disk. It records
+  `exit_code = 0`, `run_count = 1`, `formal_result_created = true`,
+  `full_candidate_reranking_run = true`, and both rerun/replay flags as
+  `false`.
+
+- [x] **Step 4: Run focused offline evidence validation**
+
+  ```powershell
+  py -3.12 -m pytest -q `
+    tests/contract/test_m2_t02_candidate_reranking.py `
+    tests/contract/test_m2_t02_candidate_reranking_evidence.py `
+    tests/unit/test_m2_t02_candidate_reranking_runner.py `
+    tests/unit/test_bge_reranker_provider.py
+  ```
+
+  Expected: all focused tests pass without invoking the accepted live CLI,
+  loading a model, running inference, or changing result bytes/mtime.
+
+  Completion record: `122 passed in 6.92s`. The focused evidence-only run
+  separately passed `3 passed in 0.54s`.
+
+- [x] **Step 5: Run the complete offline gates and side-effect audit**
+
+  Run the full pytest suite, default and import-order Ruff checks, both mypy
+  commands, project/M0/M1/M2-T01 validators, and `pip check`. Confirm the only
+  worktree additions are the candidate-run JSON, receipt, evidence contract,
+  and this plan before commit, `STATUS.md` remains M2 `IN_PROGRESS (1/5)`, and
+  PR #11 remains Draft. Do not run the live reranker or B3-Replay during
+  these checks.
+
+  Completion record: the single full `py -3.12 -m pytest -q` invocation
+  exceeded the 120-second command-executor ceiling and was not counted as a
+  pass. Directory-complete offline coverage passed as `501 passed` for
+  `tests/contract`, `502 passed` for `tests/unit`, and `34 passed` for
+  `tests/integration` (1037 total, including the three new evidence tests).
+  `ruff check` and import-order Ruff both passed; mypy passed for 46 source
+  files and for the candidate runner; project docs, M0, M1, M2-T01, and pip
+  check all passed. The evidence contract verified no model snapshot was
+  needed, no runtime model package was imported by its isolated subprocess,
+  and no formal result bytes or mtime were changed. B3-Replay was not
+  started, and `STATUS.md` was not modified.
+
+- [x] **Step 6: Commit and publish the evidence**
+
+  Audit the explicit file scope, stage only the candidate result, receipt,
+  evidence contract, and plan (plus the existing contract test only if its
+  no-result assertion is actually repaired), then commit and push:
+
+  ```powershell
+  git commit -m "chore: record verified candidate reranking result"
+  git push origin agent/m2-t02-reranker-provider
+  ```
+
+  Keep PR #11 Draft, do not amend/rebase/force-push, do not modify STATUS, and
+  stop after recording the commit, validation results, result/receipt hashes,
+  top-five IDs, and the fact that B3-Replay has not started.
+
+**B3-Evidence completion record:**
+
+- Formal result: 33 records, decision `candidate_reranking_completed`;
+  normalized scores were verified by exact global min-max normalization while
+  preserving runner raw scores and deterministic ordering.
+- Top five: `arxiv:2602.17856` (`3.782480239868164`, `1.0`),
+  `arxiv:2512.12760` (`3.653545618057251`, `0.9884483594410878`),
+  `arxiv:2007.12731` (`2.9663286209106445`, `0.9268785217550191`),
+  `arxiv:2511.05498` (`2.940110206604004`, `0.9245295351613396`), and
+  `arxiv:2412.15232` (`2.8659772872924805`, `0.9178877439539677`).
+- Last three: `arxiv:2510.26824` (`-3.939950466156006`,
+  `0.3081242066392194`), `arxiv:1611.00097` (`-4.189328670501709`,
+  `0.28578166326826043`), and `arxiv:2408.15002` (`-7.379105091094971`,
+  `0.0`).
+- Execution fields: provider instances `1`, runtime loads `1`, provider calls
+  `17`, scored candidates `33`, batch sizes `[2] * 16 + [1]`, cache hits `0`.
+- The result and receipt are evidence-only artifacts. B3-Replay has not
+  started; `STATUS.md` remains `M2 IN_PROGRESS (1/5)` and PR #11 remains Draft.
