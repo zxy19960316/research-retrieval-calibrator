@@ -702,3 +702,46 @@ def test_completion_wiring_fails_closed_when_loader_returns_none(
     assert result.valid is False
     assert result.errors == ["completed evidence requires validated B2 run audit context"]
     assert calls["model"] == (_valid_vector_context(), None)
+
+
+@pytest.mark.parametrize(
+    ("state", "completed", "total", "valid"),
+    [
+        ("IN_PROGRESS", 1, 5, True),
+        ("IN_PROGRESS", 2, 5, True),
+        ("IN_PROGRESS", 4, 5, True),
+        ("COMPLETE", 5, 5, True),
+        ("IN_PROGRESS", 0, 5, False),
+        ("IN_PROGRESS", 5, 5, False),
+        ("COMPLETE", 4, 5, False),
+        ("READY", 0, 5, False),
+    ],
+)
+def test_completed_m2_t01_status_accepts_later_m2_progress_without_claiming_completion(
+    monkeypatch: pytest.MonkeyPatch,
+    state: str,
+    completed: int,
+    total: int,
+    valid: bool,
+) -> None:
+    monkeypatch.setattr(
+        evidence,
+        "_parse_status",
+        lambda *_args: {
+            "M1": ("COMPLETE", 4, 4),
+            "M2": (state, completed, total),
+            "M3": ("BLOCKED_BY_M2", 0, 5),
+        },
+    )
+    errors: list[str] = []
+    evidence._validate_status(
+        {
+            "status_after_evidence": {
+                "m2": f"{state} {completed}/{total}",
+                "m3": "BLOCKED_BY_M2",
+            }
+        },
+        errors,
+        Path("."),
+    )
+    assert bool(errors) is (not valid)

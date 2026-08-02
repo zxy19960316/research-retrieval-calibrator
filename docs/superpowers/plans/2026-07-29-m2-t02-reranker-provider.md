@@ -2003,3 +2003,45 @@ inference, create a cache, or modify the formal result.
   `17`, scored candidates `33`, batch sizes `[2] * 16 + [1]`, cache hits `0`.
 - The result and receipt are evidence-only artifacts. B3-Replay has not
   started; `STATUS.md` remains `M2 IN_PROGRESS (1/5)` and PR #11 remains Draft.
+
+#### M2-T02 C: Completion report, machine gates, and STATUS transition
+
+**Scope:**
+
+- Create `evaluation/reports/m2-t02-reranker.json`.
+- Create `scripts/validate_m2_t02_evidence.py` and
+  `tests/contract/test_m2_t02_evidence_validation.py`.
+- Update only the historical M2-T01 status compatibility rule and its
+  regression test, `STATUS.md`, this plan, and the docs-validation workflow.
+- Preserve the candidate result, candidate execution receipt, all fixed input
+  evidence, candidate snapshot/manifest, runner, provider, and model files.
+
+**Completion record:**
+
+- The closed report binds the fixed live execution commit
+  `c1f95238480d8cfe69a79f705d98caadbf372220`, evidence/validated commit
+  `5195a4eabfccdd64dac61f2efdc2dfc4a92242ae`, the result SHA-256
+  `0a751dbc35bfa8d07433796113939412bfbdffd4c5c13043c90390bccfc5c35b`, and
+  all ten validated input blobs. The validator reads each input with
+  `git show <validated_commit>:<path>` and compares the submitted bytes before
+  calling the production preflight and candidate-run validators.
+- The report records the real CPU float32 run exactly once: 33 candidates,
+  17 serial calls, one provider instance/load, batch sizes `16 x 2 + 1`, zero
+  cache hits, and no rerun, Replay, benchmark, manual relevance judgement,
+  or M2-T03 start. Fake acceptance is explicitly classified as deterministic
+  fake; real-model evidence is separately classified as real local CPU
+  float32 evidence.
+- `STATUS.md` now records M2 `IN_PROGRESS 2/5`, M2-T02 reranker completion,
+  next task M2-T03, and M3 `BLOCKED_BY_M2 0/5`; M2 is not marked COMPLETE.
+  The historical M2-T01 validator now accepts M2 `IN_PROGRESS 1-4/5` or
+  `COMPLETE 5/5` while still rejecting zero-progress, invalid totals,
+  `READY 0/5`, and an unlocked M3.
+- Focused C evidence tests passed `118`; the complete offline pytest suite
+  passed `1049`. Ruff default/import-order, mypy (`47` source files), project
+  docs, M1, M2-T01, M2-T02, and pip check passed. The pre-commit M0 phase
+  validator correctly stopped only because the intentional STATUS change was
+  uncommitted; it is rerun after commit. No model, tokenizer, reranking,
+  Replay, network, or model-cache operation was performed.
+- CI adds `python scripts/validate_m2_t02_evidence.py` after the M2-T01
+  validator. PR #11 remains Draft until remote CI is green; no automatic
+  merge or Ready-for-review transition is performed.
