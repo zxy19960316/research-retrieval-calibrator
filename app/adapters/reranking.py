@@ -9,7 +9,7 @@ import sys
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 from app.models.reranking import (
     BGE_RERANKER_INPUT_FORMAT_VERSION,
@@ -180,26 +180,14 @@ class BgeRerankerProvider:
         queries = [query for _ in validated_inputs]
         passages = [reranker_input.text for reranker_input in validated_inputs]
         try:
-            try:
-                encoded = tokenizer(
-                    queries,
-                    passages,
-                    padding=True,
-                    truncation=True,
-                    max_length=BGE_RERANKER_MAX_LENGTH,
-                    return_tensors="pt",
-                )
-            except TypeError:
-                # Keep the old contract fake usable while the real preflight path
-                # uses the exact two-sequence tokenizer semantics above.
-                pairs = [[query, reranker_input.text] for reranker_input in validated_inputs]
-                encoded = tokenizer(
-                    pairs,
-                    padding=True,
-                    truncation="longest_first",
-                    max_length=BGE_RERANKER_MAX_LENGTH,
-                    return_tensors="pt",
-                )
+            encoded = tokenizer(
+                queries,
+                passages,
+                padding=True,
+                truncation=True,
+                max_length=BGE_RERANKER_MAX_LENGTH,
+                return_tensors="pt",
+            )
         except Exception:  # noqa: BLE001
             raise RerankerTaskError("PROVIDER_UNAVAILABLE") from None
 
@@ -246,8 +234,9 @@ class BgeRerankerProvider:
                     "use_safetensors": True,
                 }
                 torch_float32 = getattr(torch, "float32", None)
-                if torch_float32 is not None:
-                    model_kwargs["torch_dtype"] = torch_float32
+                if torch_float32 is None:
+                    raise ValueError
+                model_kwargs["torch_dtype"] = torch_float32
                 model = AutoModelForSequenceClassification.from_pretrained(
                     self._model_dir,
                     **model_kwargs,
@@ -291,23 +280,23 @@ def _offline_runtime_environment() -> Iterator[None]:
 
 
 def _validate_cpu_float32_runtime(model: object, torch: object) -> None:
-    training = getattr(model, "training", None)
-    if training is not None and training is not False:
+    model_runtime = cast(Any, model)
+    torch_runtime = cast(Any, torch)
+    if model_runtime.training is not False:
         raise ValueError
 
-    torch_version = getattr(torch, "version", None)
-    cuda_version = getattr(torch_version, "cuda", None) if torch_version is not None else None
-    if torch_version is not None and cuda_version is not None:
+    torch_version = torch_runtime.version
+    if torch_version.cuda is not None:
         raise ValueError
 
-    cuda_module = getattr(torch, "cuda", None)
-    is_available = getattr(cuda_module, "is_available", None) if cuda_module is not None else None
-    if callable(is_available) and is_available() is not False:
+    cuda_module = torch_runtime.cuda
+    is_available = cuda_module.is_available
+    if not callable(is_available) or is_available() is not False:
         raise ValueError
 
     parameters_method = getattr(model, "parameters", None)
     if not callable(parameters_method):
-        return
+        raise TypeError
     parameters = list(parameters_method())
     if not parameters:
         raise ValueError

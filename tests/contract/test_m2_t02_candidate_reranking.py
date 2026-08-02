@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import os
 import stat
@@ -20,6 +21,7 @@ def _report(tmp_path: Path) -> dict[str, object]:
         execute_local_reranking=True,
         paths=paths,
         provider_factory=lambda _snapshot: _FakeProvider(equal_scores=True),
+        model_snapshot_validator=lambda _snapshot: None,
         publish_result=False,
     )
 
@@ -36,6 +38,10 @@ def _report(tmp_path: Path) -> dict[str, object]:
         ("infinite", "score"),
         ("wrong-rank", "rank"),
         ("out-of-range", "normalized"),
+        ("normalized-mismatch", "normalized"),
+        ("wrong-snapshot-hash", "snapshot"),
+        ("wrong-input-hash", "input-hash"),
+        ("wrong-declared-order", "candidate-truth"),
         ("wrong-order", "order"),
     ],
 )
@@ -65,6 +71,14 @@ def test_candidate_report_validator_rejects_closed_contract_mutations(
         records[0]["rank"] = 2
     elif mutation == "out-of-range":
         records[0]["normalized_score"] = 2.0
+    elif mutation == "normalized-mismatch":
+        records[0]["normalized_score"] = 0.5
+    elif mutation == "wrong-snapshot-hash":
+        mutated["input"]["candidate_snapshot_sha256"] = "0" * 64
+    elif mutation == "wrong-input-hash":
+        records[0]["input_sha256"] = "0" * 64
+    elif mutation == "wrong-declared-order":
+        mutated["input"]["paper_id_order"] = list(reversed(mutated["input"]["paper_id_order"]))
     else:
         records[0], records[1] = records[1], records[0]
 
@@ -143,3 +157,20 @@ def test_report_serialization_is_closed_and_deterministic(tmp_path: Path) -> Non
     }
     assert stat.S_ISREG(destination.stat().st_mode)
     assert os.path.commonpath([str(destination), str(tmp_path)]) == str(tmp_path)
+
+
+def test_validator_requires_committed_candidate_snapshot_bytes_and_input_hashes(
+    tmp_path: Path,
+) -> None:
+    report = _report(tmp_path)
+    records = report["records"]
+    assert isinstance(records, list)
+    assert report["input"]["candidate_snapshot_sha256"] == (  # type: ignore[index]
+        "4a2aec0fd0a1d22adc801fd3bc506e5da89895d1276cd572e2ac64014c162448"
+    )
+    expected_hash = records[0]["input_sha256"]
+    records[0]["input_sha256"] = hashlib.sha256(b"not-the-fixed-candidate").hexdigest()
+    assert records[0]["input_sha256"] != expected_hash
+    with pytest.raises(runner.CandidateRerankingError) as captured:
+        runner.validate_candidate_run_report(report)
+    assert captured.value.code == "RESULT_SCHEMA_INVALID"

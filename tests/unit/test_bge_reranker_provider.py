@@ -107,6 +107,12 @@ class _FakeBatchEncoding(dict[str, object]):
     pass
 
 
+class _FakeParameter:
+    def __init__(self, *, device: object = "cpu", dtype: object = "float32") -> None:
+        self.device = device
+        self.dtype = dtype
+
+
 class _FakeAutoTokenizer:
     from_pretrained_calls: ClassVar[list[tuple[object, dict[str, object]]]] = []
     calls: ClassVar[list[tuple[object, dict[str, object]]]] = []
@@ -120,8 +126,10 @@ class _FakeAutoTokenizer:
             raise cls.load_error
         return cls()
 
-    def __call__(self, pairs: object, **kwargs: object) -> _FakeBatchEncoding:
-        type(self).calls.append((pairs, kwargs))
+    def __call__(
+        self, queries: object, passages: object, **kwargs: object
+    ) -> _FakeBatchEncoding:
+        type(self).calls.append(((queries, passages), kwargs))
         if type(self).call_error is not None:
             raise type(self).call_error
         return _FakeBatchEncoding(input_ids=[1, 2])
@@ -151,6 +159,9 @@ class _FakeAutoModelForSequenceClassification:
         self.to_error: Exception | None = None
         self.eval_error: Exception | None = None
         self.forward_error: Exception | None = None
+        self.training = True
+        self.parameters_values: list[object] = [_FakeParameter()]
+        self.parameters_error: Exception | None = None
 
     def to(self, device: object) -> _FakeAutoModelForSequenceClassification:
         self.to_calls.append(device)
@@ -162,7 +173,13 @@ class _FakeAutoModelForSequenceClassification:
         self.eval_calls += 1
         if self.eval_error is not None:
             raise self.eval_error
+        self.training = False
         return self
+
+    def parameters(self) -> list[object]:
+        if self.parameters_error is not None:
+            raise self.parameters_error
+        return list(self.parameters_values)
 
     def __call__(self, **kwargs: object) -> _FakeModelOutput:
         self.forward_calls.append((dict(kwargs), {}))
@@ -205,6 +222,9 @@ def _install_fake_runtime(monkeypatch: pytest.MonkeyPatch) -> None:
     fake_transformers.AutoModelForSequenceClassification = _FakeAutoModelForSequenceClassification
     fake_torch = types.ModuleType("torch")
     fake_torch.inference_mode = _FakeTorch.inference_mode
+    fake_torch.float32 = "float32"
+    fake_torch.version = types.SimpleNamespace(cuda=None)
+    fake_torch.cuda = types.SimpleNamespace(is_available=lambda: False)
     monkeypatch.setitem(sys.modules, "transformers", fake_transformers)
     monkeypatch.setitem(sys.modules, "torch", fake_torch)
 
@@ -359,8 +379,11 @@ def test_score_loads_once_uses_local_pair_encoding_and_preserves_raw_logits(
     assert tokenizer_kwargs == {"local_files_only": True, "trust_remote_code": False}
     assert _FakeAutoTokenizer.calls == [
         (
-            [["radiation shielding", "input_a"], ["radiation shielding", "input_b"], ["radiation shielding", "input_c"]],
-            {"padding": True, "truncation": "longest_first", "max_length": 512, "return_tensors": "pt"},
+            (
+                ["radiation shielding", "radiation shielding", "radiation shielding"],
+                ["input_a", "input_b", "input_c"],
+            ),
+            {"padding": True, "truncation": True, "max_length": 512, "return_tensors": "pt"},
         )
     ]
     model_path, model_kwargs = _FakeAutoModelForSequenceClassification.from_pretrained_calls[0]
@@ -369,6 +392,7 @@ def test_score_loads_once_uses_local_pair_encoding_and_preserves_raw_logits(
         "local_files_only": True,
         "trust_remote_code": False,
         "use_safetensors": True,
+        "torch_dtype": "float32",
     }
     model = _FakeAutoModelForSequenceClassification.instances[0]
     assert model.to_calls == ["cpu"]
@@ -523,4 +547,96 @@ def test_runtime_failures_map_to_provider_unavailable(
         assert model.to_calls == ["cpu"]
         assert model.eval_calls == 1
         assert len(model.forward_calls) == 1
+
+
+def test_tokenizer_type_error_is_not_retried_with_pair_lists(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _install_fake_runtime(monkeypatch)
+    _FakeAutoTokenizer.call_error = TypeError("two-sequence contract failure")
+    provider = _provider(_snapshot(tmp_path))
+    inputs = [_input("a", "input_a")]
+
     _assert_score_error_without_partial_result(provider, inputs)
+    assert len(_FakeAutoTokenizer.calls) == 1
+
+
+@pytest.mark.parametrize(
+    "runtime_mutation",
+    [
+        "missing-training",
+        "noop-eval",
+        "missing-version",
+        "cuda-version",
+        "missing-cuda",
+        "missing-is-available",
+        "cuda-available",
+        "missing-float32",
+        "missing-parameters",
+        "empty-parameters",
+        "parameters-error",
+        "non-cpu-parameter",
+        "non-float32-parameter",
+    ],
+)
+def test_missing_exceptional_or_drifted_runtime_observations_are_unavailable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    runtime_mutation: str,
+) -> None:
+    _install_fake_runtime(monkeypatch)
+    fake_torch = sys.modules["torch"]
+    original_loader = _FakeAutoModelForSequenceClassification.from_pretrained
+
+    @classmethod
+    def configured_loader(
+        cls, path: object, **kwargs: object
+    ) -> _FakeAutoModelForSequenceClassification:
+        instance = original_loader(path, **kwargs)
+        if runtime_mutation == "missing-training":
+            del instance.training
+            instance.eval = lambda: instance  # type: ignore[method-assign]
+        elif runtime_mutation == "noop-eval":
+            instance.training = True
+            instance.eval = lambda: instance  # type: ignore[method-assign]
+        elif runtime_mutation == "missing-parameters":
+            instance.parameters = None  # type: ignore[method-assign]
+        elif runtime_mutation == "empty-parameters":
+            instance.parameters_values = []
+        elif runtime_mutation == "parameters-error":
+            instance.parameters_error = RuntimeError("parameters failed")
+        elif runtime_mutation == "non-cpu-parameter":
+            instance.parameters_values = [_FakeParameter(device="cuda")]
+        elif runtime_mutation == "non-float32-parameter":
+            instance.parameters_values = [_FakeParameter(dtype="float64")]
+        return instance
+
+    if runtime_mutation in {
+        "missing-training",
+        "noop-eval",
+        "missing-parameters",
+        "empty-parameters",
+        "parameters-error",
+        "non-cpu-parameter",
+        "non-float32-parameter",
+    }:
+        monkeypatch.setattr(
+            _FakeAutoModelForSequenceClassification,
+            "from_pretrained",
+            configured_loader,
+        )
+    elif runtime_mutation == "missing-version":
+        del fake_torch.version
+    elif runtime_mutation == "cuda-version":
+        fake_torch.version.cuda = "12.1"
+    elif runtime_mutation == "missing-cuda":
+        del fake_torch.cuda
+    elif runtime_mutation == "missing-is-available":
+        del fake_torch.cuda.is_available
+    elif runtime_mutation == "cuda-available":
+        fake_torch.cuda.is_available = lambda: True
+    elif runtime_mutation == "missing-float32":
+        del fake_torch.float32
+
+    provider = _provider(_snapshot(tmp_path))
+    _assert_score_error_without_partial_result(provider, [_input("a", "input_a")])

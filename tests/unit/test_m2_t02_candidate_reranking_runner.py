@@ -21,6 +21,10 @@ _SNAPSHOT = _REPO_ROOT / "evaluation/snapshots/m2/m1-candidates.v1.json"
 _MANIFEST = _REPO_ROOT / "evaluation/snapshots/m2/m1-candidates.v1.manifest.json"
 _PREFLIGHT = _REPO_ROOT / "evaluation/source-artifacts/m2-t02-reranker-preflight.json"
 _RECEIPT = _REPO_ROOT / "evaluation/source-artifacts/m2-t02-reranker-preflight-run-receipt.json"
+_SELECTION = _REPO_ROOT / "evaluation/source-artifacts/m2-t02-reranker-selection.json"
+_SNAPSHOT_DOWNLOAD = (
+    _REPO_ROOT / "evaluation/source-artifacts/m2-t02-reranker-snapshot-download.json"
+)
 
 
 def _paths(tmp_path: Path) -> runner.CandidateRunPaths:
@@ -28,10 +32,14 @@ def _paths(tmp_path: Path) -> runner.CandidateRunPaths:
     manifest = tmp_path / "m1-candidates.v1.manifest.json"
     preflight = tmp_path / "m2-t02-reranker-preflight.json"
     receipt = tmp_path / "m2-t02-reranker-preflight-run-receipt.json"
+    selection = tmp_path / "m2-t02-reranker-selection.json"
+    snapshot_download = tmp_path / "m2-t02-reranker-snapshot-download.json"
     shutil.copyfile(_SNAPSHOT, snapshot)
     shutil.copyfile(_MANIFEST, manifest)
     shutil.copyfile(_PREFLIGHT, preflight)
     shutil.copyfile(_RECEIPT, receipt)
+    shutil.copyfile(_SELECTION, selection)
+    shutil.copyfile(_SNAPSHOT_DOWNLOAD, snapshot_download)
     model_snapshot = tmp_path / "model-snapshot"
     model_snapshot.mkdir()
     return runner.CandidateRunPaths(
@@ -39,6 +47,8 @@ def _paths(tmp_path: Path) -> runner.CandidateRunPaths:
         candidate_manifest_path=manifest,
         preflight_evidence_path=preflight,
         preflight_receipt_path=receipt,
+        model_selection_path=selection,
+        snapshot_download_evidence_path=snapshot_download,
         model_snapshot_path=model_snapshot,
         result_path=tmp_path / "m2-t02-reranker-candidate-run.json",
     )
@@ -47,7 +57,14 @@ def _paths(tmp_path: Path) -> runner.CandidateRunPaths:
 class _FakeProvider:
     instances: ClassVar[int] = 0
 
-    def __init__(self, *, fail_on_call: int | None = None, equal_scores: bool = False) -> None:
+    def __init__(
+        self,
+        *,
+        fail_on_call: int | None = None,
+        equal_scores: bool = False,
+        runtime_load_count: object = 1,
+        omit_runtime_load_count: bool = False,
+    ) -> None:
         type(self).instances += 1
         self.descriptor = RerankerModelDescriptor(
             provider_name="synthetic",
@@ -61,6 +78,8 @@ class _FakeProvider:
         self.fail_on_call = fail_on_call
         self.equal_scores = equal_scores
         self.calls = 0
+        if not omit_runtime_load_count:
+            self.runtime_load_count = runtime_load_count
 
     def score(self, query: str, inputs: list[Any], *, batch_size: int) -> list[ProviderRawScore]:
         assert query == runner.FIXED_QUERY
@@ -88,6 +107,7 @@ def _run(
         paths=paths,
         provider_factory=lambda _snapshot: provider,
         cache_factory=cache_factory,
+        model_snapshot_validator=lambda _snapshot: None,
         publish_result=False,
     )
 
@@ -221,9 +241,167 @@ def test_fixed_input_drift_fails_before_provider_construction(
             execute_local_reranking=True,
             paths=paths,
             provider_factory=provider_factory,
+            model_snapshot_validator=lambda _snapshot: None,
             publish_result=False,
         )
     assert constructed is False
+
+
+def test_coordinated_candidate_drift_fails_before_provider_construction(
+    tmp_path: Path,
+) -> None:
+    paths = _paths(tmp_path)
+    snapshot = json.loads(paths.candidate_snapshot_path.read_text(encoding="utf-8"))
+    first = snapshot["candidates"][0]
+    first["title"] += " coordinated drift"
+    first["abstract"] += " coordinated drift"
+    mutated_snapshot = json.dumps(snapshot, ensure_ascii=False, indent=2) + "\n"
+    paths.candidate_snapshot_path.write_text(mutated_snapshot, encoding="utf-8")
+
+    manifest = json.loads(paths.candidate_manifest_path.read_text(encoding="utf-8"))
+    manifest["snapshot_sha256"] = hashlib.sha256(mutated_snapshot.encode("utf-8")).hexdigest()
+    paths.candidate_manifest_path.write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+
+    constructed = False
+
+    def provider_factory(_snapshot: Path) -> _FakeProvider:
+        nonlocal constructed
+        constructed = True
+        raise AssertionError("coordinated candidate drift reached provider construction")
+
+    with pytest.raises(runner.CandidateRerankingError) as captured:
+        runner.run_candidate_reranking(
+            execute_local_reranking=True,
+            paths=paths,
+            provider_factory=provider_factory,
+            model_snapshot_validator=lambda _snapshot: None,
+            publish_result=False,
+        )
+    assert captured.value.code == "CANDIDATE_INPUT_INVALID"
+    assert constructed is False
+
+
+@pytest.mark.parametrize("runtime_load_count", [0, 2, True, "1"])
+def test_invalid_runtime_load_count_is_not_defaulted_or_corrected(
+    tmp_path: Path, runtime_load_count: object
+) -> None:
+    with pytest.raises(runner.CandidateRerankingError) as captured:
+        _run(paths := _paths(tmp_path), _FakeProvider(runtime_load_count=runtime_load_count))
+    assert captured.value.code == "INVALID_OUTPUT"
+    assert not paths.result_path.exists()
+
+
+def test_missing_runtime_load_count_is_invalid_output(tmp_path: Path) -> None:
+    with pytest.raises(runner.CandidateRerankingError) as captured:
+        _run(paths := _paths(tmp_path), _FakeProvider(omit_runtime_load_count=True))
+    assert captured.value.code == "INVALID_OUTPUT"
+    assert not paths.result_path.exists()
+
+
+def test_default_model_snapshot_verification_precedes_provider_construction(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    paths = _paths(tmp_path)
+    events: list[str] = []
+
+    def verify(selected_paths: runner.CandidateRunPaths, snapshot: Path) -> None:
+        assert selected_paths == paths
+        assert snapshot == paths.model_snapshot_path
+        events.append("snapshot")
+
+    monkeypatch.setattr(runner, "_validate_model_snapshot", verify)
+
+    def provider_factory(_snapshot: Path) -> _FakeProvider:
+        events.append("provider")
+        return _FakeProvider()
+
+    report = runner.run_candidate_reranking(
+        execute_local_reranking=True,
+        paths=paths,
+        provider_factory=provider_factory,
+        publish_result=False,
+    )
+    assert report["task_id"] == "M2-T02"
+    assert events == ["snapshot", "provider"]
+
+
+def test_model_snapshot_verification_reuses_read_only_production_verifiers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    paths = _paths(tmp_path)
+    events: list[str] = []
+    from scripts import download_m2_t02_reranker_snapshot as download_runner
+    from scripts import prepare_m2_t02_reranker_snapshot as preparation
+    monkeypatch.setitem(
+        sys.modules,
+        "scripts.download_m2_t02_reranker_snapshot",
+        download_runner,
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "scripts.prepare_m2_t02_reranker_snapshot",
+        preparation,
+    )
+
+    plan = preparation.SnapshotPlan(
+        model_id=runner.BGE_RERANKER_MODEL_ID,
+        revision=runner.BGE_RERANKER_MODEL_REVISION,
+        files=(),
+        total_size_bytes=0,
+        required_runtime_size_bytes=0,
+        weight_size_bytes=0,
+    )
+
+    def load_plan(_selection_path: Path) -> preparation.SnapshotPlan:
+        events.append("selection")
+        return plan
+
+    def validate_evidence(value: object, loaded_plan: preparation.SnapshotPlan) -> None:
+        assert isinstance(value, dict)
+        assert loaded_plan is plan
+        events.append("download-evidence")
+
+    def verify_snapshot(snapshot: Path, loaded_plan: preparation.SnapshotPlan) -> None:
+        assert snapshot == paths.model_snapshot_path
+        assert loaded_plan is plan
+        events.append("snapshot")
+
+    def forbidden_prepare(**_kwargs: object) -> object:
+        raise AssertionError("snapshot validation must not prepare or download")
+
+    monkeypatch.setattr(preparation, "load_snapshot_plan", load_plan)
+    monkeypatch.setattr(preparation, "_verify_snapshot", verify_snapshot)
+    monkeypatch.setattr(download_runner, "validate_download_evidence", validate_evidence)
+    monkeypatch.setattr(preparation, "prepare_snapshot", forbidden_prepare)
+
+    runner._validate_model_snapshot(paths, paths.model_snapshot_path)
+    assert events == ["selection", "download-evidence", "snapshot"]
+
+
+def test_model_selection_drift_fails_before_snapshot_integrity_check(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    paths = _paths(tmp_path)
+    selection = json.loads(paths.model_selection_path.read_text(encoding="utf-8"))
+    selection["selected_model"]["model_revision"] = "0" * 40
+    paths.model_selection_path.write_text(
+        json.dumps(selection, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+    from scripts import prepare_m2_t02_reranker_snapshot as preparation
+
+    verified = False
+
+    def verify_snapshot(_snapshot: Path, _plan: object) -> None:
+        nonlocal verified
+        verified = True
+
+    monkeypatch.setattr(preparation, "_verify_snapshot", verify_snapshot)
+    with pytest.raises(runner.CandidateRerankingError) as captured:
+        runner._validate_model_snapshot(paths, paths.model_snapshot_path)
+    assert captured.value.code == "MODEL_SNAPSHOT_INVALID"
+    assert verified is False
 
 
 def test_candidate_input_sha_is_built_by_existing_core_serializer(tmp_path: Path) -> None:

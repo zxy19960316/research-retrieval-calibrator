@@ -24,7 +24,7 @@ if __package__ in {None, ""}:
         sys.path.insert(0, repository_root_text)
 
 from app.adapters.reranking import RerankerProvider
-from app.core.reranking import rerank_candidates
+from app.core.reranking import build_reranker_input, rerank_candidates
 from app.models.embedding import FrozenCandidate
 from app.models.reranking import (
     BGE_RERANKER_MODEL_ID,
@@ -44,6 +44,10 @@ PREFLIGHT_EVIDENCE_PATH = Path("evaluation/source-artifacts/m2-t02-reranker-pref
 PREFLIGHT_RECEIPT_PATH = Path(
     "evaluation/source-artifacts/m2-t02-reranker-preflight-run-receipt.json"
 )
+MODEL_SELECTION_PATH = Path("evaluation/source-artifacts/m2-t02-reranker-selection.json")
+SNAPSHOT_DOWNLOAD_EVIDENCE_PATH = Path(
+    "evaluation/source-artifacts/m2-t02-reranker-snapshot-download.json"
+)
 MODEL_SNAPSHOT_PATH = Path(
     "models/m2-t02/bge-reranker-v2-m3/953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e"
 )
@@ -57,6 +61,12 @@ PREFLIGHT_EVIDENCE_SHA256 = (
     "103a73cc82674c2c1f1139a72a7a3d1a880029a7c01d292f52de24d6dc781b06"
 )
 PREFLIGHT_EXECUTION_COMMIT = "a50f1b9f5467c318dbbabe8807df6ede47d79b14"
+EXPECTED_CANDIDATE_SNAPSHOT_SHA256 = (
+    "4a2aec0fd0a1d22adc801fd3bc506e5da89895d1276cd572e2ac64014c162448"
+)
+EXPECTED_CANDIDATE_MANIFEST_SHA256 = (
+    "b6ce7cfab2e5df6b8c84b77fb38c6f573de7429d37a9688d7b4c62e27f8546a8"
+)
 CONFIGURED_TOP_K = 50
 EXPECTED_CANDIDATE_COUNT = 33
 BATCH_SIZE = 2
@@ -202,8 +212,17 @@ class CandidateRunPaths:
     candidate_manifest_path: Path | str = CANDIDATE_MANIFEST_PATH
     preflight_evidence_path: Path | str = PREFLIGHT_EVIDENCE_PATH
     preflight_receipt_path: Path | str = PREFLIGHT_RECEIPT_PATH
+    model_selection_path: Path | str = MODEL_SELECTION_PATH
+    snapshot_download_evidence_path: Path | str = SNAPSHOT_DOWNLOAD_EVIDENCE_PATH
     model_snapshot_path: Path | str = MODEL_SNAPSHOT_PATH
     result_path: Path | str = FORMAL_RESULT_PATH
+
+
+@dataclass(frozen=True)
+class _CandidateTruth:
+    candidates: tuple[FrozenCandidate, ...]
+    paper_id_order: tuple[str, ...]
+    snapshot_sha256: str
 
 
 @dataclass(frozen=True)
@@ -230,9 +249,8 @@ class CountingRerankerProvider:
         return self._provider.descriptor
 
     @property
-    def runtime_load_count(self) -> int:
-        value = getattr(self._provider, "runtime_load_count", 1)
-        return value if _strict_int(value) else 1
+    def runtime_load_count(self) -> object:
+        return cast(Any, self._provider).runtime_load_count
 
     def score(
         self,
@@ -423,12 +441,22 @@ def _validate_preflight_inputs(paths: CandidateRunPaths) -> tuple[str, str]:
     return hashlib.sha256(evidence_raw).hexdigest(), PREFLIGHT_EXECUTION_COMMIT
 
 
-def _validate_candidate_snapshot(paths: CandidateRunPaths) -> _FixedInputContext:
-    evidence_sha256, execution_commit = _validate_preflight_inputs(paths)
-    snapshot_path = _operational_path(paths.candidate_snapshot_path)
-    manifest_path = _operational_path(paths.candidate_manifest_path)
-    snapshot_raw, snapshot_value = _read_json_file(snapshot_path, "CANDIDATE_INPUT_INVALID")
-    _, manifest_value = _read_json_file(manifest_path, "CANDIDATE_INPUT_INVALID")
+def _validate_candidate_files(
+    snapshot_path: Path,
+    manifest_path: Path,
+) -> _CandidateTruth:
+    snapshot_raw = _read_regular_file(snapshot_path, "CANDIDATE_INPUT_INVALID")
+    manifest_raw = _read_regular_file(manifest_path, "CANDIDATE_INPUT_INVALID")
+    if (
+        hashlib.sha256(snapshot_raw).hexdigest() != EXPECTED_CANDIDATE_SNAPSHOT_SHA256
+        or hashlib.sha256(manifest_raw).hexdigest() != EXPECTED_CANDIDATE_MANIFEST_SHA256
+    ):
+        raise CandidateRerankingError("CANDIDATE_INPUT_INVALID")
+    try:
+        snapshot_value = json.loads(snapshot_raw.decode("utf-8"))
+        manifest_value = json.loads(manifest_raw.decode("utf-8"))
+    except Exception:  # noqa: BLE001
+        raise CandidateRerankingError("CANDIDATE_INPUT_INVALID") from None
     try:
         snapshot = _as_mapping(snapshot_value)
         manifest = _as_mapping(manifest_value)
@@ -445,8 +473,7 @@ def _validate_candidate_snapshot(paths: CandidateRunPaths) -> _FixedInputContext
             raise ValueError
         if manifest["abstract_missing_count"] != 0:
             raise ValueError
-        snapshot_sha256 = hashlib.sha256(snapshot_raw).hexdigest()
-        if manifest["snapshot_sha256"] != snapshot_sha256:
+        if manifest["snapshot_sha256"] != EXPECTED_CANDIDATE_SNAPSHOT_SHA256:
             raise ValueError
         paper_id_order_value = manifest["paper_id_order"]
         if not isinstance(paper_id_order_value, list) or len(paper_id_order_value) != EXPECTED_CANDIDATE_COUNT:
@@ -479,12 +506,10 @@ def _validate_candidate_snapshot(paths: CandidateRunPaths) -> _FixedInputContext
             raise ValueError
         if list(paper_id_order_value) != paper_ids:
             raise ValueError
-        return _FixedInputContext(
+        return _CandidateTruth(
             candidates=tuple(candidates),
             paper_id_order=tuple(paper_ids),
-            snapshot_sha256=snapshot_sha256,
-            preflight_evidence_sha256=evidence_sha256,
-            preflight_execution_commit=execution_commit,
+            snapshot_sha256=EXPECTED_CANDIDATE_SNAPSHOT_SHA256,
         )
     except CandidateRerankingError:
         raise
@@ -492,8 +517,57 @@ def _validate_candidate_snapshot(paths: CandidateRunPaths) -> _FixedInputContext
         raise CandidateRerankingError("CANDIDATE_INPUT_INVALID") from None
 
 
-def _validate_model_snapshot(path: Path) -> None:
-    _require_ordinary_directory(path, "MODEL_SNAPSHOT_INVALID")
+def _validate_candidate_snapshot(paths: CandidateRunPaths) -> _FixedInputContext:
+    evidence_sha256, execution_commit = _validate_preflight_inputs(paths)
+    truth = _validate_candidate_files(
+        _operational_path(paths.candidate_snapshot_path),
+        _operational_path(paths.candidate_manifest_path),
+    )
+    return _FixedInputContext(
+        candidates=truth.candidates,
+        paper_id_order=truth.paper_id_order,
+        snapshot_sha256=truth.snapshot_sha256,
+        preflight_evidence_sha256=evidence_sha256,
+        preflight_execution_commit=execution_commit,
+    )
+
+
+def _validate_model_snapshot(paths: CandidateRunPaths, path: Path) -> None:
+    selection_path = _operational_path(paths.model_selection_path)
+    evidence_path = _operational_path(paths.snapshot_download_evidence_path)
+    _, selection_value = _read_json_file(selection_path, "MODEL_SNAPSHOT_INVALID")
+    _, evidence_value = _read_json_file(evidence_path, "MODEL_SNAPSHOT_INVALID")
+    try:
+        from scripts.download_m2_t02_reranker_snapshot import validate_download_evidence
+        from scripts.prepare_m2_t02_reranker_snapshot import (
+            _verify_snapshot,
+            load_snapshot_plan,
+        )
+
+        selection = _as_mapping(selection_value)
+        selected_model = _as_mapping(selection["selected_model"])
+        if (
+            selected_model["provider_name"] != BGE_RERANKER_PROVIDER_NAME
+            or selected_model["model_id"] != BGE_RERANKER_MODEL_ID
+            or selected_model["model_revision"] != BGE_RERANKER_MODEL_REVISION
+        ):
+            raise ValueError
+        plan = load_snapshot_plan(selection_path)
+        if plan.model_id != BGE_RERANKER_MODEL_ID or plan.revision != BGE_RERANKER_MODEL_REVISION:
+            raise ValueError
+
+        evidence = _as_mapping(evidence_value)
+        evidence_model = _as_mapping(evidence["model"])
+        if evidence_model != {
+            "provider_name": BGE_RERANKER_PROVIDER_NAME,
+            "model_id": BGE_RERANKER_MODEL_ID,
+            "revision": BGE_RERANKER_MODEL_REVISION,
+        }:
+            raise ValueError
+        validate_download_evidence(evidence_value, plan)
+        _verify_snapshot(path, plan)
+    except Exception:  # noqa: BLE001
+        raise CandidateRerankingError("MODEL_SNAPSHOT_INVALID") from None
 
 
 def _default_provider_factory(snapshot_path: Path) -> RerankerProvider:
@@ -535,9 +609,10 @@ def _cleanup_cache(cache_dir: Path) -> None:
         pass
 
 
-def _runtime_load_count(provider: object) -> int:
-    value = getattr(provider, "runtime_load_count", 1)
-    return value if _strict_int(value) and value == 1 else 1
+def _require_runtime_load_count(value: object) -> int:
+    if not _strict_int(value) or value != 1:
+        raise CandidateRerankingError("INVALID_OUTPUT")
+    return value
 
 
 def _build_candidate_run_report(
@@ -547,6 +622,12 @@ def _build_candidate_run_report(
 ) -> dict[str, object]:
     if run.state is not RerankerRunState.SCORED or len(run.records) != EXPECTED_CANDIDATE_COUNT:
         raise CandidateRerankingError("INVALID_OUTPUT")
+    try:
+        runtime_load_count = _require_runtime_load_count(provider.runtime_load_count)
+    except CandidateRerankingError:
+        raise
+    except Exception:  # noqa: BLE001
+        raise CandidateRerankingError("INVALID_OUTPUT") from None
     records = [
         {
             "rank": rank,
@@ -599,7 +680,7 @@ def _build_candidate_run_report(
         },
         "execution": {
             "provider_instance_count": provider.provider_instance_count,
-            "runtime_load_count": _runtime_load_count(provider),
+            "runtime_load_count": runtime_load_count,
             "provider_call_count": provider.provider_call_count,
             "provider_scored_count": provider.provider_scored_count,
             "batch_sizes": list(provider.batch_sizes),
@@ -623,6 +704,17 @@ def validate_candidate_run_report(value: object) -> None:
     """Validate the closed, privacy-safe future B3 candidate-run schema."""
 
     try:
+        try:
+            candidate_truth = _validate_candidate_files(
+                _operational_path(CANDIDATE_SNAPSHOT_PATH),
+                _operational_path(CANDIDATE_MANIFEST_PATH),
+            )
+        except Exception:  # noqa: BLE001
+            raise ValueError
+        expected_input_hashes = {
+            candidate.paper_id: build_reranker_input(candidate).input_sha256
+            for candidate in candidate_truth.candidates
+        }
         report = _as_mapping(value)
         if set(report) != _REPORT_FIELDS:
             raise ValueError
@@ -653,14 +745,16 @@ def validate_candidate_run_report(value: object) -> None:
             raise ValueError
         if input_data["candidate_manifest_path"] != CANDIDATE_MANIFEST_PATH.as_posix():
             raise ValueError
-        _require_hex(input_data["candidate_snapshot_sha256"], _HEX64)
+        if input_data["candidate_snapshot_sha256"] != EXPECTED_CANDIDATE_SNAPSHOT_SHA256:
+            raise ValueError
         if input_data["preflight_evidence_sha256"] != PREFLIGHT_EVIDENCE_SHA256:
             raise ValueError
         if input_data["preflight_receipt_execution_commit"] != PREFLIGHT_EXECUTION_COMMIT:
             raise ValueError
         if (
-            input_data["candidate_count"] != EXPECTED_CANDIDATE_COUNT
-            or input_data["abstract_present_count"] != EXPECTED_CANDIDATE_COUNT
+            input_data["candidate_count"] != len(candidate_truth.candidates)
+            or input_data["abstract_present_count"]
+            != sum(candidate.abstract is not None for candidate in candidate_truth.candidates)
             or input_data["abstract_missing_count"] != 0
             or input_data["question"] != FIXED_QUERY
         ):
@@ -668,15 +762,7 @@ def validate_candidate_run_report(value: object) -> None:
         paper_id_order = input_data["paper_id_order"]
         if (
             not isinstance(paper_id_order, list)
-            or len(paper_id_order) != EXPECTED_CANDIDATE_COUNT
-            or any(
-                not isinstance(paper_id, str)
-                or not paper_id.startswith("arxiv:")
-                or "/" in paper_id
-                or "\\" in paper_id
-                for paper_id in paper_id_order
-            )
-            or len(set(paper_id_order)) != EXPECTED_CANDIDATE_COUNT
+            or paper_id_order != list(candidate_truth.paper_id_order)
         ):
             raise ValueError
         if model_data != {
@@ -704,6 +790,23 @@ def validate_candidate_run_report(value: object) -> None:
             "network_forbidden": True,
         }:
             raise ValueError
+        if type(execution_data["provider_instance_count"]) is not int:
+            raise ValueError
+        if type(execution_data["runtime_load_count"]) is not int:
+            raise ValueError
+        if type(execution_data["provider_call_count"]) is not int:
+            raise ValueError
+        if type(execution_data["provider_scored_count"]) is not int:
+            raise ValueError
+        if type(execution_data["cache_hits"]) is not int:
+            raise ValueError
+        if (
+            not isinstance(execution_data["batch_sizes"], list)
+            or any(type(size) is not int for size in execution_data["batch_sizes"])
+        ):
+            raise ValueError
+        if execution_data["runtime_load_count"] != 1:
+            raise ValueError
         if execution_data != {
             "provider_instance_count": 1,
             "runtime_load_count": 1,
@@ -718,36 +821,46 @@ def validate_candidate_run_report(value: object) -> None:
             raise ValueError
         seen_ids: set[str] = set()
         sortable: list[tuple[float, str]] = []
+        normalized_by_paper_id: dict[str, float] = {}
         for expected_rank, raw_record in enumerate(records, start=1):
             record = _as_mapping(raw_record)
             if set(record) != _RECORD_FIELDS:
                 raise ValueError
-            if record["rank"] != expected_rank:
+            if type(record["rank"]) is not int or record["rank"] != expected_rank:
                 raise ValueError
             paper_id = record["paper_id"]
             if (
                 not isinstance(paper_id, str)
-                or not paper_id.startswith("arxiv:")
-                or "/" in paper_id
-                or "\\" in paper_id
                 or paper_id in seen_ids
+                or paper_id not in expected_input_hashes
             ):
                 raise ValueError
             seen_ids.add(paper_id)
-            _require_hex(record["input_sha256"], _HEX64)
+            if record["input_sha256"] != expected_input_hashes[paper_id]:
+                raise ValueError
             raw_score = _require_finite_number(record["raw_score"])
             normalized_score = _require_finite_number(record["normalized_score"])
             if not 0 <= normalized_score <= 1:
                 raise ValueError
+            normalized_by_paper_id[paper_id] = normalized_score
             sortable.append((raw_score, paper_id))
-        if seen_ids != set(paper_id_order):
+        if seen_ids != set(candidate_truth.paper_id_order):
             raise ValueError
         expected_order = sorted(sortable, key=lambda item: (-item[0], item[1]))
         if sortable != expected_order:
             raise ValueError
+        raw_by_paper_id = {paper_id: raw_score for raw_score, paper_id in sortable}
+        minimum = min(raw_by_paper_id.values())
+        maximum = max(raw_by_paper_id.values())
+        for paper_id, normalized_score in normalized_by_paper_id.items():
+            expected_normalized = (
+                1.0
+                if minimum == maximum
+                else (raw_by_paper_id[paper_id] - minimum) / (maximum - minimum)
+            )
+            if normalized_score != expected_normalized:
+                raise ValueError
         _validate_safe_strings(report)
-    except CandidateRerankingError:
-        raise
     except Exception:  # noqa: BLE001
         raise CandidateRerankingError("RESULT_SCHEMA_INVALID") from None
 
@@ -854,6 +967,7 @@ def run_candidate_reranking(
     paths: CandidateRunPaths | None = None,
     provider_factory: Callable[[Path], RerankerProvider] | None = None,
     cache_factory: Callable[[], Path] | None = None,
+    model_snapshot_validator: Callable[[Path], None] | None = None,
     publish_result: bool = False,
 ) -> dict[str, object]:
     """Run the fixed 33-candidate contract; real CLI publishing is future-only."""
@@ -863,7 +977,15 @@ def run_candidate_reranking(
     selected_paths = paths or CandidateRunPaths()
     context = _validate_candidate_snapshot(selected_paths)
     model_snapshot_path = _operational_path(selected_paths.model_snapshot_path)
-    _validate_model_snapshot(model_snapshot_path)
+    selected_model_snapshot_validator = model_snapshot_validator or (
+        lambda snapshot: _validate_model_snapshot(selected_paths, snapshot)
+    )
+    try:
+        selected_model_snapshot_validator(model_snapshot_path)
+    except CandidateRerankingError:
+        raise
+    except Exception:  # noqa: BLE001
+        raise CandidateRerankingError("MODEL_SNAPSHOT_INVALID") from None
     selected_provider_factory = provider_factory or _default_provider_factory
     try:
         provider = selected_provider_factory(model_snapshot_path)
