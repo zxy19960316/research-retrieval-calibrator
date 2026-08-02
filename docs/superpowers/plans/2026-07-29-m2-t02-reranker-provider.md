@@ -602,6 +602,109 @@ only path that can publish the reserved formal result in a future authorized run
 - [x] All B3 real/live/replay execution, formal result publication, and STATUS closure
   remain explicitly not run.
 
+### B3-I.1 Candidate evidence boundary hardening
+
+**Goal:** Harden the fake-only B3-I runner so fixed candidate bytes, the current
+model snapshot, strict runtime observations, execution counts, and report
+verification cannot drift into a formal candidate-run result. This task does
+not run a real model, invoke real candidate reranking, create a formal
+candidate-run artifact, or enter B3-Live.
+
+**Files:**
+
+- Modify: `scripts/run_m2_t02_candidate_reranking.py`
+- Modify: `app/adapters/reranking.py`
+- Modify: `tests/unit/test_m2_t02_candidate_reranking_runner.py`
+- Modify: `tests/contract/test_m2_t02_candidate_reranking.py`
+- Modify: `tests/unit/test_bge_reranker_provider.py`
+- Modify: `docs/superpowers/plans/2026-07-29-m2-t02-reranker-provider.md`
+- Do not modify: `STATUS.md`, existing evidence, candidate snapshot, candidate
+  manifest, `models/**`, `pyproject.toml`, download/preflight runners,
+  `app/models/reranking.py`, or `app/core/reranking.py`.
+
+**Fixed boundary:** The candidate snapshot raw-byte SHA-256 is
+`4a2aec0fd0a1d22adc801fd3bc506e5da89895d1276cd572e2ac64014c162448`; the
+manifest raw-byte SHA-256 is computed from the committed manifest and fixed in
+the runner. Both are checked before either JSON payload is parsed. The pinned
+model is `BAAI/bge-reranker-v2-m3` at revision
+`953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e`, with the seven production snapshot
+files, exact sizes, and exact digests projected consistently by the selection
+and snapshot-download evidence verifiers. Snapshot verification is read-only
+and cannot call download, disk preparation, network, copy, rename, or write
+operations.
+
+- [x] **Step 1: Add red tests for byte, snapshot, runtime, count, and report drift**
+
+  Add the coordinated snapshot title/abstract plus manifest-digest mutation
+  and assert failure before provider construction. Add model selection,
+  snapshot-download evidence, file-size, digest, symlink/junction, and
+  projection tests that assert the read-only verifier runs before provider
+  construction. Add strict runtime tests for every missing, exceptional, or
+  drifted observation, exact two-sequence tokenizer arguments with no
+  fallback, missing/zero/two/bool/string runtime load counts, fixed snapshot
+  digest rejection, normalized-score recomputation, and candidate input-hash
+  recomputation. All test providers and runtime modules remain fake-only.
+
+- [x] **Step 2: Implement fixed candidate and current snapshot validation**
+
+  Hash the raw snapshot and manifest bytes before JSON parsing; require both
+  fixed hashes and retain the fixed candidate sequence as the validator's
+  source of truth. Reuse the production selection-plan, snapshot-integrity,
+  and snapshot-download-evidence validators before constructing any provider.
+  Require the fixed model ID/revision, exact seven-file closure, regular
+  non-link files, exact sizes/digests, and matching selection/evidence
+  projections.
+
+- [x] **Step 3: Implement strict provider runtime and tokenizer contracts**
+
+  Require observed eval mode, CPU-only Torch metadata and availability
+  behavior, an available float32 dtype, a callable non-empty parameter set,
+  CPU parameters, and float32 parameters. Convert every missing, exceptional,
+  or mismatched observation to `PROVIDER_UNAVAILABLE`. Remove the TypeError
+  tokenizer retry and call only `(queries, passages, padding=True,
+  truncation=True, max_length=512, return_tensors="pt")`.
+
+- [x] **Step 4: Implement strict counts and report truth validation**
+
+  Preserve the provider's raw `runtime_load_count` without defaulting or
+  correcting it, and require exact `int` value `1` in the counting wrapper
+  and report builder. Require the fixed candidate hash, fixed candidate order,
+  fixed serialization hashes, and exact min-max normalized scores in report
+  validation; equal raw scores must produce `1.0`, and in-range mismatches must
+  fail.
+
+- [x] **Step 5: Run the authorized offline verification and audit**
+
+  Run the five-file focused suite, full pytest, Ruff and explicit `I001`, both
+  mypy commands, project/M0/M1/M2-T01 validators, and `pip check`. Require a
+  test-count increase and confirm no formal candidate-run file, real cache,
+  model load, inference, score/ranking, or protected-byte/STATUS change.
+
+- [x] **Step 6: Commit implementation, push, then record the plan separately**
+
+  Stage only the five implementation/test files and commit
+  `fix: harden candidate reranking evidence boundary`; push the existing branch
+  without amend, rebase, or force push. Then mark this plan section complete,
+  record exact validation counts and the fake-only/not-run boundary, stage only
+  this plan, and commit `docs: record B3-I.1 hardening validation`; push again.
+  Stop immediately without `--execute-local-reranking` or B3-Live.
+
+**Completion record:** Implementation commit
+`e6e3576e63b0170b5b24d20c3be55f9684039b79` was pushed to
+`agent/m2-t02-reranker-provider`. The focused five-file suite passed `224`
+tests and the full offline suite passed `1034` tests, increasing the prior
+`1006` baseline by `28`. Ruff, explicit Ruff `I001`, production mypy,
+standalone runner mypy, project-doc validation, M0, M1, M2-T01, and `pip
+check` all passed. The current model snapshot was verified read-only through
+the production selection, snapshot-integrity, and snapshot-download-evidence
+verifiers; no downloader, disk preparation, network, copy, rename, write,
+provider construction, model load, inference, score, or ranking was performed
+by that verification. The formal candidate-run file is absent, no new
+candidate reranking cache remains, `git ls-files models` is empty, and
+`STATUS.md` plus all existing evidence, candidate snapshot, and candidate
+manifest bytes are unchanged. B3-Live and
+`--execute-local-reranking` remain not run.
+
 ## C Completion evidence and STATUS
 
 Only C may consolidate completion evidence and consider `STATUS.md`; until C, M2 remains 1/5. B0 must not start B1, B2, B3, C, M2-T03, or M3.
