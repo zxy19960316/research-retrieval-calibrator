@@ -577,7 +577,7 @@ only path that can publish the reserved formal result in a future authorized run
   no cache or temporary result remains, `git ls-files models` is empty, and all
   protected evidence/snapshot/manifest/STATUS paths are byte-unchanged.
 
-- [ ] **Step 6: Commit, push, and update Draft PR #11**
+- [x] **Step 6: Commit, push, and update Draft PR #11**
 
   Commit exactly `feat: add controlled candidate reranking runner`, push the
   current branch without amend/rebase/force, and update PR #11 while retaining
@@ -585,16 +585,21 @@ only path that can publish the reserved formal result in a future authorized run
   offline CPU contracts, the focused/full counts, no real scores, no formal
   artifact, B3-Live not started, and `STATUS.md` still at M2 `IN_PROGRESS (1/5)`.
 
+  Result: implementation commit `5a7cf46f52b20dd0b1af92ea29a25639995ff01e`
+  was pushed to `agent/m2-t02-reranker-provider`; PR #11 was updated and
+  remains open/Draft. No amend, rebase, force push, real B3 invocation, B3-Live
+  start, formal candidate-run artifact, or STATUS update occurred.
+
 ### B3-I self-review checklist
 
-- The fixed preflight validator and receipt schema are called before any runtime
+- [x] The fixed preflight validator and receipt schema are called before any runtime
   import or provider construction.
-- Candidate serialization is delegated to the existing
+- [x] Candidate serialization is delegated to the existing
   `build_reranker_input(candidate)` and never rebuilt in the runner.
-- A provider failure cannot return partial records or leave cache files.
-- The report validator rejects NaN/Inf, wrong cardinality, duplicate/missing/
+- [x] A provider failure cannot return partial records or leave cache files.
+- [x] The report validator rejects NaN/Inf, wrong cardinality, duplicate/missing/
   extra paper IDs, wrong sorting, score-range violations, and forbidden fields.
-- All B3 real/live/replay execution, formal result publication, and STATUS closure
+- [x] All B3 real/live/replay execution, formal result publication, and STATUS closure
   remain explicitly not run.
 
 ## C Completion evidence and STATUS
