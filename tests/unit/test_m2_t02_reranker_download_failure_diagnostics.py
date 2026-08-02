@@ -174,6 +174,153 @@ def test_classifier_maps_xet_reset_timeouts_proxy_and_text_to_closed_values() ->
         assert "secret" not in module.serialize_closed_failure_diagnostic(diagnostic)
 
 
+def test_classifier_preserves_xet_backend_for_nested_specific_failures() -> None:
+    module = _module()
+    xet_wrapper = type(
+        "RuntimeError",
+        (RuntimeError,),
+        {"__module__": "hf_xet"},
+    )("opaque xet wrapper")
+    certificate_error = ssl.SSLCertVerificationError(1, "opaque certificate detail")
+    xet_certificate = type(
+        "RuntimeError",
+        (RuntimeError,),
+        {"__module__": "hf_xet"},
+    )("opaque xet certificate wrapper")
+    xet_certificate.__cause__ = certificate_error
+    xet_ssl = type(
+        "RuntimeError",
+        (RuntimeError,),
+        {"__module__": "hf_xet"},
+    )("opaque xet ssl wrapper")
+    xet_ssl.__cause__ = ssl.SSLError(1, "opaque ssl detail")
+    xet_reset = type(
+        "RuntimeError",
+        (RuntimeError,),
+        {"__module__": "hf_xet"},
+    )("opaque xet reset wrapper")
+    xet_reset.__cause__ = ConnectionResetError("opaque reset detail")
+    xet_read_timeout = type(
+        "RuntimeError",
+        (RuntimeError,),
+        {"__module__": "hf_xet"},
+    )("opaque xet timeout wrapper")
+    xet_read_timeout.__cause__ = type(
+        "ReadTimeout",
+        (RuntimeError,),
+        {"__module__": "requests.exceptions"},
+    )("opaque timeout detail")
+    http_ssl = type(
+        "RuntimeError",
+        (RuntimeError,),
+        {"__module__": "requests.exceptions"},
+    )("opaque http wrapper")
+    http_ssl.__cause__ = ssl.SSLCertVerificationError(1, "opaque certificate detail")
+
+    expected = (
+        (
+            xet_certificate,
+            "xet",
+            "certificate_verification",
+            "ssl",
+            "SSLCertVerificationError",
+        ),
+        (xet_ssl, "xet", "tls_handshake", "ssl", "SSLError"),
+        (xet_reset, "xet", "connection_reset", "builtin", "ConnectionResetError"),
+        (xet_read_timeout, "xet", "read_timeout", "requests", "ReadTimeout"),
+        (
+            http_ssl,
+            "http",
+            "certificate_verification",
+            "ssl",
+            "SSLCertVerificationError",
+        ),
+        (
+            ssl.SSLCertVerificationError(1, "opaque certificate detail"),
+            "unknown",
+            "certificate_verification",
+            "ssl",
+            "SSLCertVerificationError",
+        ),
+    )
+    for exc, backend, family, module_family, type_name in expected:
+        diagnostic = module.classify_download_failure(
+            exc,
+            failure_stage="file_download",
+            identity=_identity(module, "model.safetensors"),
+        )
+
+        assert diagnostic.transport_backend == backend
+        assert diagnostic.exception_family == family
+        assert diagnostic.exception_module_family == module_family
+        assert diagnostic.exception_type == type_name
+
+    assert xet_wrapper.__cause__ is None
+
+
+def test_classifier_ignores_suppressed_context_but_follows_explicit_cause() -> None:
+    module = _module()
+    hidden = ssl.SSLCertVerificationError(1, "opaque certificate detail")
+    visible = RuntimeError("opaque visible detail")
+    visible.__context__ = hidden
+    visible.__suppress_context__ = True
+
+    suppressed_context = module.classify_download_failure(
+        visible,
+        failure_stage="file_download",
+        identity=_identity(module, "README.md"),
+    )
+
+    assert suppressed_context.exception_family == "unknown_transport"
+    assert suppressed_context.cause_chain_types == ("RuntimeError",)
+
+    visible.__cause__ = hidden
+    explicit_cause = module.classify_download_failure(
+        visible,
+        failure_stage="file_download",
+        identity=_identity(module, "README.md"),
+    )
+
+    assert explicit_cause.exception_family == "certificate_verification"
+    assert explicit_cause.cause_chain_types == (
+        "RuntimeError",
+        "SSLCertVerificationError",
+    )
+
+
+def test_classifier_prefers_cause_and_safely_stops_on_link_attribute_failure() -> None:
+    module = _module()
+    cause = ConnectionResetError("opaque reset detail")
+    context = ssl.SSLCertVerificationError(1, "opaque certificate detail")
+    visible = RuntimeError("opaque visible detail")
+    visible.__cause__ = cause
+    visible.__context__ = context
+
+    cause_preferred = module.classify_download_failure(
+        visible,
+        failure_stage="file_download",
+        identity=_identity(module, "README.md"),
+    )
+
+    assert cause_preferred.exception_family == "connection_reset"
+    assert cause_preferred.cause_chain_types == ("RuntimeError", "ConnectionResetError")
+
+    class CauseAttributeFailure(RuntimeError):
+        def __getattribute__(self, name: str) -> object:
+            if name == "__cause__":
+                raise AssertionError("link attributes must fail closed")
+            return super().__getattribute__(name)
+
+    failed_link = module.classify_download_failure(
+        CauseAttributeFailure("opaque link detail"),
+        failure_stage="file_download",
+        identity=_identity(module, "README.md"),
+    )
+
+    assert failed_link.exception_family == "unknown_transport"
+    assert failed_link.cause_chain_types == ("RuntimeError",)
+
+
 def test_classifier_does_not_render_hostile_exceptions_and_bounds_cycles() -> None:
     module = _module()
 

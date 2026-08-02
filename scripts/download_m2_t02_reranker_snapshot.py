@@ -267,12 +267,24 @@ def _exception_chain(exception: BaseException) -> tuple[BaseException, ...]:
         chain.append(current)
         try:
             cause = current.__cause__
+        except BaseException:  # noqa: BLE001, S112
+            continue
+        if cause is not None:
+            if isinstance(cause, BaseException):
+                pending.append(cause)
+            continue
+        try:
+            suppress_context = current.__suppress_context__
+        except BaseException:  # noqa: BLE001, S112
+            continue
+        if suppress_context is True:
+            continue
+        try:
             context = current.__context__
         except BaseException:  # noqa: BLE001, S112
             continue
-        for linked_exception in (cause, context):
-            if isinstance(linked_exception, BaseException):
-                pending.append(linked_exception)
+        if isinstance(context, BaseException):
+            pending.append(context)
     return tuple(chain)
 
 
@@ -284,11 +296,9 @@ def _safe_integer_attribute(exception: BaseException, attribute: str) -> int | N
     return value if type(value) is int else None
 
 
-def _transport_backend(
-    chain: Sequence[BaseException], *, allow_xet: bool
-) -> TransportBackend:
+def _transport_backend(chain: Sequence[BaseException]) -> TransportBackend:
     module_families = {_exception_module_family(exception) for exception in chain}
-    if allow_xet and "hf_xet" in module_families:
+    if "hf_xet" in module_families:
         return "xet"
     if "huggingface_hub" in module_families:
         return "huggingface_hub"
@@ -340,7 +350,7 @@ def classify_download_failure(
                 exception=current,
                 failure_stage=failure_stage,
                 exception_family="certificate_verification",
-                transport_backend=_transport_backend(chain, allow_xet=False),
+                transport_backend=_transport_backend(chain),
             )
     for current in chain:
         if isinstance(current, ssl.SSLError):
@@ -350,7 +360,7 @@ def classify_download_failure(
                 exception=current,
                 failure_stage=failure_stage,
                 exception_family="tls_handshake",
-                transport_backend=_transport_backend(chain, allow_xet=False),
+                transport_backend=_transport_backend(chain),
             )
     for current in chain:
         if isinstance(current, ConnectionResetError):
@@ -360,7 +370,7 @@ def classify_download_failure(
                 exception=current,
                 failure_stage=failure_stage,
                 exception_family="connection_reset",
-                transport_backend=_transport_backend(chain, allow_xet=False),
+                transport_backend=_transport_backend(chain),
             )
     for current in chain:
         if isinstance(current, ConnectionAbortedError):
@@ -370,7 +380,7 @@ def classify_download_failure(
                 exception=current,
                 failure_stage=failure_stage,
                 exception_family="connection_aborted",
-                transport_backend=_transport_backend(chain, allow_xet=False),
+                transport_backend=_transport_backend(chain),
             )
     for current in chain:
         if type(current).__name__ == "ConnectTimeout":
@@ -380,7 +390,7 @@ def classify_download_failure(
                 exception=current,
                 failure_stage=failure_stage,
                 exception_family="connect_timeout",
-                transport_backend=_transport_backend(chain, allow_xet=False),
+                transport_backend=_transport_backend(chain),
             )
     for current in chain:
         if type(current).__name__ == "ReadTimeout" or isinstance(current, TimeoutError):
@@ -390,7 +400,7 @@ def classify_download_failure(
                 exception=current,
                 failure_stage=failure_stage,
                 exception_family="read_timeout",
-                transport_backend=_transport_backend(chain, allow_xet=False),
+                transport_backend=_transport_backend(chain),
             )
     for current in chain:
         if type(current).__name__ == "ProxyError":
@@ -400,7 +410,7 @@ def classify_download_failure(
                 exception=current,
                 failure_stage=failure_stage,
                 exception_family="proxy_failure",
-                transport_backend=_transport_backend(chain, allow_xet=False),
+                transport_backend=_transport_backend(chain),
             )
     for current in chain:
         if _exception_module_family(current) == "hf_xet":
@@ -425,7 +435,7 @@ def classify_download_failure(
                 exception=current,
                 failure_stage=failure_stage,
                 exception_family="http_transport",
-                transport_backend=_transport_backend(chain, allow_xet=False),
+                transport_backend=_transport_backend(chain),
             )
     return _diagnostic(
         identity=identity,

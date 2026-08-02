@@ -1068,3 +1068,49 @@ download a model, alter CA configuration, or start B2-P or B3.
   download failure diagnostics`, push without amend/rebase/force, and update
   Draft PR #11. Record that real download remains unresolved and that any live
   diagnostic or Xet/CA adjustment requires separate authorization.
+
+#### B2-L-Diag.1 Transport provenance closure
+
+**Goal:** Preserve transport provenance from the offline exception-module
+chain while retaining the most specific closed failure classification. This
+closure is limited to diagnostic code and offline tests; it neither starts a
+live diagnostic nor downloads any snapshot artifact.
+
+**Files:**
+
+- Modify: `scripts/download_m2_t02_reranker_snapshot.py`
+- Modify: `tests/unit/test_m2_t02_reranker_download_failure_diagnostics.py`
+- Modify: `docs/superpowers/plans/2026-07-29-m2-t02-reranker-provider.md`
+
+- [x] **Step 1: Preserve module-chain transport provenance**
+
+  Classify `xet` only when an exception in the bounded chain belongs to the
+  `hf_xet` module family. Classify `http` only when the chain contains a
+  `requests`, `urllib3`, or `httpx` module family. Do not infer either backend
+  from a filename, file ordinal, storage type, or any snapshot metadata.
+
+- [x] **Step 2: Keep specific failure and backend classifications independent**
+
+  Apply the same module-chain backend selection to certificate verification,
+  TLS handshake, connection reset, connection aborted, connect timeout, read
+  timeout, proxy failure, and HTTP transport branches. Thus an `hf_xet`
+  wrapper around SSL, timeout, or reset can report `transport_backend="xet"`
+  alongside its more specific exception family; an HTTP wrapper around SSL can
+  similarly report `transport_backend="http"`.
+
+- [x] **Step 3: Respect explicit exception-link semantics**
+
+  Traverse an explicit `__cause__` in preference to `__context__`; when no
+  cause exists, traverse context only if `__suppress_context__ is not True`.
+  If any link-attribute read raises, stop that node safely. Preserve the
+  eight-node cap, cycle detection, closed exception-type mapping, and the ban
+  on `str()` or `repr()` over exception objects.
+
+- [x] **Step 4: Verify offline closure**
+
+  Add offline combinations for Xet plus certificate, SSL, connection-reset,
+  and read-timeout failures; HTTP plus SSL; and ordinary SSL without an Xet or
+  HTTP module. Verify suppressed context does not participate in
+  classification, while an explicit cause does and wins over a simultaneous
+  context. No live diagnostic has run in this stage. Any future live
+  diagnostic remains separately authorized; B2-P and B3 have not started.
