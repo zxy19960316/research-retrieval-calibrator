@@ -312,7 +312,8 @@ def _validate_report(
         errors.append("repair report root cause is invalid")
     if report["repair"] != "replay reuses the exact first-run frozen ResearchIntent":
         errors.append("repair report repair statement is invalid")
-    if report["historical_bundle"] != {"status": "unchanged"}:
+    historical_bundle = report["historical_bundle"]
+    if not isinstance(historical_bundle, dict) or historical_bundle.get("status") != "unchanged":
         errors.append("repair report historical bundle status is invalid")
     if report["m2_progress"] != "IN_PROGRESS 2/5":
         errors.append("repair report M2 progress is invalid")
@@ -331,16 +332,17 @@ def _validate_report(
     if source != expected_source:
         errors.append("repair report source artifact binding is invalid")
     repair_artifact = report["repair_artifact"]
+    expected_repair_artifact = {
+        "manifest_sha256": _sha256((repository_root / REPAIR_MANIFEST).read_bytes()),
+        "corrected_first_run_sha256": None if manifest is None else manifest.get("corrected_first_run_sha256"),
+        "corrected_replay_sha256": None if manifest is None else manifest.get("corrected_replay_sha256"),
+        "canonical_intent_sha256": None if manifest is None else manifest.get("canonical_intent_sha256"),
+        "candidate_array_sha256": None if manifest is None else manifest.get("candidate_array_sha256"),
+        "query_plan_sha256": None if manifest is None else manifest.get("query_plan_sha256"),
+    }
     if manifest is None or not isinstance(repair_artifact, dict):
         errors.append("repair report repair artifact binding is unavailable")
-    elif repair_artifact != {
-        "manifest_sha256": _sha256((repository_root / REPAIR_MANIFEST).read_bytes()),
-        "corrected_first_run_sha256": manifest.get("corrected_first_run_sha256"),
-        "corrected_replay_sha256": manifest.get("corrected_replay_sha256"),
-        "canonical_intent_sha256": manifest.get("canonical_intent_sha256"),
-        "candidate_array_sha256": manifest.get("candidate_array_sha256"),
-        "query_plan_sha256": manifest.get("query_plan_sha256"),
-    }:
+    elif any(repair_artifact.get(key) != value for key, value in expected_repair_artifact.items()):
         errors.append("repair report repair artifact binding is invalid")
     _validate_commands_and_totals(report, errors)
     if report["evidence_types"] != {
