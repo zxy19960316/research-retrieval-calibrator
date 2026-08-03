@@ -95,9 +95,11 @@ class EvidenceValidationResult:
     errors: list[str]
 
 
-def _git(*arguments: str) -> subprocess.CompletedProcess[bytes]:
+def _git(
+    repository_root: Path, *arguments: str
+) -> subprocess.CompletedProcess[bytes]:
     return subprocess.run(
-        ["git", *arguments], cwd=ROOT, capture_output=True, check=False
+        ["git", *arguments], cwd=repository_root, capture_output=True, check=False
     )
 
 
@@ -130,11 +132,17 @@ def _relative_path(value: object) -> bool:
     return not path.is_absolute() and ".." not in path.parts
 
 
-def _validate_commit(value: object, errors: list[str], *, field: str) -> None:
+def _validate_commit(
+    value: object,
+    errors: list[str],
+    *,
+    field: str,
+    repository_root: Path,
+) -> None:
     if not isinstance(value, str) or IMPLEMENTATION_COMMIT_RE.fullmatch(value) is None:
         errors.append(f"{field} is not a lowercase Git SHA-1")
         return
-    if _git("merge-base", "--is-ancestor", value, "HEAD").returncode != 0:
+    if _git(repository_root, "merge-base", "--is-ancestor", value, "HEAD").returncode != 0:
         errors.append(f"{field} is not an ancestor of HEAD")
 
 
@@ -163,7 +171,12 @@ def _validate_privacy(value: object, errors: list[str]) -> None:
             errors.append("evidence contains forbidden credential or raw-error text")
 
 
-def _validate_inputs(report: Mapping[str, object], errors: list[str]) -> None:
+def _validate_inputs(
+    report: Mapping[str, object],
+    errors: list[str],
+    *,
+    repository_root: Path,
+) -> None:
     raw_inputs = report.get("input_artifacts")
     if not isinstance(raw_inputs, list) or len(raw_inputs) != len(EXPECTED_INPUT_ARTIFACTS):
         errors.append("input_artifacts must contain the exact four fixed inputs")
@@ -180,7 +193,7 @@ def _validate_inputs(report: Mapping[str, object], errors: list[str]) -> None:
                 raise ValueError
             if path in seen or digest != EXPECTED_INPUT_ARTIFACTS[path]:
                 raise ValueError
-            if _sha256(ROOT / path) != digest:
+            if _sha256(repository_root / path) != digest:
                 raise ValueError
             seen.add(path)
         except (OSError, TypeError, ValueError, KeyError):
@@ -189,7 +202,12 @@ def _validate_inputs(report: Mapping[str, object], errors: list[str]) -> None:
         errors.append("input_artifacts does not cover every fixed input")
 
 
-def _validate_artifacts(report: Mapping[str, object], errors: list[str]) -> None:
+def _validate_artifacts(
+    report: Mapping[str, object],
+    errors: list[str],
+    *,
+    repository_root: Path,
+) -> None:
     try:
         artifact = _as_mapping(report["artifact"])
         if set(artifact) != {"result_path", "result_sha256", "receipt_path", "receipt_sha256"}:
@@ -197,12 +215,14 @@ def _validate_artifacts(report: Mapping[str, object], errors: list[str]) -> None
         if (
             artifact["result_path"] != FORMAL_RESULT_PATH.as_posix()
             or artifact["receipt_path"] != FORMAL_RECEIPT_PATH.as_posix()
-            or artifact["result_sha256"] != _sha256(ROOT / FORMAL_RESULT_PATH)
-            or artifact["receipt_sha256"] != _sha256(ROOT / FORMAL_RECEIPT_PATH)
+            or artifact["result_sha256"]
+            != _sha256(repository_root / FORMAL_RESULT_PATH)
+            or artifact["receipt_sha256"]
+            != _sha256(repository_root / FORMAL_RECEIPT_PATH)
         ):
             raise ValueError
-        result = _load_json(ROOT / FORMAL_RESULT_PATH)
-        receipt = _load_json(ROOT / FORMAL_RECEIPT_PATH)
+        result = _load_json(repository_root / FORMAL_RESULT_PATH)
+        receipt = _load_json(repository_root / FORMAL_RECEIPT_PATH)
         validate_classification_run_report(result)
         validate_classification_receipt(receipt, report=result)
         result_execution = _as_mapping(result["execution"])
@@ -240,11 +260,16 @@ def _validate_commands(report: Mapping[str, object], errors: list[str]) -> None:
         errors.append("exit_codes do not match command identities")
 
 
-def _validate_status(report: Mapping[str, object], errors: list[str]) -> None:
+def _validate_status(
+    report: Mapping[str, object],
+    errors: list[str],
+    *,
+    repository_root: Path,
+) -> None:
     if report.get("status_after_evidence") != EXPECTED_STATUS:
         errors.append("report status transition is not the M2-T03 handoff")
     try:
-        status_text = (ROOT / "STATUS.md").read_text(encoding="utf-8")
+        status_text = (repository_root / "STATUS.md").read_text(encoding="utf-8")
         rows = {
             phase: (state, int(done), int(total))
             for phase, state, done, total in STATUS_ROW.findall(status_text)
@@ -276,8 +301,18 @@ def validate_m2_t03_evidence(
             raise ValueError
         if report["report_version"] != REPORT_VERSION or report["task_id"] != "M2-T03":
             raise ValueError
-        _validate_commit(report["implementation_commit"], errors, field="implementation_commit")
-        _validate_commit(report["validated_commit"], errors, field="validated_commit")
+        _validate_commit(
+            report["implementation_commit"],
+            errors,
+            field="implementation_commit",
+            repository_root=repository_root,
+        )
+        _validate_commit(
+            report["validated_commit"],
+            errors,
+            field="validated_commit",
+            repository_root=repository_root,
+        )
         if not isinstance(report["timestamp_utc"], str) or TIMESTAMP_RE.fullmatch(report["timestamp_utc"]) is None:
             raise ValueError
         datetime.strptime(report["timestamp_utc"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
@@ -339,10 +374,10 @@ def validate_m2_t03_evidence(
         test_totals = _as_mapping(report["test_totals"])
         if not test_totals or any(not isinstance(key, str) for key in test_totals):
             raise ValueError
-        _validate_inputs(report, errors)
-        _validate_artifacts(report, errors)
+        _validate_inputs(report, errors, repository_root=repository_root)
+        _validate_artifacts(report, errors, repository_root=repository_root)
         _validate_commands(report, errors)
-        _validate_status(report, errors)
+        _validate_status(report, errors, repository_root=repository_root)
         _validate_privacy(report, errors)
     except (TypeError, ValueError, KeyError):
         errors.append("M2-T03 evidence report has an invalid closed field or value")
