@@ -260,7 +260,7 @@ def _add_json(path: Path, key: str, value: object) -> None:
 
 def _pop_json(path: Path, key: str) -> None:
     payload = _read_json(path)
-    payload.pop(key)
+    payload.pop(key, None)
     _write_json(path, payload)
 
 
@@ -268,7 +268,7 @@ def _set_nested_json(path: Path, keys: tuple[str, ...], value: object) -> None:
     payload = _read_json(path)
     current: dict[str, object] = payload
     for key in keys[:-1]:
-        nested = current[key]
+        nested = current.setdefault(key, {})
         assert isinstance(nested, dict)
         current = nested
     current[keys[-1]] = value

@@ -5,7 +5,10 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
+import shutil
 import sys
+import uuid
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
@@ -26,6 +29,10 @@ from app.cli.first_round import render_json
 from app.core.first_round import run_first_round
 from app.core.intent import canonical_research_intent_bytes
 from app.models.first_round import FirstRoundConfig, FirstRoundRun, FirstRoundStatus
+from app.models.m1_replay_repair import (
+    M1ReplayCandidateAudit,
+    M1ReplayRepairManifest,
+)
 from app.models.project import ResearchIntent
 
 SOURCE_BUNDLE = Path("evaluation/source-artifacts/m1-rebaseline-2026-07-28")
@@ -37,6 +44,7 @@ REPAIR_BUNDLE = Path("evaluation/source-artifacts/m1-intent-replay-repair-2026-0
 REPAIR_FIRST_RUN = REPAIR_BUNDLE / "first-run/first-round.json"
 REPAIR_REPLAY = REPAIR_BUNDLE / "replay/first-round.json"
 REPAIR_MANIFEST = REPAIR_BUNDLE / "repair-manifest.json"
+PROTECTED_CANDIDATE_SNAPSHOT = Path("evaluation/snapshots/m2/m1-candidates.v1.json")
 
 EXPECTED_SOURCE_MANIFEST_SHA256 = (
     "5dad9e6070edececceeead3f8bb3e7f43302f7405fee811dcc7ddb34c84f0849"
@@ -47,7 +55,10 @@ EXPECTED_SOURCE_FIRST_RUN_SHA256 = (
 EXPECTED_SOURCE_REPLAY_SHA256 = (
     "6caecd1454ff2e0bd945a6a51dac276dfc0ce9fda5716033014e245843d0aab7"
 )
-REPAIR_VERSION = "m1-frozen-intent-replay-repair.v1"
+EXPECTED_PROTECTED_CANDIDATE_SNAPSHOT_SHA256 = (
+    "4a2aec0fd0a1d22adc801fd3bc506e5da89895d1276cd572e2ac64014c162448"
+)
+REPAIR_VERSION = "m1-frozen-intent-replay-repair.v2"
 _INTENT_FIELDS = (
     "object_terms",
     "task_terms",
@@ -59,6 +70,22 @@ _INTENT_FIELDS = (
     "revision",
     "frozen_at",
 )
+_CANDIDATE_FIELDS = (
+    "paper_id",
+    "source",
+    "source_id",
+    "title",
+    "abstract",
+    "authors",
+    "year",
+    "doi",
+    "url",
+    "retrieval_paths",
+    "cluster_id",
+    "member_source_identities",
+    "merge_reasons",
+)
+_CANDIDATE_IDENTITY_FIELDS = tuple(field for field in _CANDIDATE_FIELDS if field != "abstract")
 
 
 class RepairError(RuntimeError):
@@ -109,12 +136,22 @@ def main(argv: Sequence[str] | None = None) -> int:
     return 0
 
 
-def execute_offline_repair() -> dict[str, object]:
-    """Validate fixed historical inputs and write only the new repair bundle."""
+def execute_offline_repair(
+    *,
+    repository_root: Path = ROOT,
+    cache_dir: Path | None = None,
+) -> dict[str, object]:
+    """Validate fixed historical inputs and publish only the new repair bundle."""
 
-    source_manifest_bytes = _read_fixed(SOURCE_MANIFEST, EXPECTED_SOURCE_MANIFEST_SHA256)
-    source_first_bytes = _read_fixed(SOURCE_FIRST_RUN, EXPECTED_SOURCE_FIRST_RUN_SHA256)
-    source_replay_bytes = _read_fixed(SOURCE_REPLAY, EXPECTED_SOURCE_REPLAY_SHA256)
+    source_manifest_path = repository_root / SOURCE_MANIFEST
+    source_first_path = repository_root / SOURCE_FIRST_RUN
+    source_replay_path = repository_root / SOURCE_REPLAY
+    source_manifest_bytes = _read_fixed(source_manifest_path, EXPECTED_SOURCE_MANIFEST_SHA256)
+    source_first_bytes = _read_fixed(source_first_path, EXPECTED_SOURCE_FIRST_RUN_SHA256)
+    source_replay_bytes = _read_fixed(source_replay_path, EXPECTED_SOURCE_REPLAY_SHA256)
+    inventory = _source_bundle_inventory(repository_root)
+    if not inventory.valid:
+        raise RepairError("SOURCE_BUNDLE_INVENTORY_INVALID")
     first_run = _load_run(source_first_bytes)
     historical_replay = _load_run(source_replay_bytes)
     if first_run.intent is None or historical_replay.intent is None:
@@ -125,25 +162,38 @@ def execute_offline_repair() -> dict[str, object]:
     if _intent_drift(first_run.intent, historical_replay.intent) != ["intent.frozen_at"]:
         raise RepairError("HISTORICAL_INTENT_DRIFT_NOT_EXACT")
 
-    repaired_replay, transport = _run_cache_only_replay(first_run, historical_replay)
-    _validate_repaired_replay(first_run, repaired_replay, transport)
+    repaired_replay, transport = _run_cache_only_replay(
+        first_run,
+        historical_replay,
+        repository_root=repository_root,
+        cache_dir=cache_dir,
+    )
+    if repaired_replay.status is not FirstRoundStatus.SUCCESS:
+        _validate_repaired_replay(first_run, repaired_replay, transport, None)
+    candidate_audit = _candidate_audit(first_run, repaired_replay, repository_root)
+    _validate_repaired_replay(first_run, repaired_replay, transport, candidate_audit)
 
-    repaired_first_hash = _write_if_unchanged(REPAIR_FIRST_RUN, source_first_bytes)
     repaired_replay_bytes = render_json(repaired_replay).encode("utf-8")
-    repaired_replay_hash = _write_if_unchanged(REPAIR_REPLAY, repaired_replay_bytes)
     manifest = _repair_manifest(
         source_manifest_bytes=source_manifest_bytes,
         source_first_bytes=source_first_bytes,
         source_replay_bytes=source_replay_bytes,
         first_run=first_run,
         repaired_replay=repaired_replay,
-        repaired_first_hash=repaired_first_hash,
-        repaired_replay_hash=repaired_replay_hash,
+        candidate_audit=candidate_audit,
     )
     manifest_bytes = (
         json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
     ).encode("utf-8")
-    manifest_hash = _write_if_unchanged(REPAIR_MANIFEST, manifest_bytes)
+    target_bytes = {
+        repository_root / REPAIR_FIRST_RUN: source_first_bytes,
+        repository_root / REPAIR_REPLAY: repaired_replay_bytes,
+        repository_root / REPAIR_MANIFEST: manifest_bytes,
+    }
+    hashes = _publish_bundle(target_bytes)
+    repaired_first_hash = hashes[repository_root / REPAIR_FIRST_RUN]
+    repaired_replay_hash = hashes[repository_root / REPAIR_REPLAY]
+    manifest_hash = hashes[repository_root / REPAIR_MANIFEST]
     return {
         "canonical_intent_sha256": manifest["canonical_intent_sha256"],
         "corrected_replay_sha256": repaired_replay_hash,
@@ -159,6 +209,16 @@ def _read_fixed(path: Path, expected_sha256: str) -> bytes:
     if _sha256(data) != expected_sha256:
         raise RepairError("FIXED_HISTORICAL_HASH_MISMATCH")
     return data
+
+
+def _source_bundle_inventory(repository_root: Path):
+    """Run the public source inventory audit without introducing an import cycle."""
+
+    from scripts.validate_m1_frozen_intent_replay_repair import (
+        validate_source_bundle_inventory,
+    )
+
+    return validate_source_bundle_inventory(repository_root)
 
 
 def _load_run(data: bytes) -> FirstRoundRun:
@@ -196,11 +256,19 @@ def _intent_drift(first: ResearchIntent, replay: ResearchIntent) -> list[str]:
 def _run_cache_only_replay(
     first_run: FirstRoundRun,
     historical_replay: FirstRoundRun,
+    *,
+    repository_root: Path,
+    cache_dir: Path | None,
 ) -> tuple[FirstRoundRun, OfflineCacheMissTransport]:
     if first_run.intent is None:
         raise RepairError("HISTORICAL_INTENT_MISSING")
     transport = OfflineCacheMissTransport()
-    adapter = _cache_only_adapter(first_run.config, transport)
+    adapter = _cache_only_adapter(
+        first_run.config,
+        transport,
+        repository_root=repository_root,
+        cache_dir=cache_dir,
+    )
     now = _sequence_clock(
         [historical_replay.started_at_utc, historical_replay.finished_at_utc]
     )
@@ -213,13 +281,15 @@ def _run_cache_only_replay(
         monotonic=monotonic,
         frozen_intent=first_run.intent,
     )
-    repaired = _align_historical_candidate_contract(first_run, repaired)
     return repaired, transport
 
 
 def _cache_only_adapter(
     config: FirstRoundConfig,
     transport: OfflineCacheMissTransport,
+    *,
+    repository_root: Path,
+    cache_dir: Path | None,
 ) -> ArxivAdapter:
     return ArxivAdapter(
         ArxivAdapterConfig(
@@ -232,7 +302,7 @@ def _cache_only_adapter(
             max_total_results=config.max_results_per_query,
             max_total_attempts=config.max_total_attempts,
             initial_backoff_seconds=0.0,
-            cache_dir=ROOT / SOURCE_CACHE,
+            cache_dir=cache_dir or repository_root / SOURCE_CACHE,
             cache_schema_version=config.adapter_schema_version,
             cache_namespace=config.cache_namespace,
         ),
@@ -258,6 +328,7 @@ def _validate_repaired_replay(
     first_run: FirstRoundRun,
     repaired: FirstRoundRun,
     transport: OfflineCacheMissTransport,
+    candidate_audit: M1ReplayCandidateAudit | None,
 ) -> None:
     if repaired.status is not FirstRoundStatus.SUCCESS:
         raise RepairError("OFFLINE_REPLAY_FAILED")
@@ -271,8 +342,11 @@ def _validate_repaired_replay(
         raise RepairError("OFFLINE_REPLAY_CACHE_COUNTS_INVALID")
     if not all(result.cache_hit and result.attempt_count == 0 for result in repaired.query_results):
         raise RepairError("OFFLINE_REPLAY_NOT_CACHE_ONLY")
-    if repaired.candidates != first_run.candidates:
-        raise RepairError("OFFLINE_REPLAY_CANDIDATES_CHANGED")
+    if candidate_audit is not None:
+        if not candidate_audit.candidate_order_equal:
+            raise RepairError("OFFLINE_REPLAY_CANDIDATE_ORDER_CHANGED")
+        if not candidate_audit.candidate_identity_equal:
+            raise RepairError("OFFLINE_REPLAY_CANDIDATE_IDENTITY_CHANGED")
     first_queries = [(query.query_id, query.query_text) for query in first_run.query_plan.queries]
     repaired_queries = [(query.query_id, query.query_text) for query in repaired.query_plan.queries]
     if repaired_queries != first_queries or repaired.query_plan != first_run.query_plan:
@@ -283,26 +357,92 @@ def _validate_repaired_replay(
         raise RepairError("OFFLINE_REPLAY_INTENT_CHANGED")
 
 
-def _align_historical_candidate_contract(
+def _candidate_audit(
     first_run: FirstRoundRun,
     repaired: FirstRoundRun,
-) -> FirstRoundRun:
-    """Keep the accepted M1 candidate shape while preserving source identity."""
+    repository_root: Path,
+) -> M1ReplayCandidateAudit:
+    """Audit raw candidate evolution and bind replay metadata to the M2 snapshot."""
 
-    if repaired.status is not FirstRoundStatus.SUCCESS:
-        return repaired
-    if len(first_run.candidates) != len(repaired.candidates):
-        raise RepairError("OFFLINE_REPLAY_CANDIDATE_COUNT_CHANGED")
-    for expected, observed in zip(first_run.candidates, repaired.candidates, strict=True):
-        expected_payload = expected.model_dump(mode="json")
-        observed_payload = observed.model_dump(mode="json")
-        expected_payload.pop("abstract", None)
-        observed_payload.pop("abstract", None)
-        if expected_payload != observed_payload:
-            raise RepairError("OFFLINE_REPLAY_CANDIDATE_IDENTITY_CHANGED")
-    if repaired.candidates == first_run.candidates:
-        return repaired
-    return repaired.model_copy(update={"candidates": first_run.candidates})
+    first_payload = [candidate.model_dump(mode="json") for candidate in first_run.candidates]
+    replay_payload = [candidate.model_dump(mode="json") for candidate in repaired.candidates]
+    first_by_id = {candidate["paper_id"]: candidate for candidate in first_payload}
+    replay_by_id = {candidate["paper_id"]: candidate for candidate in replay_payload}
+    first_order = [candidate["paper_id"] for candidate in first_payload]
+    replay_order = [candidate["paper_id"] for candidate in replay_payload]
+    candidate_order_equal = first_order == replay_order
+    candidate_ids_equal = set(first_by_id) == set(replay_by_id)
+    candidate_identity_equal = candidate_ids_equal and all(
+        _candidate_projection(first_by_id[paper_id], _CANDIDATE_IDENTITY_FIELDS)
+        == _candidate_projection(replay_by_id[paper_id], _CANDIDATE_IDENTITY_FIELDS)
+        for paper_id in first_by_id.keys() & replay_by_id.keys()
+    )
+    delta_fields: set[str] = set()
+    for paper_id in first_by_id.keys() | replay_by_id.keys():
+        left = first_by_id.get(paper_id)
+        right = replay_by_id.get(paper_id)
+        if left is None or right is None:
+            delta_fields.add("paper_id")
+            continue
+        delta_fields.update(
+            field
+            for field in _CANDIDATE_FIELDS
+            if left.get(field) != right.get(field)
+        )
+    _validate_protected_candidate_snapshot(repository_root, replay_payload)
+    return M1ReplayCandidateAudit.model_validate(
+        {
+            "candidate_count": len(replay_payload),
+            "candidate_order_equal": candidate_order_equal,
+            "candidate_identity_equal": candidate_identity_equal,
+            "candidate_payload_equal": first_payload == replay_payload,
+            "candidate_delta_fields": sorted(delta_fields),
+            "protected_candidate_snapshot_path": PROTECTED_CANDIDATE_SNAPSHOT.as_posix(),
+            "protected_candidate_snapshot_sha256": EXPECTED_PROTECTED_CANDIDATE_SNAPSHOT_SHA256,
+            "replay_candidate_array_sha256": _sha256(
+                _canonical_json_bytes(replay_payload)
+            ),
+        }
+    )
+
+
+def _candidate_projection(payload: dict[str, Any], fields: tuple[str, ...]) -> bytes:
+    return _canonical_json_bytes({field: payload.get(field) for field in fields})
+
+
+def _validate_protected_candidate_snapshot(
+    repository_root: Path,
+    replay_payload: list[dict[str, Any]],
+) -> None:
+    snapshot_path = repository_root / PROTECTED_CANDIDATE_SNAPSHOT
+    try:
+        snapshot_bytes = snapshot_path.read_bytes()
+    except OSError as error:
+        raise RepairError("PROTECTED_M2_CANDIDATE_SNAPSHOT_UNAVAILABLE") from error
+    if _sha256(snapshot_bytes) != EXPECTED_PROTECTED_CANDIDATE_SNAPSHOT_SHA256:
+        raise RepairError("PROTECTED_M2_CANDIDATE_SNAPSHOT_HASH_MISMATCH")
+    try:
+        snapshot = json.loads(snapshot_bytes.decode("utf-8"))
+        expected_candidates = snapshot["candidates"]
+    except (KeyError, TypeError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise RepairError("PROTECTED_M2_CANDIDATE_SNAPSHOT_INVALID") from error
+    if not isinstance(expected_candidates, list) or len(expected_candidates) != 33:
+        raise RepairError("PROTECTED_M2_CANDIDATE_SNAPSHOT_INVALID")
+    expected_by_id = {
+        candidate.get("paper_id"): candidate
+        for candidate in expected_candidates
+        if isinstance(candidate, dict)
+    }
+    if len(expected_by_id) != 33 or len(replay_payload) != 33:
+        raise RepairError("PROTECTED_M2_CANDIDATE_MISMATCH")
+    for candidate in replay_payload:
+        paper_id = candidate.get("paper_id")
+        protected = expected_by_id.get(paper_id)
+        if not isinstance(protected, dict):
+            raise RepairError("PROTECTED_M2_CANDIDATE_MISMATCH")
+        for field in ("title", "abstract", "source", "source_id"):
+            if candidate.get(field) != protected.get(field):
+                raise RepairError("PROTECTED_M2_CANDIDATE_MISMATCH")
 
 
 def _repair_manifest(
@@ -312,16 +452,12 @@ def _repair_manifest(
     source_replay_bytes: bytes,
     first_run: FirstRoundRun,
     repaired_replay: FirstRoundRun,
-    repaired_first_hash: str,
-    repaired_replay_hash: str,
+    candidate_audit: M1ReplayCandidateAudit,
 ) -> dict[str, object]:
     if first_run.intent is None or repaired_replay.query_plan is None:
         raise RepairError("REPAIR_MANIFEST_INPUT_MISSING")
-    candidate_bytes = _canonical_json_bytes(
-        [candidate.model_dump(mode="json") for candidate in first_run.candidates]
-    )
     query_plan_bytes = _canonical_json_bytes(repaired_replay.query_plan.model_dump(mode="json"))
-    return {
+    manifest = {
         "repair_version": REPAIR_VERSION,
         "source_bundle": SOURCE_BUNDLE.as_posix(),
         "source_bundle_manifest_sha256": _sha256(source_manifest_bytes),
@@ -331,11 +467,11 @@ def _repair_manifest(
         "original_replay_sha256": _sha256(source_replay_bytes),
         "drift_fields": ["intent.frozen_at"],
         "corrected_first_run_path": REPAIR_FIRST_RUN.as_posix(),
-        "corrected_first_run_sha256": repaired_first_hash,
+        "corrected_first_run_sha256": _sha256(source_first_bytes),
         "corrected_replay_path": REPAIR_REPLAY.as_posix(),
-        "corrected_replay_sha256": repaired_replay_hash,
+        "corrected_replay_sha256": "0" * 64,
         "canonical_intent_sha256": _sha256(canonical_research_intent_bytes(first_run.intent)),
-        "candidate_array_sha256": _sha256(candidate_bytes),
+        "candidate_audit": candidate_audit.model_dump(mode="json"),
         "query_plan_sha256": _sha256(query_plan_bytes),
         "zero_transport_replay": {
             "transport_requests": repaired_replay.metrics.transport_requests,
@@ -344,6 +480,9 @@ def _repair_manifest(
         },
         "historical_artifacts_modified": False,
     }
+    repaired_replay_bytes = render_json(repaired_replay).encode("utf-8")
+    manifest["corrected_replay_sha256"] = _sha256(repaired_replay_bytes)
+    return M1ReplayRepairManifest.model_validate(manifest).model_dump(mode="json")
 
 
 def _canonical_json_bytes(value: object) -> bytes:
@@ -355,14 +494,74 @@ def _canonical_json_bytes(value: object) -> bytes:
     ).encode("utf-8")
 
 
-def _write_if_unchanged(path: Path, data: bytes) -> str:
-    if path.exists():
-        if path.read_bytes() != data:
+def _publish_bundle(target_bytes: dict[Path, bytes]) -> dict[Path, str]:
+    """Preflight, stage, and conflict-safely publish the complete three-file bundle."""
+
+    _preflight_bundle_targets(target_bytes)
+    bundle = _bundle_root(target_bytes)
+    if bundle is None:
+        raise RepairError("REPAIR_TARGET_CONFLICT")
+    staging = bundle.parent / f".{bundle.name}.staging-{uuid.uuid4().hex}"
+    published: list[tuple[Path, bytes]] = []
+    try:
+        for target, data in target_bytes.items():
+            staged = staging / target.relative_to(bundle)
+            staged.parent.mkdir(parents=True, exist_ok=True)
+            staged.write_bytes(data)
+            if staged.read_bytes() != data:
+                raise RepairError("REPAIR_STAGING_VALIDATION_FAILED")
+        for target, data in target_bytes.items():
+            if target.exists() and not target.is_symlink():
+                continue
+            target.parent.mkdir(parents=True, exist_ok=True)
+            os.replace(staging / target.relative_to(bundle), target)
+            published.append((target, data))
+    except RepairError:
+        _rollback_published(published)
+        raise
+    except OSError as error:
+        _rollback_published(published)
+        raise RepairError("REPAIR_PUBLICATION_FAILED") from error
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
+    return {path: _sha256(data) for path, data in target_bytes.items()}
+
+
+def _preflight_bundle_targets(target_bytes: dict[Path, bytes]) -> None:
+    """Reject every conflict before staging or creating any target file."""
+
+    bundle = _bundle_root(target_bytes)
+    if bundle is None:
+        raise RepairError("REPAIR_TARGET_CONFLICT")
+    if bundle.is_symlink() or (bundle.exists() and not bundle.is_dir()):
+        raise RepairError("REPAIR_TARGET_CONFLICT")
+    target_set = set(target_bytes)
+    if bundle.is_dir():
+        for path in bundle.rglob("*"):
+            if path.is_symlink() or path.is_file():
+                if path not in target_set:
+                    raise RepairError("REPAIR_TARGET_CONFLICT")
+    for target, data in target_bytes.items():
+        if target.is_symlink() or (target.exists() and not target.is_file()):
             raise RepairError("REPAIR_TARGET_CONFLICT")
-    else:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(data)
-    return _sha256(data)
+        if target.exists() and target.read_bytes() != data:
+            raise RepairError("REPAIR_TARGET_CONFLICT")
+
+
+def _bundle_root(target_bytes: dict[Path, bytes]) -> Path | None:
+    try:
+        return Path(os.path.commonpath([str(path) for path in target_bytes]))
+    except (OSError, ValueError):
+        return None
+
+
+def _rollback_published(published: list[tuple[Path, bytes]]) -> None:
+    for path, data in reversed(published):
+        try:
+            if path.is_file() and not path.is_symlink() and path.read_bytes() == data:
+                path.unlink()
+        except OSError:
+            continue
 
 
 def _sha256(data: bytes) -> str:
