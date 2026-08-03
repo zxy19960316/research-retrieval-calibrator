@@ -58,7 +58,7 @@ def _run(
     )
 
 
-def test_fixed_run_classifies_all_33_candidates_without_scores_or_selection_fields(
+def test_fixed_run_keeps_33_candidate_records_without_scores_or_selection_fields(
     tmp_path: Path,
 ) -> None:
     paths = _paths(tmp_path)
@@ -67,7 +67,12 @@ def test_fixed_run_classifies_all_33_candidates_without_scores_or_selection_fiel
     assert report["task_id"] == "M2-T03"
     assert report["input"]["candidate_count"] == 33  # type: ignore[index]
     assert report["execution"]["record_count"] == 33  # type: ignore[index]
-    assert report["execution"]["rejected_count"] == 0  # type: ignore[index]
+    assert report["execution"]["rejected_count"] >= 1  # type: ignore[index]
+    assert report["decision_status"] == "classification_partial_failure"
+    diagnostics = report["execution"]["quality_diagnostics"]  # type: ignore[index]
+    assert diagnostics["observed_slot_count"] >= 1  # type: ignore[index]
+    assert diagnostics["ambiguous_rejection_count"] >= 0  # type: ignore[index]
+    assert "NO_REJECTED_OR_UNCERTAIN_RECORDS" not in diagnostics["warnings"]  # type: ignore[index]
     serialized = json.dumps(report, ensure_ascii=False)
     assert all(
         forbidden not in serialized

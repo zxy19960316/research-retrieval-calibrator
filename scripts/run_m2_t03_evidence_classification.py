@@ -38,6 +38,7 @@ from app.models.evidence_classification import (
     EvidenceClassificationBatch,
     EvidenceClassificationError,
     EvidenceClassificationInput,
+    EvidenceClassificationQualityDiagnostics,
     EvidenceClassificationRecord,
     EvidenceClassificationState,
     EvidenceClassifierDescriptor,
@@ -154,6 +155,7 @@ _RUN_EXECUTION_FIELDS = {
     "rejected_count",
     "slot_distribution",
     "support_level_distribution",
+    "quality_diagnostics",
 }
 _RECORD_FIELDS = {
     "paper_id",
@@ -231,6 +233,11 @@ class CountingEvidenceClassifierProvider:
     def classify(self, inputs: Sequence[EvidenceClassificationInput]) -> Sequence[object]:
         self.provider_call_count += 1
         return self._provider.classify(inputs)
+
+    @property
+    def quality_diagnostics(self) -> EvidenceClassificationQualityDiagnostics | None:
+        diagnostics = getattr(self._provider, "quality_diagnostics", None)
+        return diagnostics if isinstance(diagnostics, EvidenceClassificationQualityDiagnostics) else None
 
 
 def _operational_path(path: Path | str) -> Path:
@@ -420,6 +427,7 @@ def _build_run_report(
     context: _FixedInputContext,
     batch: EvidenceClassificationBatch,
     provider_call_count: int,
+    quality_diagnostics: EvidenceClassificationQualityDiagnostics | None,
 ) -> dict[str, object]:
     records = [record.model_dump(mode="json") for record in batch.records]
     slot_distribution, support_distribution = _distribution(batch.records)
@@ -431,6 +439,7 @@ def _build_run_report(
         in {EvidenceClassificationState.REJECTED, EvidenceClassificationState.INSUFFICIENT_SOURCE_TEXT}
         for record in batch.records
     )
+    diagnostics = quality_diagnostics or _derive_quality_diagnostics(batch.records)
     return {
         "report_version": "m2-t03-evidence-classification-run.v1",
         "phase": "M2",
@@ -484,9 +493,41 @@ def _build_run_report(
             "rejected_count": rejected_count,
             "slot_distribution": slot_distribution,
             "support_level_distribution": support_distribution,
+            "quality_diagnostics": diagnostics.model_dump(mode="json"),
         },
         "records": records,
     }
+
+
+def _derive_quality_diagnostics(
+    records: Sequence[EvidenceClassificationRecord],
+) -> EvidenceClassificationQualityDiagnostics:
+    slots = {record.evidence_slot for record in records if record.evidence_slot is not None}
+    support_levels = {
+        record.support_level for record in records if record.support_level is not None
+    }
+    rejected_count = sum(
+        record.state
+        in {EvidenceClassificationState.REJECTED, EvidenceClassificationState.INSUFFICIENT_SOURCE_TEXT}
+        for record in records
+    )
+    warnings: list[str] = []
+    if len(slots) < 3:
+        warnings.append("FEWER_THAN_THREE_SLOTS_OBSERVED")
+    if support_levels and len(support_levels) == 1:
+        warnings.append("ALL_RECORDS_SAME_SUPPORT_LEVEL")
+    if not {SupportLevel.INDIRECT, SupportLevel.HYPOTHETICAL} & support_levels:
+        warnings.append("NO_INDIRECT_OR_HYPOTHETICAL_RECORDS")
+    if rejected_count == 0:
+        warnings.append("NO_REJECTED_OR_UNCERTAIN_RECORDS")
+    return EvidenceClassificationQualityDiagnostics(
+        observed_slot_count=len(slots),
+        observed_support_level_count=len(support_levels),
+        all_records_same_support_level=bool(support_levels) and len(support_levels) == 1,
+        generic_marker_only_count=0,
+        ambiguous_rejection_count=0,
+        warnings=warnings,  # type: ignore[arg-type]
+    )
 
 
 def _serialized_json(value: Mapping[str, object]) -> bytes:
@@ -691,7 +732,21 @@ def validate_classification_run_report(value: object) -> None:
             "slot_distribution": slot_distribution,
             "support_level_distribution": support_distribution,
         }
-        if execution != expected_execution:
+        quality_diagnostics = EvidenceClassificationQualityDiagnostics.model_validate(
+            execution["quality_diagnostics"]
+        )
+        if (
+            quality_diagnostics.observed_slot_count
+            != sum(value > 0 for value in slot_distribution.values())
+            or quality_diagnostics.observed_support_level_count
+            != sum(value > 0 for value in support_distribution.values())
+            or quality_diagnostics.generic_marker_only_count > rejected_count
+            or quality_diagnostics.ambiguous_rejection_count > rejected_count
+        ):
+            raise ValueError
+        if {
+            key: value for key, value in execution.items() if key != "quality_diagnostics"
+        } != expected_execution:
             raise ValueError
         expected_status = (
             "classification_completed" if rejected_count == 0 else "classification_partial_failure"
@@ -893,7 +948,12 @@ def run_m2_t03_evidence_classification(
             raise EvidenceClassificationError("INVALID_INPUT")
         inputs = [build_classification_input(candidate, counting_provider.descriptor) for candidate in context.candidates]
         batch = classify_evidence_batch(inputs, counting_provider)
-        report = _build_run_report(context, batch, counting_provider.provider_call_count)
+        report = _build_run_report(
+            context,
+            batch,
+            counting_provider.provider_call_count,
+            counting_provider.quality_diagnostics,
+        )
         validate_classification_run_report(report)
         if publish_result:
             receipt = _build_receipt(report, formal_result_created=True)

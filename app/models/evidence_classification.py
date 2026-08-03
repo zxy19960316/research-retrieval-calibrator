@@ -72,6 +72,45 @@ class EvidenceClassificationBatchState(StrEnum):
     PARTIAL_FAILURE = "PARTIAL_FAILURE"
 
 
+EvidenceClassificationWarningCode = Literal[
+    "FEWER_THAN_THREE_SLOTS_OBSERVED",
+    "ALL_RECORDS_SAME_SUPPORT_LEVEL",
+    "NO_INDIRECT_OR_HYPOTHETICAL_RECORDS",
+    "GENERIC_MARKER_DOMINANCE",
+    "NO_REJECTED_OR_UNCERTAIN_RECORDS",
+]
+
+EVIDENCE_CLASSIFICATION_WARNING_CODES: tuple[EvidenceClassificationWarningCode, ...] = (
+    "FEWER_THAN_THREE_SLOTS_OBSERVED",
+    "ALL_RECORDS_SAME_SUPPORT_LEVEL",
+    "NO_INDIRECT_OR_HYPOTHETICAL_RECORDS",
+    "GENERIC_MARKER_DOMINANCE",
+    "NO_REJECTED_OR_UNCERTAIN_RECORDS",
+)
+
+
+class EvidenceClassificationQualityDiagnostics(BaseModel):
+    """Closed, non-quality-claiming diagnostics for one deterministic run."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    observed_slot_count: int = Field(ge=0)
+    observed_support_level_count: int = Field(ge=0)
+    all_records_same_support_level: bool
+    generic_marker_only_count: int = Field(ge=0)
+    ambiguous_rejection_count: int = Field(ge=0)
+    warnings: list[EvidenceClassificationWarningCode] = Field(default_factory=list)
+
+    @field_validator("warnings")
+    @classmethod
+    def require_unique_warning_codes(
+        cls, value: list[EvidenceClassificationWarningCode]
+    ) -> list[EvidenceClassificationWarningCode]:
+        if len(value) != len(set(value)):
+            raise ValueError("quality warning codes must be unique")
+        return value
+
+
 def normalize_source_text(value: str, *, field_name: str) -> str:
     """Normalize one source field without inventing or silently dropping text."""
 
