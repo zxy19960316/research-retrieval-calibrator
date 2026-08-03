@@ -52,7 +52,7 @@ class EvidenceClassificationError(ValueError):
     def __init__(self, code: EvidenceClassificationErrorCode | str) -> None:
         if code not in EVIDENCE_CLASSIFICATION_ERROR_CODES:
             raise ValueError(f"Unknown evidence classification error code: {code}")
-        self.code: EvidenceClassificationErrorCode = code  # type: ignore[assignment]
+        self.code: EvidenceClassificationErrorCode = code
         super().__init__(code)
 
 
