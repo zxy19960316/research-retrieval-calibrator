@@ -8,6 +8,7 @@ import re
 import subprocess
 import sys
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -44,6 +45,8 @@ from scripts.repair_m1_frozen_intent_replay import (
 
 REPORT_PATH = Path("evaluation/reports/m1-frozen-intent-replay-repair-2026-08-03.json")
 REPORT_VERSION = "m1-frozen-intent-replay-repair.v2"
+REPORT_BOUND_REMOTE_CI_RUN_ID = "30804091518"
+REPORT_BOUND_REMOTE_CI_HEAD_SHA = "6b37c70b8373f6cd02cd587f8bfb7f8fb16fecf9"
 SHA1_RE = re.compile(r"^[0-9a-f]{40}$")
 STATUS_M2_RE = re.compile(
     r"^\|\s*M2\b[^|]*\|\s*([A-Z0-9_]+)\s*\|\s*(\d+)/(\d+)\s*\|",
@@ -59,6 +62,36 @@ FORBIDDEN_TEXT = (
     "-----begin",
     "traceback",
 )
+
+EXPECTED_COMMANDS: dict[str, str] = {
+    "new_repair_contract": "python -m pytest tests/contract/test_m1_frozen_intent_repair_runner.py tests/contract/test_m1_frozen_intent_repair_validation.py -q",
+    "frozen_intent_core_contract": "python -m pytest tests/contract/test_m1_frozen_intent_replay_repair.py -q",
+    "m1_focused_tests": "python -m pytest tests/unit/test_intent_clarification.py tests/unit/test_first_round_cli.py tests/integration/test_first_round_pipeline.py -q",
+    "focused_repair_and_m2_tests": "python -m pytest tests/contract/test_m1_frozen_intent_replay_repair.py tests/contract/test_m1_frozen_intent_repair_runner.py tests/contract/test_m1_frozen_intent_repair_validation.py tests/contract/test_m2_frozen_input_replay.py -q",
+    "offline_repair": "python scripts/repair_m1_frozen_intent_replay.py --execute-offline-repair",
+    "offline_repair_idempotence": "python scripts/repair_m1_frozen_intent_replay.py --execute-offline-repair",
+    "m1_replay_repair_validator": "python scripts/validate_m1_frozen_intent_replay_repair.py",
+    "full_non_packaging_tests": "python -m pytest -q -m \"not packaging\"",
+    "packaging_tests": "python -m pytest -q -m packaging",
+    "ruff": "python -m ruff check app evaluation scripts tests",
+    "ruff_import_order": "python -m ruff check --select I app evaluation scripts tests",
+    "mypy": "python -m mypy app evaluation scripts",
+    "project_docs": "python scripts/validate_project_docs.py",
+    "m0_validator": "python scripts/validate_phase.py M0",
+    "m1_validator": "python scripts/validate_m1_evidence.py",
+    "m2_t01_validator": "python scripts/validate_m2_t01_evidence.py",
+    "m2_t02_validator": "python scripts/validate_m2_t02_evidence.py",
+    "m2_t03_validator": "python scripts/validate_m2_t03_evidence.py",
+    "pip_check": "python -m pip check",
+    "git_diff_check": "git diff --check",
+}
+EXPECTED_TEST_TOTALS: dict[str, dict[str, int]] = {
+    "new_repair_contract": {"passed": 60, "failed": 0},
+    "m1_focused_tests": {"passed": 39, "failed": 0},
+    "focused_repair_and_m2_tests": {"passed": 180, "failed": 0},
+    "full_non_packaging_tests": {"passed": 1194, "failed": 0, "deselected": 1},
+    "packaging_tests": {"passed": 1, "failed": 0, "deselected": 1194},
+}
 
 PROTECTED_HASHES = {
     "evaluation/snapshots/m2/m1-candidates.v1.json": EXPECTED_PROTECTED_CANDIDATE_SNAPSHOT_SHA256,
@@ -168,13 +201,13 @@ def validate_m1_frozen_intent_replay_repair(
     _validate_fixed_history(errors, repository_root)
     inventory = validate_source_bundle_inventory(repository_root)
     errors.extend(f"source inventory: {error}" for error in inventory.errors)
-    manifest, _first_run, _replay = _validate_bundle(errors, repository_root)
+    manifest, first_run, replay = _validate_bundle(errors, repository_root)
     _validate_status_and_protected_artifacts(errors, repository_root)
     report = _load_json(repository_root / report_path)
     if report is None:
         errors.append("repair report is unavailable or invalid")
     else:
-        _validate_report(report, manifest, errors, repository_root)
+        _validate_report(report, manifest, first_run, replay, errors, repository_root)
         _validate_safe_text(report, errors)
     return ValidationResult(not errors, errors)
 
@@ -384,6 +417,8 @@ def _validate_status_and_protected_artifacts(errors: list[str], repository_root:
 def _validate_report(
     payload: dict[str, Any],
     manifest: M1ReplayRepairManifest | None,
+    first_run: FirstRoundRun | None,
+    replay: FirstRoundRun | None,
     errors: list[str],
     repository_root: Path,
 ) -> None:
@@ -395,11 +430,34 @@ def _validate_report(
     if report.report_version != REPORT_VERSION or report.task_id != "M1-FROZEN-INTENT-REPLAY-REPAIR":
         errors.append("repair report identity is invalid")
     for field in ("implementation_commit", "validated_commit"):
-        value = getattr(report, field)
-        if SHA1_RE.fullmatch(value) is None:
-            errors.append(f"repair report {field} is not a Git SHA-1")
-        elif _git(repository_root, "merge-base", "--is-ancestor", value, "HEAD") != 0:
-            errors.append(f"repair report {field} is not an ancestor of HEAD")
+        _validate_commit_ancestor(
+            getattr(report, field),
+            f"repair report {field}",
+            repository_root,
+            errors,
+        )
+    for field, value in report.implementation_commits.model_dump(mode="json").items():
+        _validate_commit_ancestor(
+            value,
+            f"repair report implementation_commits.{field}",
+            repository_root,
+            errors,
+        )
+    if report.remote_ci_run_id != REPORT_BOUND_REMOTE_CI_RUN_ID:
+        errors.append("repair report remote CI run binding is invalid")
+    remote_ci_head_valid = report.remote_ci_head_sha == REPORT_BOUND_REMOTE_CI_HEAD_SHA
+    if not remote_ci_head_valid:
+        errors.append("repair report remote CI head binding is invalid")
+    elif _git(repository_root, "merge-base", "--is-ancestor", report.remote_ci_head_sha, "HEAD") != 0:
+        errors.append("repair report remote CI head is not an ancestor of HEAD")
+    elif SHA1_RE.fullmatch(report.validated_commit) is not None and _git(
+        repository_root,
+        "merge-base",
+        "--is-ancestor",
+        report.remote_ci_head_sha,
+        report.validated_commit,
+    ) != 0:
+        errors.append("repair report remote CI head is not an ancestor of validated_commit")
     if report.root_cause != "replay reconstructed ResearchIntent using replay started_at":
         errors.append("repair report root cause is invalid")
     if report.repair != "replay reuses the exact first-run frozen ResearchIntent":
@@ -416,6 +474,7 @@ def _validate_report(
         errors.append("repair report source inventory counts are invalid")
     if report.candidate_projection_applied is not False:
         errors.append("repair report must prove candidate projection was not applied")
+    _validate_historical_bundle(report, errors)
     expected_source = {
         "source_bundle_manifest_sha256": EXPECTED_SOURCE_MANIFEST_SHA256,
         "original_first_run_sha256": EXPECTED_SOURCE_FIRST_RUN_SHA256,
@@ -439,6 +498,11 @@ def _validate_report(
             errors.append("repair report repair artifact binding is invalid")
         if report.candidate_audit != manifest.candidate_audit:
             errors.append("repair report candidate audit binding is invalid")
+        expected_replay_assertions = _derive_replay_assertions(manifest, first_run, replay)
+        if expected_replay_assertions is None:
+            errors.append("repair report replay assertion inputs are unavailable")
+        elif report.replay_assertions.model_dump(mode="json") != expected_replay_assertions:
+            errors.append("repair report replay assertions are not derived from replay evidence")
     if report.protected_hashes != {**PROTECTED_REPORT_HASHES, **PROTECTED_HASHES}:
         errors.append("repair report protected hash binding is invalid")
     if report.evidence_types.model_dump(mode="json") != {
@@ -451,27 +515,108 @@ def _validate_report(
     _validate_commands_and_totals(report, errors)
 
 
+def _validate_historical_bundle(
+    report: M1ReplayRepairReport,
+    errors: list[str],
+) -> None:
+    expected_historical_bundle = {
+        "status": "unchanged",
+        "source_bundle": SOURCE_BUNDLE.as_posix(),
+        "old_first_run_sha256": EXPECTED_SOURCE_FIRST_RUN_SHA256,
+        "old_replay_sha256": EXPECTED_SOURCE_REPLAY_SHA256,
+        "old_first_run_frozen_at": datetime(
+            2026, 7, 28, 7, 8, 40, 329494, tzinfo=UTC
+        ),
+        "old_replay_frozen_at": datetime(
+            2026, 7, 28, 7, 10, 58, 105607, tzinfo=UTC
+        ),
+        "drift_fields": ["intent.frozen_at"],
+    }
+    actual = report.historical_bundle
+    for field in (
+        "status",
+        "source_bundle",
+        "old_first_run_sha256",
+        "old_replay_sha256",
+        "drift_fields",
+    ):
+        if getattr(actual, field) != expected_historical_bundle[field]:
+            errors.append(f"repair report historical bundle field is invalid: {field}")
+    for field in ("old_first_run_frozen_at", "old_replay_frozen_at"):
+        actual_utc = _as_utc(getattr(actual, field))
+        if actual_utc != expected_historical_bundle[field]:
+            errors.append(f"repair report historical bundle timestamp is invalid: {field}")
+
+
+def _derive_replay_assertions(
+    manifest: M1ReplayRepairManifest,
+    first_run: FirstRoundRun | None,
+    replay: FirstRoundRun | None,
+) -> dict[str, object] | None:
+    if (
+        first_run is None
+        or replay is None
+        or first_run.intent is None
+        or replay.intent is None
+        or first_run.query_plan is None
+        or replay.query_plan is None
+    ):
+        return None
+    first_queries = [(query.query_id, query.query_text) for query in first_run.query_plan.queries]
+    replay_queries = [(query.query_id, query.query_text) for query in replay.query_plan.queries]
+    return {
+        "canonical_intent_equal": canonical_research_intent_bytes(first_run.intent)
+        == canonical_research_intent_bytes(replay.intent),
+        "candidate_identity_equal": manifest.candidate_audit.candidate_identity_equal,
+        "candidate_payload_equal": manifest.candidate_audit.candidate_payload_equal,
+        "query_ids_equal": [query_id for query_id, _ in first_queries]
+        == [query_id for query_id, _ in replay_queries],
+        "query_text_equal": [query_text for _, query_text in first_queries]
+        == [query_text for _, query_text in replay_queries],
+        "query_plan_equal": first_run.query_plan == replay.query_plan,
+        "transport_requests": manifest.zero_transport_replay.transport_requests,
+        "cache_hits": manifest.zero_transport_replay.cache_hits,
+    }
+
+
 def _validate_commands_and_totals(
     report: M1ReplayRepairReport,
     errors: list[str],
 ) -> None:
-    if not report.commands:
-        errors.append("repair report commands must be non-empty")
+    command_names = [command.name for command in report.commands]
+    if len(command_names) != len(set(command_names)):
+        errors.append("repair report command names contain duplicates")
+    if set(command_names) != set(EXPECTED_COMMANDS) or len(command_names) != len(EXPECTED_COMMANDS):
+        errors.append("repair report command names are not exact")
     for command in report.commands:
+        expected_command = EXPECTED_COMMANDS.get(command.name)
+        if expected_command is None or command.command != expected_command:
+            errors.append(f"repair report command text is invalid: {command.name}")
         if command.exit_code != 0:
             errors.append(f"repair report command is not green: {command.name}")
-    totals = report.test_totals
-    if any(
-        total.failed != 0
-        for total in (
-            totals.new_repair_contract,
-            totals.m1_focused_tests,
-            totals.focused_repair_and_m2_tests,
-            totals.full_non_packaging_tests,
-            totals.packaging_tests,
-        )
-    ):
-        errors.append("repair report test totals contain failures")
+    if report.test_totals.model_dump(mode="json") != EXPECTED_TEST_TOTALS:
+        errors.append("repair report test totals are not exact")
+
+
+def _validate_commit_ancestor(
+    value: str,
+    label: str,
+    repository_root: Path,
+    errors: list[str],
+) -> bool:
+    if SHA1_RE.fullmatch(value) is None:
+        errors.append(f"{label} is not a Git SHA-1")
+        return False
+    if _git(repository_root, "merge-base", "--is-ancestor", value, "HEAD") != 0:
+        errors.append(f"{label} is not an ancestor of HEAD")
+        return False
+    return True
+
+
+def _as_utc(value: datetime) -> datetime | None:
+    if value.tzinfo is None or value.utcoffset() is None:
+        return None
+    return value.astimezone(UTC)
 
 
 def _validate_safe_text(value: object, errors: list[str]) -> None:
