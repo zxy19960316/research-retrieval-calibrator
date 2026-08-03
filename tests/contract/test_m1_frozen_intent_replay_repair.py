@@ -118,7 +118,6 @@ def test_replay_preserves_original_frozen_intent_and_canonical_identity(
         ("method_constraint", MethodConstraint.REQUIRED),
         ("accepted_paper_roles", {"method", "background"}),
         ("revision", 2),
-        ("frozen_at", REPLAY_STARTED_AT),
     ],
 )
 def test_any_intent_field_mutation_fails_closed(
@@ -152,7 +151,7 @@ def test_non_utc_frozen_at_is_rejected_before_replay_transport(tmp_path: Path) -
     assert first.intent is not None
 
     non_utc = first.intent.model_copy(
-        update={"frozen_at": datetime(2026, 7, 28, 7, 8, 40, 329494)}
+        update={"frozen_at": FIRST_STARTED_AT.replace(tzinfo=None)}
     )
     forbidden = ForbiddenTransport()
     replay = _run(
@@ -183,8 +182,12 @@ def test_canonical_intent_identity_sorts_roles_and_includes_frozen_at() -> None:
 
     first_bytes = canonical_research_intent_bytes(intent)
     second_bytes = canonical_research_intent_bytes(reordered)
+    changed_timestamp_bytes = canonical_research_intent_bytes(
+        intent.model_copy(update={"frozen_at": REPLAY_STARTED_AT})
+    )
 
     assert first_bytes == second_bytes
+    assert first_bytes != changed_timestamp_bytes
     assert b'"frozen_at":"2026-07-28T07:08:40.329494Z"' in first_bytes
 
 

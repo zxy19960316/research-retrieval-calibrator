@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 from pydantic import ValidationError
 
 from app.adapters.arxiv import ArxivAdapter, ArxivAdapterError, ArxivRequestObservation
-from app.core.intent import freeze_research_intent
+from app.core.intent import canonical_research_intent_bytes, freeze_research_intent
 from app.core.paper_dedup import deduplicate_papers
 from app.core.query_planner import build_query_plan
 from app.models.dedup import DedupCluster, PaperDeduplicationError
@@ -51,6 +51,7 @@ def run_first_round(
     adapter: ArxivAdapter,
     now: Callable[[], datetime] = lambda: datetime.now(UTC),
     monotonic: Callable[[], float] = time.monotonic,
+    frozen_intent: ResearchIntent | None = None,
 ) -> FirstRoundRun:
     """Run the fixed M1 retrieval path without generating terms or metadata."""
 
@@ -59,21 +60,44 @@ def run_first_round(
     started_monotonic = monotonic()
     safe_question = question.strip() or "<blank question>"
 
+    intent_timestamp = started_at
     try:
-        intent = _intent_from_question(question, started_at)
+        if frozen_intent is None:
+            intent = _intent_from_question(question, intent_timestamp)
+        else:
+            intent = _validated_replay_intent(question, frozen_intent)
+            intent_timestamp = intent.frozen_at
         query_plan = build_query_plan(
             _PROJECT_ID,
             intent,
-            generated_at_utc=started_at,
+            generated_at_utc=intent_timestamp,
         )
-    except (PlanningError, ValidationError, ValueError):
+    except PlanningError as error:
+        error_code = (
+            "INTENT_REPLAY_MISMATCH"
+            if frozen_intent is not None and error.code == "INTENT_REPLAY_MISMATCH"
+            else "INTENT_PARSE_FAILED"
+        )
         return _failed_run(
             question=safe_question,
             config=config,
             started_at=started_at,
             started_monotonic=started_monotonic,
             monotonic=monotonic,
-            error_code="INTENT_PARSE_FAILED",
+            error_code=error_code,
+        )
+    except (ValidationError, TypeError, ValueError):
+        return _failed_run(
+            question=safe_question,
+            config=config,
+            started_at=started_at,
+            started_monotonic=started_monotonic,
+            monotonic=monotonic,
+            error_code=(
+                "INTENT_REPLAY_MISMATCH"
+                if frozen_intent is not None
+                else "INTENT_PARSE_FAILED"
+            ),
         )
 
     run_id = _run_id(safe_question, config, query_plan.plan_id)
@@ -261,6 +285,26 @@ def _intent_from_question(question: str, frozen_at: datetime) -> ResearchIntent:
         },
     )
     return freeze_research_intent(draft, frozen_at)
+
+
+def _validated_replay_intent(
+    question: str,
+    frozen_intent: ResearchIntent,
+) -> ResearchIntent:
+    """Revalidate and identity-check a supplied intent before cache replay."""
+
+    try:
+        validated = ResearchIntent.model_validate(frozen_intent.model_dump(mode="json"))
+        derived = _intent_from_question(question, validated.frozen_at)
+        if canonical_research_intent_bytes(derived) != canonical_research_intent_bytes(
+            validated
+        ):
+            raise PlanningError("INTENT_REPLAY_MISMATCH")
+        return validated
+    except (AttributeError, PlanningError, TypeError, ValidationError, ValueError) as error:
+        if isinstance(error, PlanningError) and error.code == "INTENT_REPLAY_MISMATCH":
+            raise
+        raise PlanningError("INTENT_REPLAY_MISMATCH") from error
 
 
 def _unique_terms(terms: list[str]) -> list[str]:

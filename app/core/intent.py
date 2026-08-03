@@ -1,5 +1,6 @@
 """Pure M1-T01 intent normalisation, clarification, and freeze functions."""
 
+import json
 import re
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
@@ -177,6 +178,25 @@ def freeze_research_intent(draft: IntentDraft, frozen_at: datetime) -> ResearchI
         revision=draft.revision,
         frozen_at=frozen_at,
     )
+
+
+def canonical_research_intent_bytes(intent: ResearchIntent) -> bytes:
+    """Return the strict, byte-stable identity of a frozen research intent."""
+
+    validated = ResearchIntent.model_validate(intent.model_dump(mode="json"))
+    payload = validated.model_dump(mode="json")
+    payload["accepted_paper_roles"] = sorted(validated.accepted_paper_roles)
+    payload["frozen_at"] = (
+        validated.frozen_at.astimezone(UTC).isoformat(timespec="microseconds").replace(
+            "+00:00", "Z"
+        )
+    )
+    return json.dumps(
+        payload,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
 
 
 def prepare_intent(
