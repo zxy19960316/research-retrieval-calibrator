@@ -210,6 +210,147 @@ def test_implementation_commit_not_ancestor_of_head_fails_closed(tmp_path: Path)
     assert any("not an ancestor" in error for error in result.errors)
 
 
+@pytest.mark.parametrize(
+    ("field", "replacement"),
+    [
+        ("source_bundle", "evaluation/source-artifacts/other"),
+        ("old_first_run_sha256", "0" * 64),
+        ("old_replay_sha256", "0" * 64),
+        ("old_first_run_frozen_at", "2026-07-28T07:08:41.329494Z"),
+        ("old_replay_frozen_at", "2026-07-28T07:10:59.105607Z"),
+        ("drift_fields", ["intent.frozen_at", "query_plan"]),
+    ],
+)
+def test_historical_bundle_mutations_fail_closed(
+    tmp_path: Path,
+    field: str,
+    replacement: object,
+) -> None:
+    repository = _copy_validation_fixture(tmp_path)
+    _set_nested_json(repository / REPORT_PATH, ("historical_bundle", field), replacement)
+
+    result = validator.validate_m1_frozen_intent_replay_repair(
+        report_path=REPORT_PATH,
+        repository_root=repository,
+    )
+
+    assert result.valid is False, field
+
+
+@pytest.mark.parametrize(
+    ("field", "replacement"),
+    [
+        ("canonical_intent_equal", False),
+        ("candidate_identity_equal", False),
+        ("candidate_payload_equal", True),
+        ("query_ids_equal", False),
+        ("query_text_equal", False),
+        ("query_plan_equal", False),
+        ("transport_requests", 1),
+        ("cache_hits", 11),
+    ],
+)
+def test_replay_assertion_mutations_fail_closed(
+    tmp_path: Path,
+    field: str,
+    replacement: object,
+) -> None:
+    repository = _copy_validation_fixture(tmp_path)
+    _set_nested_json(repository / REPORT_PATH, ("replay_assertions", field), replacement)
+
+    result = validator.validate_m1_frozen_intent_replay_repair(
+        report_path=REPORT_PATH,
+        repository_root=repository,
+    )
+
+    assert result.valid is False, field
+
+
+@pytest.mark.parametrize(
+    "field",
+    ["intent_core", "repair_runner", "repair_validator", "repair_schema"],
+)
+def test_implementation_commit_map_non_ancestor_fails_closed(
+    tmp_path: Path,
+    field: str,
+) -> None:
+    repository = _copy_validation_fixture(tmp_path)
+    _set_nested_json(repository / REPORT_PATH, ("implementation_commits", field), "0" * 40)
+
+    result = validator.validate_m1_frozen_intent_replay_repair(
+        report_path=REPORT_PATH,
+        repository_root=repository,
+    )
+
+    assert result.valid is False, field
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    ["missing", "unknown", "duplicate", "text", "exit_code"],
+)
+def test_command_evidence_mutations_fail_closed(tmp_path: Path, mutation: str) -> None:
+    repository = _copy_validation_fixture(tmp_path)
+    report_path = repository / REPORT_PATH
+    payload = _read_json(report_path)
+    commands = payload["commands"]
+    assert isinstance(commands, list)
+    assert commands
+    if mutation == "missing":
+        payload["commands"] = commands[1:]
+    elif mutation == "unknown":
+        commands.append({"command": "python -m pytest", "exit_code": 0, "name": "unknown"})
+    elif mutation == "duplicate":
+        assert len(commands) > 1
+        commands[1]["name"] = commands[0]["name"]
+    elif mutation == "text":
+        commands[0]["command"] = f"{commands[0]['command']} --mutation"
+    elif mutation == "exit_code":
+        commands[0]["exit_code"] = 1
+    else:
+        raise AssertionError(mutation)
+    _write_json(report_path, payload)
+
+    result = validator.validate_m1_frozen_intent_replay_repair(
+        report_path=REPORT_PATH,
+        repository_root=repository,
+    )
+
+    assert result.valid is False, mutation
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    ["passed_zero", "passed_plus_one", "failed_one", "deselected_changed", "missing"],
+)
+def test_test_total_mutations_fail_closed(tmp_path: Path, mutation: str) -> None:
+    repository = _copy_validation_fixture(tmp_path)
+    report_path = repository / REPORT_PATH
+    payload = _read_json(report_path)
+    totals = payload["test_totals"]
+    assert isinstance(totals, dict)
+    if mutation == "passed_zero":
+        totals["new_repair_contract"]["passed"] = 0
+    elif mutation == "passed_plus_one":
+        totals["new_repair_contract"]["passed"] += 1
+    elif mutation == "failed_one":
+        totals["new_repair_contract"]["failed"] = 1
+    elif mutation == "deselected_changed":
+        totals["full_non_packaging_tests"]["deselected"] += 1
+    elif mutation == "missing":
+        totals.pop("new_repair_contract")
+    else:
+        raise AssertionError(mutation)
+    _write_json(report_path, payload)
+
+    result = validator.validate_m1_frozen_intent_replay_repair(
+        report_path=REPORT_PATH,
+        repository_root=repository,
+    )
+
+    assert result.valid is False, mutation
+
+
 def _copy_validation_fixture(tmp_path: Path) -> Path:
     repository = tmp_path / "repository"
     repository.mkdir(parents=True)
