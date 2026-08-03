@@ -1,9 +1,9 @@
 {
   "report_version": "m2-t03-evidence-classification.v1",
   "task_id": "M2-T03",
-  "implementation_commit": "eafa2ef14857154d3590fbec5410a1953981512a",
-  "validated_commit": "1fa2ba008d48a230cb8e7b7e685a03467e01fdfc",
-  "timestamp_utc": "2026-08-03T04:17:18Z",
+  "implementation_commit": "e0c1a6d0c8f169a21f23632ac970d64246dd162e",
+  "validated_commit": "ebb19eebfd804dfda2adbf8c65aeecbac17968fe",
+  "timestamp_utc": "2026-08-03T05:22:17Z",
   "python_version": "3.12.10",
   "dependency_versions": {
     "pydantic": "2.13.4",
@@ -31,25 +31,38 @@
   ],
   "artifact": {
     "result_path": "evaluation/source-artifacts/m2-t03-evidence-classification-run.json",
-    "result_sha256": "fed79bda5c815a0637e189b8195910d556a82ffe3733f4b8ab6b06fbd1392eeb",
+    "result_sha256": "8c2b91771c1456aac4d347ccf74dec9e0b583f6a08f192e157f0fb1538719a5d",
     "receipt_path": "evaluation/source-artifacts/m2-t03-evidence-classification-run-receipt.json",
-    "receipt_sha256": "8547a58e97b990a2a6f54409e9bccef0437fe2f1ed78150d32b2f958bb800a7a"
+    "receipt_sha256": "3110d04099132417dcf8fb08a8f4e3e648cb96587690184ac7be3ed0575af40a"
   },
   "record_count": 33,
   "slot_distribution": {
-    "PROBLEM_EXISTENCE": 0,
-    "CURRENT_METHODS": 0,
+    "PROBLEM_EXISTENCE": 3,
+    "CURRENT_METHODS": 8,
     "METHOD_TRANSFERABILITY": 0,
     "IMPLEMENTATION_PATH": 7,
-    "EVALUATION_BASIS": 26
+    "EVALUATION_BASIS": 13
   },
   "support_level_distribution": {
-    "DIRECT": 33,
+    "DIRECT": 31,
     "INDIRECT": 0,
     "HYPOTHETICAL": 0
   },
+  "quality_diagnostics": {
+    "observed_slot_count": 4,
+    "observed_support_level_count": 1,
+    "all_records_same_support_level": true,
+    "generic_marker_only_count": 2,
+    "ambiguous_rejection_count": 0,
+    "warnings": [
+      "ALL_RECORDS_SAME_SUPPORT_LEVEL",
+      "NO_INDIRECT_OR_HYPOTHETICAL_RECORDS"
+    ]
+  },
   "title_only_count": 0,
-  "rejected_count": 0,
+  "rejected_count": 2,
+  "completion_scope": "contract_only",
+  "scoring_eligible": false,
   "evidence_types": {
     "deterministic_fake": "passed",
     "real_model": "not_run",
@@ -64,7 +77,7 @@
     },
     {
       "name": "focused_tests",
-      "command": "python -m pytest -q tests/contract/test_m2_t02_evidence_validation.py tests/contract/test_m2_t03_evidence_classification.py tests/unit/test_m2_t03_evidence_classification_provider.py tests/contract/test_m2_t03_evidence_classification_evidence.py tests/unit/test_m2_t03_evidence_classification_runner.py",
+      "command": "python -m pytest -q tests/unit/test_m2_t03_evidence_classification_provider.py tests/unit/test_m2_t03_evidence_classification_runner.py tests/contract/test_m2_t03_evidence_classification.py tests/contract/test_m2_t03_evidence_classification_evidence.py tests/contract/test_project_docs_validation.py",
       "exit_code": 0
     },
     {
@@ -151,9 +164,9 @@
     "m2_t03_validator": 0
   },
   "test_totals": {
-    "focused": "41 passed",
-    "full_non_packaging": "1086 passed, 1 deselected",
-    "packaging": "1 passed, 1086 deselected"
+    "focused": "62 passed",
+    "full_non_packaging": "1098 passed, 1 deselected",
+    "packaging": "1 passed, 1098 deselected"
   },
   "not_run": {
     "real_model": true,
@@ -162,13 +175,14 @@
     "m2_t05": true
   },
   "residual_risks": [
-    "The formal classification run uses only the deterministic fake provider; no real classification model was approved or executed.",
-    "No human review was performed, so the deterministic output does not establish classification quality.",
+    "The deterministic fake artifact validates contracts and reproducibility only; it is not evidence of real classification quality.",
+    "It is not eligible to provide the evidence_slot_score used by M2-T04.",
+    "Real-model classification and human review remain not run.",
     "M2-T04 six-item scoring and M2-T05 diversity selection remain not implemented and not run."
   ],
   "status_after_evidence": {
-    "m2": "IN_PROGRESS 3/5",
+    "m2": "IN_PROGRESS 2/5",
     "m3": "BLOCKED_BY_M2 0/5",
-    "next_task": "M2-T04"
+    "next_task": "M2-T03 quality closure"
   }
 }
