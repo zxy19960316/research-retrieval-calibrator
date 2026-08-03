@@ -128,6 +128,7 @@ _SLOT_MARKERS: tuple[tuple[EvidenceSlot, tuple[_MarkerRule, ...]], ...] = (
             _make_rule("we develop a system", specificity=5),
             _make_rule("pipeline", specificity=4),
             _make_rule("architecture", specificity=4),
+            _make_rule("open[- ]source", marker="open-source", specificity=4),
             _make_rule("open[- ]source implementation", marker="open-source implementation", specificity=5),
             _make_rule("engineering solution", specificity=4),
             _make_rule("implementation", specificity=4),
@@ -238,6 +239,7 @@ class _EvidenceMatch:
     matched_source: Literal["title", "abstract"]
     supporting_excerpt: str
     specificity: int
+    excerpt_start: int
 
 
 @dataclass(frozen=True)
@@ -247,7 +249,6 @@ class _ScoredEvidenceMatch:
     high_specificity_count: int
     generic_marker_count: int
     source_priority: int
-    excerpt_start: int
 
 
 _RejectionKind = Literal["none", "no_match", "generic_only", "ambiguous"]
@@ -325,16 +326,77 @@ class DeterministicFakeEvidenceClassifier:
         )
 
 
+_PROTECTED_DOT_TOKENS = frozenset(
+    {"e.g.", "i.e.", "et al.", "fig.", "dr.", "vs.", "etc.", "al."}
+)
+_DIRECT_FRAGMENT_BOUNDARIES = frozenset("!?。！？\n")
+
+
+def _dotted_token_ending_at(source: str, period_index: int) -> str:
+    start = period_index
+    while start > 0 and (
+        source[start - 1].isalnum() or source[start - 1] == "."
+    ):
+        start -= 1
+    return source[start : period_index + 1]
+
+
+def _is_sentence_terminal_period(source: str, period_index: int) -> bool:
+    if source[period_index] != ".":
+        return False
+    previous = source[period_index - 1] if period_index else ""
+    following = source[period_index + 1] if period_index + 1 < len(source) else ""
+    if previous.isalnum() and following.isalnum():
+        return False
+    token = _dotted_token_ending_at(source, period_index).casefold()
+    if token in _PROTECTED_DOT_TOKENS:
+        return False
+    parts = token[:-1].split(".") if token.endswith(".") else []
+    return not (
+        len(parts) >= 2 and all(len(part) == 1 and part.isalpha() for part in parts)
+    )
+
+
+def _append_source_fragment(
+    fragments: list[tuple[str, Literal["title", "abstract"], int]],
+    source: str,
+    source_name: Literal["title", "abstract"],
+    start: int,
+    end: int,
+) -> None:
+    raw = source[start:end]
+    fragment = raw.strip()
+    if fragment:
+        leading = len(raw) - len(raw.lstrip())
+        fragments.append((fragment, source_name, start + leading))
+
+
 def _source_fragments(
     source: str, source_name: Literal["title", "abstract"]
 ) -> list[tuple[str, Literal["title", "abstract"], int]]:
     fragments: list[tuple[str, Literal["title", "abstract"], int]] = []
-    for match in re.finditer(r"[^.!?。！？\n]+(?:[.!?。！？]+|$)", source):
-        raw = match.group(0)
-        fragment = raw.strip()
-        if fragment:
-            leading = len(raw) - len(raw.lstrip())
-            fragments.append((fragment, source_name, match.start() + leading))
+    fragment_start = 0
+    for index, character in enumerate(source):
+        if character == ".":
+            is_boundary = _is_sentence_terminal_period(source, index)
+        else:
+            is_boundary = character in _DIRECT_FRAGMENT_BOUNDARIES
+        if is_boundary:
+            _append_source_fragment(
+                fragments,
+                source,
+                source_name,
+                fragment_start,
+                index + 1,
+            )
+            fragment_start = index + 1
+    _append_source_fragment(
+        fragments,
+        source,
+        source_name,
+        fragment_start,
+        len(source),
+    )
     return fragments
 
 
@@ -347,13 +409,15 @@ def _candidate_fragments(
     return fragments
 
 
-def _bounded_excerpt(fragment: str, marker_start: int) -> str:
+def _bounded_excerpt(fragment: str, marker_start: int) -> tuple[str, int]:
     if len(fragment) <= MAX_SUPPORTING_EXCERPT_LENGTH:
-        return fragment
+        return fragment, 0
     start = max(0, marker_start - MAX_SUPPORTING_EXCERPT_LENGTH // 3)
     end = min(len(fragment), start + MAX_SUPPORTING_EXCERPT_LENGTH)
     start = max(0, end - MAX_SUPPORTING_EXCERPT_LENGTH)
-    return fragment[start:end].strip()
+    raw_excerpt = fragment[start:end]
+    leading = len(raw_excerpt) - len(raw_excerpt.lstrip())
+    return raw_excerpt.strip(), start + leading
 
 
 def _select_support_level(text: str) -> SupportLevel:
@@ -377,27 +441,34 @@ def _collect_matches(item: EvidenceClassificationInput) -> list[_ScoredEvidenceM
                 continue
             high = [rule for rule, _ in matched if rule.high_specificity]
             generic = [rule for rule, _ in matched if not rule.high_specificity]
-            primary_rule, primary_hit = max(
+            _primary_rule, primary_hit = max(
                 matched,
                 key=lambda pair: (pair[0].specificity, len(pair[0].marker), pair[0].marker),
             )
             assert primary_hit is not None
-            excerpt = _bounded_excerpt(fragment, primary_hit.start())
+            excerpt, excerpt_local_start = _bounded_excerpt(fragment, primary_hit.start())
+            matched_marker = primary_hit.group(0)
+            if (
+                fragment[excerpt_local_start : excerpt_local_start + len(excerpt)]
+                != excerpt
+                or matched_marker.casefold() not in excerpt.casefold()
+            ):
+                raise ValueError("evidence match excerpt is not source-grounded")
             matches.append(
                 _ScoredEvidenceMatch(
                     evidence=_EvidenceMatch(
                         slot=slot,
                         support_level=_select_support_level(excerpt),
-                        matched_marker=primary_rule.marker,
+                        matched_marker=matched_marker,
                         matched_source=source_name,
                         supporting_excerpt=excerpt,
                         specificity=sum(rule.specificity for rule, _ in matched),
+                        excerpt_start=source_offset + excerpt_local_start,
                     ),
                     match_score=3 * len(high) + len(generic),
                     high_specificity_count=len(high),
                     generic_marker_count=len(generic),
                     source_priority=0 if source_name == "title" else 1,
-                    excerpt_start=source_offset + primary_hit.start(),
                 )
             )
     return matches
@@ -418,7 +489,7 @@ def _select_match(
     best = [candidate for candidate in best if candidate.evidence.specificity == best_specificity]
     if len(best) > 1 and len(
         {
-            (candidate.source_priority, candidate.excerpt_start)
+            (candidate.source_priority, candidate.evidence.excerpt_start)
             for candidate in best
         }
     ) == 1:
@@ -427,7 +498,7 @@ def _select_match(
         best,
         key=lambda candidate: (
             candidate.source_priority,
-            candidate.excerpt_start,
+            candidate.evidence.excerpt_start,
             list(EvidenceSlot).index(candidate.evidence.slot),
         ),
     )

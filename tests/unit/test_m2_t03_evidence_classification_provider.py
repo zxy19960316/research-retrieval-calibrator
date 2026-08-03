@@ -9,6 +9,7 @@ import pytest
 from app.adapters.evidence_classification import (
     DeterministicFakeEvidenceClassifier,
     EvidenceClassifierProvider,
+    _collect_matches,
     _source_fragments,
 )
 from app.core.evidence_classification import classify_evidence_batch
@@ -159,6 +160,38 @@ def test_scanner_preserves_order_offsets_and_exact_substrings() -> None:
     assert [offset for _, _, offset in fragments] == sorted(
         offset for _, _, offset in fragments
     )
+
+
+def test_evidence_match_marker_and_excerpt_share_source_offset() -> None:
+    item = _input(
+        title="Cross-domain retrieval method",
+        abstract="The method transfers to a related-domain task. It demonstrates strong results.",
+    )
+
+    matches = _collect_matches(item)
+
+    assert matches
+    for candidate in matches:
+        evidence = candidate.evidence
+        source = item.title if evidence.matched_source == "title" else item.abstract
+        assert source is not None
+        assert source[
+            evidence.excerpt_start : evidence.excerpt_start + len(evidence.supporting_excerpt)
+        ] == evidence.supporting_excerpt
+        assert evidence.matched_marker.casefold() in evidence.supporting_excerpt.casefold()
+
+
+def test_excerpt_does_not_absorb_direct_marker_from_next_sentence() -> None:
+    item = _input(
+        title="A cross-domain retrieval method",
+        abstract="The method transfers to a related-domain task. It demonstrates strong results.",
+    )
+
+    record = classify_evidence_batch([item], DeterministicFakeEvidenceClassifier()).records[0]
+
+    assert record.support_level is SupportLevel.INDIRECT
+    assert record.supporting_excerpt == "The method transfers to a related-domain task."
+    assert "demonstrates" not in record.supporting_excerpt
 
 
 def test_title_only_marker_uses_title_excerpt() -> None:
