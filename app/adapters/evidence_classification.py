@@ -522,11 +522,17 @@ def _build_quality_diagnostics(
         for outcome in outcomes
         if (record := outcome.record).get("evidence_slot") is not None
     }
-    support_levels = {
-        record["support_level"]
-        for outcome in outcomes
-        if (record := outcome.record).get("support_level") is not None
-    }
+    support_levels: set[str] = set()
+    for outcome in outcomes:
+        raw_support_level = outcome.record.get("support_level")
+        if raw_support_level is not None:
+            if isinstance(raw_support_level, SupportLevel):
+                normalized_support_level = raw_support_level
+            elif isinstance(raw_support_level, str):
+                normalized_support_level = SupportLevel(raw_support_level)
+            else:
+                raise ValueError("support level must be a SupportLevel or string")
+            support_levels.add(normalized_support_level.value)
     generic_only_count = sum(outcome.rejection_kind == "generic_only" for outcome in outcomes)
     ambiguous_count = sum(outcome.rejection_kind == "ambiguous" for outcome in outcomes)
     rejected_count = sum(outcome.rejection_kind != "none" for outcome in outcomes)
