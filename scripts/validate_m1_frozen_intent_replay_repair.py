@@ -9,7 +9,7 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Any
+from typing import Any, cast
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -28,7 +28,6 @@ from scripts.repair_m1_frozen_intent_replay import (
     EXPECTED_SOURCE_FIRST_RUN_SHA256,
     EXPECTED_SOURCE_MANIFEST_SHA256,
     EXPECTED_SOURCE_REPLAY_SHA256,
-    PROTECTED_CANDIDATE_SNAPSHOT,
     REPAIR_BUNDLE,
     REPAIR_FIRST_RUN,
     REPAIR_MANIFEST,
@@ -37,10 +36,10 @@ from scripts.repair_m1_frozen_intent_replay import (
     SOURCE_FIRST_RUN,
     SOURCE_MANIFEST,
     SOURCE_REPLAY,
+    RepairError,
     _candidate_audit,
     _canonical_json_bytes,
     _intent_drift,
-    RepairError,
 )
 
 REPORT_PATH = Path("evaluation/reports/m1-frozen-intent-replay-repair-2026-08-03.json")
@@ -169,7 +168,7 @@ def validate_m1_frozen_intent_replay_repair(
     _validate_fixed_history(errors, repository_root)
     inventory = validate_source_bundle_inventory(repository_root)
     errors.extend(f"source inventory: {error}" for error in inventory.errors)
-    manifest, first_run, replay = _validate_bundle(errors, repository_root)
+    manifest, _first_run, _replay = _validate_bundle(errors, repository_root)
     _validate_status_and_protected_artifacts(errors, repository_root)
     report = _load_json(repository_root / report_path)
     if report is None:
@@ -280,7 +279,7 @@ def _validate_manifest(
         errors.append("repair manifest JSON is unavailable")
         return None
     try:
-        return M1ReplayRepairManifest.model_validate(payload)
+        return cast(M1ReplayRepairManifest, M1ReplayRepairManifest.model_validate(payload))
     except ValidationError:
         errors.append("repair manifest schema is invalid or contains unknown fields")
         return None
@@ -335,6 +334,9 @@ def _validate_semantic_replay(
     errors: list[str],
     repository_root: Path,
 ) -> None:
+    if first_run.intent is None or replay.intent is None:
+        errors.append("corrected replay intent is unavailable")
+        return
     if _intent_drift(first_run.intent, replay.intent):
         errors.append("corrected intent fields are not identical")
     canonical_first = canonical_research_intent_bytes(first_run.intent)

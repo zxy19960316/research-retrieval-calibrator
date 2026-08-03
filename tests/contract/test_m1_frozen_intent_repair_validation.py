@@ -212,10 +212,10 @@ def test_implementation_commit_not_ancestor_of_head_fails_closed(tmp_path: Path)
 
 def _copy_validation_fixture(tmp_path: Path) -> Path:
     repository = tmp_path / "repository"
-    shutil.copytree(
-        REPOSITORY_ROOT / ".git",
-        repository / ".git",
-        ignore=shutil.ignore_patterns("turn-diffs", "index.lock"),
+    repository.mkdir(parents=True)
+    (repository / ".git").write_text(
+        f"gitdir: {(REPOSITORY_ROOT / '.git').as_posix()}\n",
+        encoding="utf-8",
     )
 
     directories = (
