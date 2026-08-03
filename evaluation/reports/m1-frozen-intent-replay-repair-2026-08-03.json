@@ -1,0 +1,202 @@
+{
+  "report_version": "m1-frozen-intent-replay-repair.v1",
+  "task_id": "M1-FROZEN-INTENT-REPLAY-REPAIR",
+  "timestamp_utc": "2026-08-03T08:21:17Z",
+  "implementation_commit": "131177df11f6bd9772240c70b1d6e5414797828c",
+  "validated_commit": "1a88b7b1dbef4fdecf9ab6080c601377247a64ca",
+  "implementation_commits": {
+    "intent_core": "63bbf24a0f0aa15a6ee6d46f045addf8ad51fd50",
+    "repair_runner": "131177df11f6bd9772240c70b1d6e5414797828c",
+    "repair_validator": "1a88b7b1dbef4fdecf9ab6080c601377247a64ca"
+  },
+  "root_cause": "replay reconstructed ResearchIntent using replay started_at",
+  "repair": "replay reuses the exact first-run frozen ResearchIntent",
+  "historical_bundle": {
+    "status": "unchanged",
+    "source_bundle": "evaluation/source-artifacts/m1-rebaseline-2026-07-28",
+    "old_first_run_sha256": "ed4a4d89a247c535e6138644069094d3c59a046bdefd44a79e48a4f861f95afa",
+    "old_replay_sha256": "6caecd1454ff2e0bd945a6a51dac276dfc0ce9fda5716033014e245843d0aab7",
+    "old_first_run_frozen_at": "2026-07-28T07:08:40.329494Z",
+    "old_replay_frozen_at": "2026-07-28T07:10:58.105607Z",
+    "drift_fields": [
+      "intent.frozen_at"
+    ]
+  },
+  "m2_historical_evidence": {
+    "status": "unchanged",
+    "protected_hashes_unchanged": true,
+    "m2_progress": "IN_PROGRESS 2/5"
+  },
+  "m2_progress": "IN_PROGRESS 2/5",
+  "human_review": "not started",
+  "m2_t04": "not started",
+  "scoring_eligible": false,
+  "source_artifacts": {
+    "source_bundle_manifest_sha256": "5dad9e6070edececceeead3f8bb3e7f43302f7405fee811dcc7ddb34c84f0849",
+    "original_first_run_sha256": "ed4a4d89a247c535e6138644069094d3c59a046bdefd44a79e48a4f861f95afa",
+    "original_replay_sha256": "6caecd1454ff2e0bd945a6a51dac276dfc0ce9fda5716033014e245843d0aab7",
+    "drift_fields": [
+      "intent.frozen_at"
+    ]
+  },
+  "repair_artifact": {
+    "manifest_sha256": "a80f5f5014a84c236dbad9d5209decc3957d5b03dbfb67e745e4d35399876204",
+    "corrected_first_run_sha256": "ed4a4d89a247c535e6138644069094d3c59a046bdefd44a79e48a4f861f95afa",
+    "corrected_replay_sha256": "a5121045f927561eb3378664ac0b83dae62bbe57f3db296627568096cb520da1",
+    "canonical_intent_sha256": "3bb7c50d4993eb217979333eae192c2a3c8d5ca1099ecc60c137e4efecdbe5fe",
+    "candidate_array_sha256": "ad62c8f91e1b457081fb237d8ee8c3ae595deee905a9baecb96700661d93ba59",
+    "query_plan_sha256": "225ff93f098891d58e6315fefcfdf209478cb0208228a6cf322c6028ccdc68f3",
+    "zero_transport_replay": {
+      "transport_requests": 0,
+      "cache_hits": 12,
+      "query_count": 12
+    }
+  },
+  "replay_assertions": {
+    "canonical_intent_equal": true,
+    "candidate_arrays_equal": true,
+    "query_ids_equal": true,
+    "query_text_equal": true,
+    "query_plan_equal": true,
+    "transport_requests": 0,
+    "cache_hits": 12
+  },
+  "protected_hashes": {
+    "evaluation/reports/m1-rebaseline-2026-07-28.json": "3336d6a6a1123fd5204f2db1f11cc155dc080f3e440db0f3eab7a2f84d2287fd",
+    "evaluation/reports/m1-validation.json": "92d5776c519f8da1e7924db71961a683a471a75dc12be81628e7772d23ace01d",
+    "evaluation/snapshots/m2/m1-candidates.v1.json": "4a2aec0fd0a1d22adc801fd3bc506e5da89895d1276cd572e2ac64014c162448",
+    "evaluation/snapshots/m2/m1-candidates.v1.manifest.json": "b6ce7cfab2e5df6b8c84b77fb38c6f573de7429d37a9688d7b4c62e27f8546a8",
+    "evaluation/source-artifacts/m2-t02-reranker-candidate-run.json": "0a751dbc35bfa8d07433796113939412bfbdffd4c5c13043c90390bccfc5c35b",
+    "evaluation/source-artifacts/m2-t02-reranker-candidate-run-receipt.json": "0c9ca1339a2385a9c6940f8c53bd4711c62b8faf9f3f4cf98710ff465d56ec9a",
+    "evaluation/source-artifacts/m2-t03-evidence-classification-run.json": "2bd80d2b6a10bfe531ea2ca3b7570768fd1a78e5d05efca96fc28464d72baee8",
+    "evaluation/source-artifacts/m2-t03-evidence-classification-run-receipt.json": "0bc69ad7a4398c8070c2ba96949f7b9a023c4940b83913f38e1ba6cd41beeec4"
+  },
+  "evidence_types": {
+    "offline_cache_replay": "recorded_cache_replay",
+    "real_arxiv_requests": "not_run",
+    "model_runs": "not_run",
+    "human_review": "not_started"
+  },
+  "commands": [
+    {
+      "name": "new_repair_contract",
+      "command": "python -m pytest tests/contract/test_m1_frozen_intent_replay_repair.py -q",
+      "exit_code": 0
+    },
+    {
+      "name": "m1_focused_tests",
+      "command": "python -m pytest tests/unit/test_intent_clarification.py tests/unit/test_first_round_cli.py tests/integration/test_first_round_pipeline.py -q",
+      "exit_code": 0
+    },
+    {
+      "name": "ruff_repair_scripts",
+      "command": "python -m ruff check scripts/repair_m1_frozen_intent_replay.py scripts/validate_m1_frozen_intent_replay_repair.py",
+      "exit_code": 0
+    },
+    {
+      "name": "ruff_import_order",
+      "command": "python -m ruff check --select I app evaluation scripts tests",
+      "exit_code": 0
+    },
+    {
+      "name": "offline_repair",
+      "command": "python scripts/repair_m1_frozen_intent_replay.py --execute-offline-repair",
+      "exit_code": 0
+    },
+    {
+      "name": "offline_repair_idempotence",
+      "command": "python scripts/repair_m1_frozen_intent_replay.py --execute-offline-repair",
+      "exit_code": 0
+    },
+    {
+      "name": "full_non_packaging_tests",
+      "command": "python -m pytest -q -m \"not packaging\"",
+      "exit_code": 0
+    },
+    {
+      "name": "packaging_tests",
+      "command": "python -m pytest -q -m packaging",
+      "exit_code": 0
+    },
+    {
+      "name": "ruff",
+      "command": "python -m ruff check app evaluation scripts tests",
+      "exit_code": 0
+    },
+    {
+      "name": "mypy",
+      "command": "python -m mypy app evaluation scripts",
+      "exit_code": 0
+    },
+    {
+      "name": "project_docs",
+      "command": "python scripts/validate_project_docs.py",
+      "exit_code": 0
+    },
+    {
+      "name": "m0_validator",
+      "command": "python scripts/validate_phase.py M0",
+      "exit_code": 0
+    },
+    {
+      "name": "m1_validator",
+      "command": "python scripts/validate_m1_evidence.py",
+      "exit_code": 0
+    },
+    {
+      "name": "m2_t01_validator",
+      "command": "python scripts/validate_m2_t01_evidence.py",
+      "exit_code": 0
+    },
+    {
+      "name": "m2_t02_validator",
+      "command": "python scripts/validate_m2_t02_evidence.py",
+      "exit_code": 0
+    },
+    {
+      "name": "m2_t03_validator",
+      "command": "python scripts/validate_m2_t03_evidence.py",
+      "exit_code": 0
+    },
+    {
+      "name": "pip_check",
+      "command": "python -m pip check",
+      "exit_code": 0
+    },
+    {
+      "name": "git_diff_check",
+      "command": "git diff --check",
+      "exit_code": 0
+    }
+  ],
+  "test_totals": {
+    "new_repair_contract": {
+      "passed": 13,
+      "failed": 0
+    },
+    "m1_focused_tests": {
+      "passed": 39,
+      "failed": 0
+    },
+    "focused_repair_and_m2_tests": {
+      "passed": 159,
+      "failed": 0
+    },
+    "full_non_packaging_tests": {
+      "passed": 1134,
+      "failed": 0,
+      "deselected": 1
+    },
+    "packaging_tests": {
+      "passed": 1,
+      "failed": 0,
+      "deselected": 1134
+    }
+  },
+  "not_run": {
+    "real_arxiv_requests": true,
+    "model_runs": true,
+    "human_review": true,
+    "m2_t04": true
+  }
+}

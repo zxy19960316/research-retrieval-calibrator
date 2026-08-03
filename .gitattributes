@@ -6,3 +6,5 @@
 *.gif binary
 *.pdf binary
 *.zip binary
+
+evaluation/source-artifacts/m1-intent-replay-repair-2026-08-03/first-run/first-round.json binary

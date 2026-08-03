@@ -1,0 +1,1550 @@
+{
+  "candidates": [
+    {
+      "abstract": null,
+      "authors": [
+        "Gabriela Csurka",
+        "Julien Ah-Pine",
+        "Stéphane Clinchant"
+      ],
+      "cluster_id": "arxiv:1401.6891",
+      "doi": null,
+      "member_source_identities": [
+        {
+          "source": "arxiv",
+          "source_id": "1401.6891",
+          "url": "http://arxiv.org/abs/1401.6891v1"
+        }
+      ],
+      "merge_reasons": [],
+      "paper_id": "arxiv:1401.6891",
+      "retrieval_paths": [
+        "Q1-6dc96c56f6f1e49a"
+      ],
+      "source": "arxiv",
+      "source_id": "1401.6891",
+      "title": "Unsupervised Visual and Textual Information Fusion in Multimedia Retrieval - A Graph-based Point of View",
+      "url": "http://arxiv.org/abs/1401.6891v1",
+      "year": 2014
+    },
+    {
+      "abstract": null,
+      "authors": [
+        "Gopal P. Sarma"
+      ],
+      "cluster_id": "arxiv:1611.00097",
+      "doi": null,
+      "member_source_identities": [
+        {
+          "source": "arxiv",
+          "source_id": "1611.00097",
+          "url": "http://arxiv.org/abs/1611.00097v3"
+        }
+      ],
+      "merge_reasons": [],
+      "paper_id": "arxiv:1611.00097",
+      "retrieval_paths": [
+        "Q1-ae88ee9e9a5ff91f"
+      ],
+      "source": "arxiv",
+      "source_id": "1611.00097",
+      "title": "Scientific Literature Text Mining and the Case for Open Access",
+      "url": "http://arxiv.org/abs/1611.00097v3",
+      "year": 2016
+    },
+    {
+      "abstract": null,
+      "authors": [
+        "Haw-Shiuan Chang",
+        "Amol Agrawal",
+        "Ananya Ganesh",
+        "Anirudha Desai",
+        "Vinayak Mathur",
+        "Alfred Hough",
+        "Andrew McCallum"
+      ],
+      "cluster_id": "arxiv:1804.03257",
+      "doi": null,
+      "member_source_identities": [
+        {
+          "source": "arxiv",
+          "source_id": "1804.03257",
+          "url": "http://arxiv.org/abs/1804.03257v2"
+        }
+      ],
+      "merge_reasons": [],
+      "paper_id": "arxiv:1804.03257",
+      "retrieval_paths": [
+        "Q1-040540c9679d7f10"
+      ],
+      "source": "arxiv",
+      "source_id": "1804.03257",
+      "title": "Efficient Graph-based Word Sense Induction by Distributional Inclusion Vector Embeddings",
+      "url": "http://arxiv.org/abs/1804.03257v2",
+      "year": 2018
+    },
+    {
+      "abstract": null,
+      "authors": [
+        "Onur Gökçe",
+        "Jonathan Prada",
+        "Nikola I. Nikolov",
+        "Nianlong Gu",
+        "Richard H. R. Hahnloser"
+      ],
+      "cluster_id": "arxiv:2005.04961",
+      "doi": null,
+      "member_source_identities": [
+        {
+          "source": "arxiv",
+          "source_id": "2005.04961",
+          "url": "http://arxiv.org/abs/2005.04961v1"
+        }
+      ],
+      "merge_reasons": [],
+      "paper_id": "arxiv:2005.04961",
+      "retrieval_paths": [
+        "Q1-be01416bad9ecb19"
+      ],
+      "source": "arxiv",
+      "source_id": "2005.04961",
+      "title": "Embedding-based Scientific Literature Discovery in a Text Editor Application",
+      "url": "http://arxiv.org/abs/2005.04961v1",
+      "year": 2020
+    },
+    {
+      "abstract": null,
+      "authors": [
+        "Colby Wise",
+        "Vassilis N. Ioannidis",
+        "Miguel Romero Calvo",
+        "Xiang Song",
+        "George Price",
+        "Ninad Kulkarni",
+        "Ryan Brand",
+        "Parminder Bhatia",
+        "George Karypis"
+      ],
+      "cluster_id": "arxiv:2007.12731",
+      "doi": null,
+      "member_source_identities": [
+        {
+          "source": "arxiv",
+          "source_id": "2007.12731",
+          "url": "http://arxiv.org/abs/2007.12731v1"
+        }
+      ],
+      "merge_reasons": [],
+      "paper_id": "arxiv:2007.12731",
+      "retrieval_paths": [
+        "Q1-8b68f4bbf8561196",
+        "Q1-8de87d0bacb5005b"
+      ],
+      "source": "arxiv",
+      "source_id": "2007.12731",
+      "title": "COVID-19 Knowledge Graph: Accelerating Information Retrieval and Discovery for Scientific Literature",
+      "url": "http://arxiv.org/abs/2007.12731v1",
+      "year": 2020
+    },
+    {
+      "abstract": null,
+      "authors": [
+        "Guillaume Cabanac"
+      ],
+      "cluster_id": "arxiv:2210.15912",
+      "doi": null,
+      "member_source_identities": [
+        {
+          "source": "arxiv",
+          "source_id": "2210.15912",
+          "url": "http://arxiv.org/abs/2210.15912v1"
+        }
+      ],
+      "merge_reasons": [],
+      "paper_id": "arxiv:2210.15912",
+      "retrieval_paths": [
+        "Q1-0297414dafd0e41d",
+        "Q1-23cfe0602c5c3bda",
+        "Q1-8b68f4bbf8561196",
+        "Q1-8de87d0bacb5005b",
+        "Q1-ae88ee9e9a5ff91f"
+      ],
+      "source": "arxiv",
+      "source_id": "2210.15912",
+      "title": "Decontamination of the scientific literature",
+      "url": "http://arxiv.org/abs/2210.15912v1",
+      "year": 2022
+    },
+    {
+      "abstract": null,
+      "authors": [
+        "Nianlong Gu",
+        "Richard H. R. Hahnloser"
+      ],
+      "cluster_id": "arxiv:2306.03535",
+      "doi": null,
+      "member_source_identities": [
+        {
+          "source": "arxiv",
+          "source_id": "2306.03535",
+          "url": "http://arxiv.org/abs/2306.03535v2"
+        }
+      ],
+      "merge_reasons": [],
+      "paper_id": "arxiv:2306.03535",
+      "retrieval_paths": [
+        "Q1-be01416bad9ecb19"
+      ],
+      "source": "arxiv",
+      "source_id": "2306.03535",
+      "title": "SciLit: A Platform for Joint Scientific Literature Discovery, Summarization and Citation Generation",
+      "url": "http://arxiv.org/abs/2306.03535v2",
+      "year": 2023
+    },
+    {
+      "abstract": null,
+      "authors": [
+        "Varish Mulwad",
+        "Tim Finin",
+        "Vijay S. Kumar",
+        "Jenny Weisenberg Williams",
+        "Sharad Dixit",
+        "Anupam Joshi"
+      ],
+      "cluster_id": "arxiv:2306.10044",
+      "doi": null,
+      "member_source_identities": [
+        {
+          "source": "arxiv",
+          "source_id": "2306.10044",
+          "url": "http://arxiv.org/abs/2306.10044v1"
+        }
+      ],
+      "merge_reasons": [],
+      "paper_id": "arxiv:2306.10044",
+      "retrieval_paths": [
+        "Q1-8b68f4bbf8561196"
+      ],
+      "source": "arxiv",
+      "source_id": "2306.10044",
+      "title": "A Practical Entity Linking System for Tables in Scientific Literature",
+      "url": "http://arxiv.org/abs/2306.10044v1",
+      "year": 2023
+    },
+    {
+      "abstract": null,
+      "authors": [
+        "Alejandro Lozano",
+        "Scott L Fleming",
+        "Chia-Chun Chiang",
+        "Nigam Shah"
+      ],
+      "cluster_id": "arxiv:2310.16146",
+      "doi": null,
+      "member_source_identities": [
+        {
+          "source": "arxiv",
+          "source_id": "2310.16146",
+          "url": "http://arxiv.org/abs/2310.16146v1"
+        }
+      ],
+      "merge_reasons": [],
+      "paper_id": "arxiv:2310.16146",
+      "retrieval_paths": [
+        "Q1-0297414dafd0e41d",
+        "Q1-23cfe0602c5c3bda",
+        "Q1-8b68f4bbf8561196"
+      ],
+      "source": "arxiv",
+      "source_id": "2310.16146",
+      "title": "Clinfo.ai: An Open-Source Retrieval-Augmented Large Language Model System for Answering Medical Questions using Scientific Literature",
+      "url": "http://arxiv.org/abs/2310.16146v1",
+      "year": 2023
+    },
+    {
+      "abstract": null,
+      "authors": [
+        "Julien Delile",
+        "Srayanta Mukherjee",
+        "Anton Van Pamel",
+        "Leonid Zhukov"
+      ],
+      "cluster_id": "arxiv:2402.12352",
+      "doi": null,
+      "member_source_identities": [
+        {
+          "source": "arxiv",
+          "source_id": "2402.12352",
+          "url": "http://arxiv.org/abs/2402.12352v1"
+        }
+      ],
+      "merge_reasons": [],
+      "paper_id": "arxiv:2402.12352",
+      "retrieval_paths": [
+        "Q1-a16109f2426f3024"
+      ],
+      "source": "arxiv",
+      "source_id": "2402.12352",
+      "title": "Graph-Based Retriever Captures the Long Tail of Biomedical Knowledge",
+      "url": "http://arxiv.org/abs/2402.12352v1",
+      "year": 2024
+    },
+    {
+      "abstract": null,
+      "authors": [
+        "Elona Shatri",
+        "George Fazekas"
+      ],
+      "cluster_id": "arxiv:2408.15002",
+      "doi": null,
+      "member_source_identities": [
+        {
+          "source": "arxiv",
+          "source_id": "2408.15002",
+          "url": "http://arxiv.org/abs/2408.15002v2"
+        }
+      ],
+      "merge_reasons": [],
+      "paper_id": "arxiv:2408.15002",
+      "retrieval_paths": [
+        "Q1-040540c9679d7f10"
+      ],
+      "source": "arxiv",
+      "source_id": "2408.15002",
+      "title": "Knowledge Discovery in Optical Music Recognition: Enhancing Information Retrieval with Instance Segmentation",
+      "url": "http://arxiv.org/abs/2408.15002v2",
+      "year": 2024
+    },
+    {
+      "abstract": null,
+      "authors": [
+        "Sihang Li",
+        "Jin Huang",
+        "Jiaxi Zhuang",
+        "Yaorui Shi",
+        "Xiaochen Cai",
+        "Mingjun Xu",
+        "Xiang Wang",
+        "Linfeng Zhang",
+        "Guolin Ke",
+        "Hengxing Cai"
+      ],
+      "cluster_id": "arxiv:2408.15545",
+      "doi": null,
+      "member_source_identities": [
+        {
+          "source": "arxiv",
+          "source_id": "2408.15545",
+          "url": "http://arxiv.org/abs/2408.15545v5"
+        }
+      ],
+      "merge_reasons": [],
+      "paper_id": "arxiv:2408.15545",
+      "retrieval_paths": [
+        "Q1-0297414dafd0e41d",
+        "Q1-ae88ee9e9a5ff91f"
+      ],
+      "source": "arxiv",
+      "source_id": "2408.15545",
+      "title": "SciLitLLM: How to Adapt LLMs for Scientific Literature Understanding",
+      "url": "http://arxiv.org/abs/2408.15545v5",
+      "year": 2024
+    },
+    {
+      "abstract": null,
+      "authors": [
+        "Savini Kashmira",
+        "Jayanaka L. Dantanarayana",
+        "Joshua Brodsky",
+        "Ashish Mahendra",
+        "Yiping Kang",
+        "Krisztian Flautner",
+        "Lingjia Tang",
+        "Jason Mars"
+      ],
+      "cluster_id": "arxiv:2412.05447",
+      "doi": null,
+      "member_source_identities": [
+        {
+          "source": "arxiv",
+          "source_id": "2412.05447",
+          "url": "http://arxiv.org/abs/2412.05447v3"
+        }
+      ],
+      "merge_reasons": [],
+      "paper_id": "arxiv:2412.05447",
+      "retrieval_paths": [
+        "Q1-6dc96c56f6f1e49a"
+      ],
+      "source": "arxiv",
+      "source_id": "2412.05447",
+      "title": "TOBUGraph: Knowledge Graph-Based Retrieval for Enhanced LLM Performance Beyond RAG",
+      "url": "http://arxiv.org/abs/2412.05447v3",
+      "year": 2024
+    },
+    {
+      "abstract": null,
+      "authors": [
+        "Hermann Kroll",
+        "Pascal Sackhoff",
+        "Timo Breuer",
+        "Ralf Schenkel",
+        "Wolf-Tilo Balke"
+      ],
+      "cluster_id": "arxiv:2412.15232",
+      "doi": null,
+      "member_source_identities": [
+        {
+          "source": "arxiv",
+          "source_id": "2412.15232",
+          "url": "http://arxiv.org/abs/2412.15232v1"
+        }
+      ],
+      "merge_reasons": [],
+      "paper_id": "arxiv:2412.15232",
+      "retrieval_paths": [
+        "Q1-040540c9679d7f10",
+        "Q1-a16109f2426f3024"
+      ],
+      "source": "arxiv",
+      "source_id": "2412.15232",
+      "title": "Ranking Narrative Query Graphs for Biomedical Document Retrieval (Technical Report)",
+      "url": "http://arxiv.org/abs/2412.15232v1",
+      "year": 2024
+    },
+    {
+      "abstract": null,
+      "authors": [
+        "Steven Au",
+        "Cameron J. Dimacali",
+        "Ojasmitha Pedirappagari",
+        "Namyong Park",
+        "Franck Dernoncourt",
+        "Yu Wang",
+        "Nikos Kanakaris",
+        "Hanieh Deilamsalehy",
+        "Ryan A. Rossi",
+        "Nesreen K. Ahmed"
+      ],
+      "cluster_id": "arxiv:2501.02157",
+      "doi": null,
+      "member_source_identities": [
+        {
+          "source": "arxiv",
+          "source_id": "2501.02157",
+          "url": "http://arxiv.org/abs/2501.02157v2"
+        }
+      ],
+      "merge_reasons": [],
+      "paper_id": "arxiv:2501.02157",
+      "retrieval_paths": [
+        "Q1-6dc96c56f6f1e49a"
+      ],
+      "source": "arxiv",
+      "source_id": "2501.02157",
+      "title": "Personalized Graph-Based Retrieval for Large Language Models",
+      "url": "http://arxiv.org/abs/2501.02157v2",
+      "year": 2025
+    },
+    {
+      "abstract": null,
+      "authors": [
+        "Joyce Cahoon",
+        "Prerna Singh",
+        "Nick Litombe",
+        "Jonathan Larson",
+        "Ha Trinh",
+        "Yiwen Zhu",
+        "Andreas Mueller",
+        "Fotis Psallidas",
+        "Carlo Curino"
+      ],
+      "cluster_id": "arxiv:2503.02922",
+      "doi": null,
+      "member_source_identities": [
+        {
+          "source": "arxiv",
+          "source_id": "2503.02922",
+          "url": "http://arxiv.org/abs/2503.02922v1"
+        }
+      ],
+      "merge_reasons": [],
+      "paper_id": "arxiv:2503.02922",
+      "retrieval_paths": [
+        "Q1-6dc96c56f6f1e49a"
+      ],
+      "source": "arxiv",
+      "source_id": "2503.02922",
+      "title": "Optimizing open-domain question answering with graph-based retrieval augmented generation",
+      "url": "http://arxiv.org/abs/2503.02922v1",
+      "year": 2025
+    },
+    {
+      "abstract": null,
+      "authors": [
+        "Xiaofan Zhou",
+        "Liangjie Huang",
+        "Pinyang Cheng",
+        "Wenpen Yin",
+        "Rui Zhang",
+        "Wenrui Hao",
+        "Lu Cheng"
+      ],
+      "cluster_id": "arxiv:2504.08768",
+      "doi": null,
+      "member_source_identities": [
+        {
+          "source": "arxiv",
+          "source_id": "2504.08768",
+          "url": "http://arxiv.org/abs/2504.08768v2"
+        }
+      ],
+      "merge_reasons": [],
+      "paper_id": "arxiv:2504.08768",
+      "retrieval_paths": [
+        "Q1-8de87d0bacb5005b"
+      ],
+      "source": "arxiv",
+      "source_id": "2504.08768",
+      "title": "Accelerating Causal Network Discovery of Alzheimer Disease Biomarkers via Scientific Literature-based Retrieval Augmented Generation",
+      "url": "http://arxiv.org/abs/2504.08768v2",
+      "year": 2025
+    },
+    {
+      "abstract": null,
+      "authors": [
+        "Savini Kashmira",
+        "Jayanaka L. Dantanarayana",
+        "Krisztián Flautner",
+        "Lingjia Tang",
+        "Jason Mars"
+      ],
+      "cluster_id": "arxiv:2507.08945",
+      "doi": null,
+      "member_source_identities": [
+        {
+          "source": "arxiv",
+          "source_id": "2507.08945",
+          "url": "http://arxiv.org/abs/2507.08945v1"
+        }
+      ],
+      "merge_reasons": [],
+      "paper_id": "arxiv:2507.08945",
+      "retrieval_paths": [
+        "Q1-6dc96c56f6f1e49a"
+      ],
+      "source": "arxiv",
+      "source_id": "2507.08945",
+      "title": "GraphRunner: A Multi-Stage Framework for Efficient and Accurate Graph-Based Retrieval",
+      "url": "http://arxiv.org/abs/2507.08945v1",
+      "year": 2025
+    },
+    {
+      "abstract": null,
+      "authors": [
+        "Rui Zhou",
+        "Haohui Ma",
+        "Tianle Xin",
+        "Lixin Zou",
+        "Qiuyue Hu",
+        "Hongxi Cheng",
+        "Mingzhi Lin",
+        "Jingjing Guo",
+        "Sheng Wang",
+        "Guoqing Zhang",
+        "Yanjie Wei",
+        "Liangzhen Zheng"
+      ],
+      "cluster_id": "arxiv:2508.09995",
+      "doi": null,
+      "member_source_identities": [
+        {
+          "source": "arxiv",
+          "source_id": "2508.09995",
+          "url": "http://arxiv.org/abs/2508.09995v1"
+        }
+      ],
+      "merge_reasons": [],
+      "paper_id": "arxiv:2508.09995",
+      "retrieval_paths": [
+        "Q1-9bb3a309c0570081"
+      ],
+      "source": "arxiv",
+      "source_id": "2508.09995",
+      "title": "zERExtractor:An Automated Platform for Enzyme-Catalyzed Reaction Data Extraction from Scientific Literature",
+      "url": "http://arxiv.org/abs/2508.09995v1",
+      "year": 2025
+    },
+    {
+      "abstract": null,
+      "authors": [
+        "Pengjiang Li",
+        "Zaitian Wang",
+        "Xinhao Zhang",
+        "Ran Zhang",
+        "Lu Jiang",
+        "Pengfei Wang",
+        "Yuanchun Zhou"
+      ],
+      "cluster_id": "arxiv:2508.20514",
+      "doi": null,
+      "member_source_identities": [
+        {
+          "source": "arxiv",
+          "source_id": "2508.20514",
+          "url": "http://arxiv.org/abs/2508.20514v2"
+        }
+      ],
+      "merge_reasons": [],
+      "paper_id": "arxiv:2508.20514",
+      "retrieval_paths": [
+        "Q1-8de87d0bacb5005b"
+      ],
+      "source": "arxiv",
+      "source_id": "2508.20514",
+      "title": "SciTopic: Enhancing Topic Discovery in Scientific Literature through Advanced LLM",
+      "url": "http://arxiv.org/abs/2508.20514v2",
+      "year": 2025
+    },
+    {
+      "abstract": null,
+      "authors": [
+        "Hirofumi Tsuruta",
+        "Masaya Kumagai"
+      ],
+      "cluster_id": "arxiv:2509.01042",
+      "doi": null,
+      "member_source_identities": [
+        {
+          "source": "arxiv",
+          "source_id": "2509.01042",
+          "url": "http://arxiv.org/abs/2509.01042v3"
+        }
+      ],
+      "merge_reasons": [],
+      "paper_id": "arxiv:2509.01042",
+      "retrieval_paths": [
+        "Q1-9bb3a309c0570081",
+        "Q1-be01416bad9ecb19"
+      ],
+      "source": "arxiv",
+      "source_id": "2509.01042",
+      "title": "MatPROV: A Provenance Graph Dataset of Material Synthesis Extracted from Scientific Literature",
+      "url": "http://arxiv.org/abs/2509.01042v3",
+      "year": 2025
+    },
+    {
+      "abstract": null,
+      "authors": [
+        "Fengyu She",
+        "Nan Wang",
+        "Hongfei Wu",
+        "Ziyi Wan",
+        "Jingmian Wang",
+        "Chang Wang"
+      ],
+      "cluster_id": "arxiv:2509.08032",
+      "doi": null,
+      "member_source_identities": [
+        {
+          "source": "arxiv",
+          "source_id": "2509.08032",
+          "url": "http://arxiv.org/abs/2509.08032v1"
+        }
+      ],
+      "merge_reasons": [],
+      "paper_id": "arxiv:2509.08032",
+      "retrieval_paths": [
+        "Q1-ae88ee9e9a5ff91f"
+      ],
+      "source": "arxiv",
+      "source_id": "2509.08032",
+      "title": "SciGPT: A Large Language Model for Scientific Literature Understanding and Knowledge Discovery",
+      "url": "http://arxiv.org/abs/2509.08032v1",
+      "year": 2025
+    },
+    {
+      "abstract": null,
+      "authors": [
+        "Magdalena Lederbauer",
+        "Siddharth Betala",
+        "Xiyao Li",
+        "Ayush Jain",
+        "Amine Sehaba",
+        "Georgia Channing",
+        "Grégoire Germain",
+        "Anamaria Leonescu",
+        "Faris Flaifil",
+        "Alfonso Amayuelas",
+        "Alexandre Nozadze",
+        "Stefan P. Schmid",
+        "Mohd Zaki",
+        "Sudheesh Kumar Ethirajan",
+        "Elton Pan",
+        "Mathilde Franckel",
+        "Alexandre Duval",
+        "N. M. Anoop Krishnan",
+        "Samuel P. Gleason"
+      ],
+      "cluster_id": "arxiv:2510.26824",
+      "doi": null,
+      "member_source_identities": [
+        {
+          "source": "arxiv",
+          "source_id": "2510.26824",
+          "url": "http://arxiv.org/abs/2510.26824v1"
+        }
+      ],
+      "merge_reasons": [],
+      "paper_id": "arxiv:2510.26824",
+      "retrieval_paths": [
+        "Q1-9bb3a309c0570081"
+      ],
+      "source": "arxiv",
+      "source_id": "2510.26824",
+      "title": "LeMat-Synth: a multi-modal toolbox to curate broad synthesis procedure databases from scientific literature",
+      "url": "http://arxiv.org/abs/2510.26824v1",
+      "year": 2025
+    },
+    {
+      "abstract": null,
+      "authors": [
+        "Ilya Tyagin",
+        "Saeideh Valipour",
+        "Aliaksandra Sikirzhytskaya",
+        "Michael Shtutman",
+        "Ilya Safro"
+      ],
+      "cluster_id": "arxiv:2511.05498",
+      "doi": null,
+      "member_source_identities": [
+        {
+          "source": "arxiv",
+          "source_id": "2511.05498",
+          "url": "http://arxiv.org/abs/2511.05498v1"
+        }
+      ],
+      "merge_reasons": [],
+      "paper_id": "arxiv:2511.05498",
+      "retrieval_paths": [
+        "Q1-040540c9679d7f10",
+        "Q1-5817f8956b30c396",
+        "Q1-a16109f2426f3024"
+      ],
+      "source": "arxiv",
+      "source_id": "2511.05498",
+      "title": "Biomedical Hypothesis Explainability with Graph-Based Context Retrieval",
+      "url": "http://arxiv.org/abs/2511.05498v1",
+      "year": 2025
+    },
+    {
+      "abstract": null,
+      "authors": [
+        "Guofeng Meng",
+        "Li Shen",
+        "Qiuyan Zhong",
+        "Wei Wang",
+        "Haizhou Zhang",
+        "Xiaozhen Wang"
+      ],
+      "cluster_id": "arxiv:2511.10014",
+      "doi": null,
+      "member_source_identities": [
+        {
+          "source": "arxiv",
+          "source_id": "2511.10014",
+          "url": "http://arxiv.org/abs/2511.10014v1"
+        }
+      ],
+      "merge_reasons": [],
+      "paper_id": "arxiv:2511.10014",
+      "retrieval_paths": [
+        "Q1-a16109f2426f3024"
+      ],
+      "source": "arxiv",
+      "source_id": "2511.10014",
+      "title": "fastbmRAG: A Fast Graph-Based RAG Framework for Efficient Processing of Large-Scale Biomedical Literature",
+      "url": "http://arxiv.org/abs/2511.10014v1",
+      "year": 2025
+    },
+    {
+      "abstract": null,
+      "authors": [
+        "Hang Ding",
+        "Yilun Zhao",
+        "Tiansheng Hu",
+        "Manasi Patwardhan",
+        "Arman Cohan"
+      ],
+      "cluster_id": "arxiv:2511.14362",
+      "doi": null,
+      "member_source_identities": [
+        {
+          "source": "arxiv",
+          "source_id": "2511.14362",
+          "url": "http://arxiv.org/abs/2511.14362v1"
+        }
+      ],
+      "merge_reasons": [],
+      "paper_id": "arxiv:2511.14362",
+      "retrieval_paths": [
+        "Q1-0297414dafd0e41d",
+        "Q1-23cfe0602c5c3bda"
+      ],
+      "source": "arxiv",
+      "source_id": "2511.14362",
+      "title": "SciRAG: Adaptive, Citation-Aware, and Outline-Guided Retrieval and Synthesis for Scientific Literature",
+      "url": "http://arxiv.org/abs/2511.14362v1",
+      "year": 2025
+    },
+    {
+      "abstract": null,
+      "authors": [
+        "Sina Jani",
+        "Arman Heidari",
+        "Amirmohammad Anvari",
+        "Zahra Rahimi"
+      ],
+      "cluster_id": "arxiv:2512.12760",
+      "doi": null,
+      "member_source_identities": [
+        {
+          "source": "arxiv",
+          "source_id": "2512.12760",
+          "url": "http://arxiv.org/abs/2512.12760v1"
+        }
+      ],
+      "merge_reasons": [],
+      "paper_id": "arxiv:2512.12760",
+      "retrieval_paths": [
+        "Q1-8de87d0bacb5005b"
+      ],
+      "source": "arxiv",
+      "source_id": "2512.12760",
+      "title": "Intelligent Scientific Literature Explorer using Machine Learning (ISLE)",
+      "url": "http://arxiv.org/abs/2512.12760v1",
+      "year": 2025
+    },
+    {
+      "abstract": null,
+      "authors": [
+        "Shuhua Yang",
+        "Jiahao Zhang",
+        "Yilong Wang",
+        "Dongwon Lee",
+        "Suhang Wang"
+      ],
+      "cluster_id": "arxiv:2601.14662",
+      "doi": null,
+      "member_source_identities": [
+        {
+          "source": "arxiv",
+          "source_id": "2601.14662",
+          "url": "http://arxiv.org/abs/2601.14662v2"
+        }
+      ],
+      "merge_reasons": [],
+      "paper_id": "arxiv:2601.14662",
+      "retrieval_paths": [
+        "Q1-a16109f2426f3024"
+      ],
+      "source": "arxiv",
+      "source_id": "2601.14662",
+      "title": "Query-Efficient Agentic Graph Extraction Attacks on GraphRAG Systems",
+      "url": "http://arxiv.org/abs/2601.14662v2",
+      "year": 2026
+    },
+    {
+      "abstract": null,
+      "authors": [
+        "Hamideh Ghanadian",
+        "Amin Kamali",
+        "Mohammad Hossein Tekieh"
+      ],
+      "cluster_id": "arxiv:2602.17856",
+      "doi": null,
+      "member_source_identities": [
+        {
+          "source": "arxiv",
+          "source_id": "2602.17856",
+          "url": "http://arxiv.org/abs/2602.17856v1"
+        }
+      ],
+      "merge_reasons": [],
+      "paper_id": "arxiv:2602.17856",
+      "retrieval_paths": [
+        "Q1-0297414dafd0e41d",
+        "Q1-23cfe0602c5c3bda",
+        "Q1-8b68f4bbf8561196"
+      ],
+      "source": "arxiv",
+      "source_id": "2602.17856",
+      "title": "Enhancing Scientific Literature Chatbots with Retrieval-Augmented Generation: A Performance Evaluation of Vector and Graph-Based Systems",
+      "url": "http://arxiv.org/abs/2602.17856v1",
+      "year": 2026
+    },
+    {
+      "abstract": null,
+      "authors": [
+        "Runwen You",
+        "Tong Xia",
+        "Jingzhi Wang",
+        "Jiankun Zhang",
+        "Tengyao Tu",
+        "Jinghua Piao",
+        "Yi Chang",
+        "Yong Li"
+      ],
+      "cluster_id": "arxiv:2604.16317",
+      "doi": null,
+      "member_source_identities": [
+        {
+          "source": "arxiv",
+          "source_id": "2604.16317",
+          "url": "http://arxiv.org/abs/2604.16317v1"
+        }
+      ],
+      "merge_reasons": [],
+      "paper_id": "arxiv:2604.16317",
+      "retrieval_paths": [
+        "Q1-9bb3a309c0570081",
+        "Q1-be01416bad9ecb19"
+      ],
+      "source": "arxiv",
+      "source_id": "2604.16317",
+      "title": "Paper2Data: Large-Scale LLM Extraction and Metadata Structuring of Global Urban Data from Scientific Literature",
+      "url": "http://arxiv.org/abs/2604.16317v1",
+      "year": 2026
+    },
+    {
+      "abstract": null,
+      "authors": [
+        "Xing Wei",
+        "Yang Yu"
+      ],
+      "cluster_id": "arxiv:2604.16416",
+      "doi": null,
+      "member_source_identities": [
+        {
+          "source": "arxiv",
+          "source_id": "2604.16416",
+          "url": "http://arxiv.org/abs/2604.16416v1"
+        }
+      ],
+      "merge_reasons": [],
+      "paper_id": "arxiv:2604.16416",
+      "retrieval_paths": [
+        "Q1-23cfe0602c5c3bda"
+      ],
+      "source": "arxiv",
+      "source_id": "2604.16416",
+      "title": "Tensor Manifold-Based Graph-Vector Fusion for AI-Native Academic Literature Retrieval",
+      "url": "http://arxiv.org/abs/2604.16416v1",
+      "year": 2026
+    },
+    {
+      "abstract": null,
+      "authors": [
+        "Lei Xiong",
+        "Kun Luo",
+        "Ziyi Xia",
+        "Wenbo Zhang",
+        "Jin-Ge Yao",
+        "Zheng Liu",
+        "Jingying Shao",
+        "Jianlyu Chen",
+        "Hongjin Qian",
+        "Xi Yang",
+        "Qian Yu",
+        "Hao Li",
+        "Chen Yue",
+        "Xiaan Du",
+        "Yuyang Wang",
+        "Yesheng Liu",
+        "Haiyu Xu",
+        "Zhicheng Dou"
+      ],
+      "cluster_id": "arxiv:2604.25256",
+      "doi": null,
+      "member_source_identities": [
+        {
+          "source": "arxiv",
+          "source_id": "2604.25256",
+          "url": "http://arxiv.org/abs/2604.25256v1"
+        }
+      ],
+      "merge_reasons": [],
+      "paper_id": "arxiv:2604.25256",
+      "retrieval_paths": [
+        "Q1-9bb3a309c0570081",
+        "Q1-ae88ee9e9a5ff91f",
+        "Q1-be01416bad9ecb19"
+      ],
+      "source": "arxiv",
+      "source_id": "2604.25256",
+      "title": "AutoResearchBench: Benchmarking AI Agents on Complex Scientific Literature Discovery",
+      "url": "http://arxiv.org/abs/2604.25256v1",
+      "year": 2026
+    },
+    {
+      "abstract": null,
+      "authors": [
+        "Yi Cao",
+        "Liaoyaqi Wang",
+        "Jieneng Chen",
+        "Benjamin Van Durme",
+        "Alan Yuille",
+        "Paulette Clancy"
+      ],
+      "cluster_id": "arxiv:2606.22375",
+      "doi": null,
+      "member_source_identities": [
+        {
+          "source": "arxiv",
+          "source_id": "2606.22375",
+          "url": "http://arxiv.org/abs/2606.22375v1"
+        }
+      ],
+      "merge_reasons": [],
+      "paper_id": "arxiv:2606.22375",
+      "retrieval_paths": [
+        "Q1-040540c9679d7f10"
+      ],
+      "source": "arxiv",
+      "source_id": "2606.22375",
+      "title": "ARIA: A Causal-Aware Framework for Rescuing LLM Reasoning in Trustworthy Materials Discovery",
+      "url": "http://arxiv.org/abs/2606.22375v1",
+      "year": 2026
+    }
+  ],
+  "config": {
+    "adapter_schema_version": "m1-t04.v2",
+    "cache_dir": ".runtime\\m1-rebaseline-20260728\\cache",
+    "cache_namespace": "first-round:real",
+    "max_results_per_query": 5,
+    "max_total_attempts": 20,
+    "max_total_candidates": 60,
+    "min_request_interval_seconds": 3.0,
+    "mode": "real",
+    "timeout_seconds": 20.0
+  },
+  "deduplicated_candidate_count": 33,
+  "error_code": null,
+  "failure": null,
+  "finished_at_utc": "2026-07-28T07:10:58.540710Z",
+  "intent": {
+    "accepted_paper_roles": [
+      "method"
+    ],
+    "exclusions": [],
+    "frozen_at": "2026-07-28T07:08:40.329494Z",
+    "method_constraint": "PREFERRED",
+    "method_terms": [
+      "graph-based retrieval",
+      "graph-based",
+      "retrieval"
+    ],
+    "object_terms": [
+      "scientific literature",
+      "scientific",
+      "literature"
+    ],
+    "revision": 1,
+    "scope_terms": [
+      "support",
+      "scientific literature discovery"
+    ],
+    "task_terms": [
+      "discovery"
+    ]
+  },
+  "metrics": {
+    "cache_hits": 12,
+    "candidate_budget_reached": false,
+    "configured_min_request_interval_seconds": 3.0,
+    "deduplicated_candidate_count": 33,
+    "elapsed_seconds": 0.4370000000053551,
+    "manual_review_count": 1,
+    "metadata_hallucination_rate": 0.0,
+    "metadata_projection_mismatch_count": 0,
+    "minimum_observed_request_start_delta_seconds": null,
+    "rate_limit_wait_count": 0,
+    "rate_limit_wait_seconds": 0.0,
+    "raw_candidate_count": 51,
+    "request_start_offsets_seconds": [],
+    "source_id_coverage": 1.0,
+    "transport_requests": 0,
+    "url_coverage": 1.0
+  },
+  "query_plan": {
+    "branch_weights": {
+      "BRIDGE_DOMAIN": 0.2,
+      "DIRECT_INTERSECTION": 0.35,
+      "METHOD_DOMAIN": 0.2,
+      "PROBLEM_DOMAIN": 0.25
+    },
+    "excluded_term_conflicts": [],
+    "exclusions": [],
+    "expressions": {
+      "Q1-0297414dafd0e41d": {
+        "anchor_terms": [
+          "scientific literature"
+        ],
+        "required_groups": [
+          [
+            "scientific literature",
+            "scientific",
+            "literature",
+            "discovery"
+          ],
+          [
+            "graph-based retrieval",
+            "graph-based",
+            "retrieval",
+            "application",
+            "adaptation",
+            "transfer",
+            "framework",
+            "methodology",
+            "benchmark"
+          ]
+        ]
+      },
+      "Q1-040540c9679d7f10": {
+        "anchor_terms": [
+          "graph-based retrieval"
+        ],
+        "required_groups": [
+          [
+            "graph-based retrieval",
+            "graph-based",
+            "retrieval"
+          ],
+          [
+            "discovery"
+          ]
+        ]
+      },
+      "Q1-23cfe0602c5c3bda": {
+        "anchor_terms": [
+          "scientific literature"
+        ],
+        "required_groups": [
+          [
+            "scientific literature",
+            "scientific",
+            "literature"
+          ],
+          [
+            "graph-based retrieval",
+            "graph-based",
+            "retrieval"
+          ],
+          [
+            "application",
+            "adaptation",
+            "transfer",
+            "framework",
+            "methodology",
+            "benchmark"
+          ]
+        ]
+      },
+      "Q1-3fb237a1ce9ed2b3": {
+        "anchor_terms": [
+          "scientific literature"
+        ],
+        "required_groups": [
+          [
+            "scientific literature"
+          ],
+          [
+            "discovery"
+          ],
+          [
+            "graph-based retrieval"
+          ],
+          [
+            "application"
+          ]
+        ]
+      },
+      "Q1-5817f8956b30c396": {
+        "anchor_terms": [
+          "scientific literature"
+        ],
+        "required_groups": [
+          [
+            "scientific literature"
+          ],
+          [
+            "discovery"
+          ],
+          [
+            "graph-based retrieval"
+          ]
+        ]
+      },
+      "Q1-6dc96c56f6f1e49a": {
+        "anchor_terms": [
+          "graph-based retrieval"
+        ],
+        "required_groups": [
+          [
+            "graph-based retrieval",
+            "graph-based",
+            "retrieval"
+          ]
+        ]
+      },
+      "Q1-8b68f4bbf8561196": {
+        "anchor_terms": [
+          "scientific literature"
+        ],
+        "required_groups": [
+          [
+            "scientific literature",
+            "scientific",
+            "literature"
+          ],
+          [
+            "discovery",
+            "graph-based retrieval",
+            "graph-based",
+            "retrieval"
+          ]
+        ]
+      },
+      "Q1-8de87d0bacb5005b": {
+        "anchor_terms": [
+          "scientific literature"
+        ],
+        "required_groups": [
+          [
+            "scientific literature",
+            "scientific",
+            "literature"
+          ],
+          [
+            "discovery"
+          ],
+          [
+            "graph-based retrieval",
+            "graph-based",
+            "retrieval"
+          ]
+        ]
+      },
+      "Q1-9bb3a309c0570081": {
+        "anchor_terms": [
+          "scientific literature"
+        ],
+        "required_groups": [
+          [
+            "scientific literature"
+          ],
+          [
+            "discovery"
+          ],
+          [
+            "support"
+          ]
+        ]
+      },
+      "Q1-a16109f2426f3024": {
+        "anchor_terms": [
+          "graph-based retrieval"
+        ],
+        "required_groups": [
+          [
+            "graph-based retrieval"
+          ],
+          [
+            "discovery"
+          ]
+        ]
+      },
+      "Q1-ae88ee9e9a5ff91f": {
+        "anchor_terms": [
+          "scientific literature"
+        ],
+        "required_groups": [
+          [
+            "scientific literature",
+            "scientific",
+            "literature"
+          ],
+          [
+            "discovery",
+            "support",
+            "scientific literature discovery"
+          ]
+        ]
+      },
+      "Q1-be01416bad9ecb19": {
+        "anchor_terms": [
+          "scientific literature"
+        ],
+        "required_groups": [
+          [
+            "scientific literature",
+            "scientific",
+            "literature"
+          ],
+          [
+            "discovery"
+          ],
+          [
+            "support",
+            "scientific literature discovery"
+          ]
+        ]
+      }
+    },
+    "generated_at_utc": "2026-07-28T07:08:40.329494Z",
+    "intent_revision": 1,
+    "plan_id": "QP-c17969ee46fa7831",
+    "planning_config_version": "m1-t01.v2",
+    "positive_expansions": [],
+    "project_id": "RRC-2026-0001",
+    "queries": [
+      {
+        "branch": "DIRECT_INTERSECTION",
+        "breadth": "NARROW",
+        "language": "en",
+        "query_id": "Q1-5817f8956b30c396",
+        "query_text": "all:\"scientific literature\" AND all:\"discovery\" AND all:\"graph-based retrieval\"",
+        "revision_sources": [],
+        "round_number": 1,
+        "weight": 0.11666666666666665
+      },
+      {
+        "branch": "DIRECT_INTERSECTION",
+        "breadth": "MEDIUM",
+        "language": "en",
+        "query_id": "Q1-8de87d0bacb5005b",
+        "query_text": "(all:\"scientific literature\" OR all:\"scientific\" OR all:\"literature\") AND all:\"discovery\" AND (all:\"graph-based retrieval\" OR all:\"graph-based\" OR all:\"retrieval\")",
+        "revision_sources": [],
+        "round_number": 1,
+        "weight": 0.11666666666666665
+      },
+      {
+        "branch": "DIRECT_INTERSECTION",
+        "breadth": "WIDE",
+        "language": "en",
+        "query_id": "Q1-8b68f4bbf8561196",
+        "query_text": "(all:\"scientific literature\" OR all:\"scientific\" OR all:\"literature\") AND (all:\"discovery\" OR all:\"graph-based retrieval\" OR all:\"graph-based\" OR all:\"retrieval\")",
+        "revision_sources": [],
+        "round_number": 1,
+        "weight": 0.11666666666666665
+      },
+      {
+        "branch": "PROBLEM_DOMAIN",
+        "breadth": "NARROW",
+        "language": "en",
+        "query_id": "Q1-9bb3a309c0570081",
+        "query_text": "all:\"scientific literature\" AND all:\"discovery\" AND all:\"support\"",
+        "revision_sources": [],
+        "round_number": 1,
+        "weight": 0.08333333333333333
+      },
+      {
+        "branch": "PROBLEM_DOMAIN",
+        "breadth": "MEDIUM",
+        "language": "en",
+        "query_id": "Q1-be01416bad9ecb19",
+        "query_text": "(all:\"scientific literature\" OR all:\"scientific\" OR all:\"literature\") AND all:\"discovery\" AND (all:\"support\" OR all:\"scientific literature discovery\")",
+        "revision_sources": [],
+        "round_number": 1,
+        "weight": 0.08333333333333333
+      },
+      {
+        "branch": "PROBLEM_DOMAIN",
+        "breadth": "WIDE",
+        "language": "en",
+        "query_id": "Q1-ae88ee9e9a5ff91f",
+        "query_text": "(all:\"scientific literature\" OR all:\"scientific\" OR all:\"literature\") AND (all:\"discovery\" OR all:\"support\" OR all:\"scientific literature discovery\")",
+        "revision_sources": [],
+        "round_number": 1,
+        "weight": 0.08333333333333333
+      },
+      {
+        "branch": "METHOD_DOMAIN",
+        "breadth": "NARROW",
+        "language": "en",
+        "query_id": "Q1-a16109f2426f3024",
+        "query_text": "all:\"graph-based retrieval\" AND all:\"discovery\"",
+        "revision_sources": [],
+        "round_number": 1,
+        "weight": 0.06666666666666667
+      },
+      {
+        "branch": "METHOD_DOMAIN",
+        "breadth": "MEDIUM",
+        "language": "en",
+        "query_id": "Q1-040540c9679d7f10",
+        "query_text": "(all:\"graph-based retrieval\" OR all:\"graph-based\" OR all:\"retrieval\") AND all:\"discovery\"",
+        "revision_sources": [],
+        "round_number": 1,
+        "weight": 0.06666666666666667
+      },
+      {
+        "branch": "METHOD_DOMAIN",
+        "breadth": "WIDE",
+        "language": "en",
+        "query_id": "Q1-6dc96c56f6f1e49a",
+        "query_text": "(all:\"graph-based retrieval\" OR all:\"graph-based\" OR all:\"retrieval\")",
+        "revision_sources": [],
+        "round_number": 1,
+        "weight": 0.06666666666666667
+      },
+      {
+        "branch": "BRIDGE_DOMAIN",
+        "breadth": "NARROW",
+        "language": "en",
+        "query_id": "Q1-3fb237a1ce9ed2b3",
+        "query_text": "all:\"scientific literature\" AND all:\"discovery\" AND all:\"graph-based retrieval\" AND all:\"application\"",
+        "revision_sources": [],
+        "round_number": 1,
+        "weight": 0.06666666666666667
+      },
+      {
+        "branch": "BRIDGE_DOMAIN",
+        "breadth": "MEDIUM",
+        "language": "en",
+        "query_id": "Q1-23cfe0602c5c3bda",
+        "query_text": "(all:\"scientific literature\" OR all:\"scientific\" OR all:\"literature\") AND (all:\"graph-based retrieval\" OR all:\"graph-based\" OR all:\"retrieval\") AND (all:\"application\" OR all:\"adaptation\" OR all:\"transfer\" OR all:\"framework\" OR all:\"methodology\" OR all:\"benchmark\")",
+        "revision_sources": [],
+        "round_number": 1,
+        "weight": 0.06666666666666667
+      },
+      {
+        "branch": "BRIDGE_DOMAIN",
+        "breadth": "WIDE",
+        "language": "en",
+        "query_id": "Q1-0297414dafd0e41d",
+        "query_text": "(all:\"scientific literature\" OR all:\"scientific\" OR all:\"literature\" OR all:\"discovery\") AND (all:\"graph-based retrieval\" OR all:\"graph-based\" OR all:\"retrieval\" OR all:\"application\" OR all:\"adaptation\" OR all:\"transfer\" OR all:\"framework\" OR all:\"methodology\" OR all:\"benchmark\")",
+        "revision_sources": [],
+        "round_number": 1,
+        "weight": 0.06666666666666667
+      }
+    ],
+    "round_number": 1,
+    "source": "arxiv"
+  },
+  "query_results": [
+    {
+      "attempt_count": 0,
+      "cache_hit": true,
+      "candidate_count": 1,
+      "error_code": null,
+      "http_status": null,
+      "query_id": "Q1-5817f8956b30c396",
+      "status": "success"
+    },
+    {
+      "attempt_count": 0,
+      "cache_hit": true,
+      "candidate_count": 5,
+      "error_code": null,
+      "http_status": null,
+      "query_id": "Q1-8de87d0bacb5005b",
+      "status": "success"
+    },
+    {
+      "attempt_count": 0,
+      "cache_hit": true,
+      "candidate_count": 5,
+      "error_code": null,
+      "http_status": null,
+      "query_id": "Q1-8b68f4bbf8561196",
+      "status": "success"
+    },
+    {
+      "attempt_count": 0,
+      "cache_hit": true,
+      "candidate_count": 5,
+      "error_code": null,
+      "http_status": null,
+      "query_id": "Q1-9bb3a309c0570081",
+      "status": "success"
+    },
+    {
+      "attempt_count": 0,
+      "cache_hit": true,
+      "candidate_count": 5,
+      "error_code": null,
+      "http_status": null,
+      "query_id": "Q1-be01416bad9ecb19",
+      "status": "success"
+    },
+    {
+      "attempt_count": 0,
+      "cache_hit": true,
+      "candidate_count": 5,
+      "error_code": null,
+      "http_status": null,
+      "query_id": "Q1-ae88ee9e9a5ff91f",
+      "status": "success"
+    },
+    {
+      "attempt_count": 0,
+      "cache_hit": true,
+      "candidate_count": 5,
+      "error_code": null,
+      "http_status": null,
+      "query_id": "Q1-a16109f2426f3024",
+      "status": "success"
+    },
+    {
+      "attempt_count": 0,
+      "cache_hit": true,
+      "candidate_count": 5,
+      "error_code": null,
+      "http_status": null,
+      "query_id": "Q1-040540c9679d7f10",
+      "status": "success"
+    },
+    {
+      "attempt_count": 0,
+      "cache_hit": true,
+      "candidate_count": 5,
+      "error_code": null,
+      "http_status": null,
+      "query_id": "Q1-6dc96c56f6f1e49a",
+      "status": "success"
+    },
+    {
+      "attempt_count": 0,
+      "cache_hit": true,
+      "candidate_count": 0,
+      "error_code": null,
+      "http_status": null,
+      "query_id": "Q1-3fb237a1ce9ed2b3",
+      "status": "success"
+    },
+    {
+      "attempt_count": 0,
+      "cache_hit": true,
+      "candidate_count": 5,
+      "error_code": null,
+      "http_status": null,
+      "query_id": "Q1-23cfe0602c5c3bda",
+      "status": "success"
+    },
+    {
+      "attempt_count": 0,
+      "cache_hit": true,
+      "candidate_count": 5,
+      "error_code": null,
+      "http_status": null,
+      "query_id": "Q1-0297414dafd0e41d",
+      "status": "success"
+    }
+  ],
+  "question": "How can graph-based retrieval support scientific literature discovery?",
+  "raw_candidate_count": 51,
+  "run_id": "0c9b2c5c39e1377c818f9e5ce647f1c33e20772eec55d896ecf8b6cad4072f18",
+  "started_at_utc": "2026-07-28T07:10:58.105607Z",
+  "status": "success"
+}
