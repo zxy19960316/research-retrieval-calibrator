@@ -7,6 +7,8 @@ from collections.abc import Sequence
 import pytest
 
 from app.adapters.evidence_classification import (
+    _ClassificationOutcome,
+    _build_quality_diagnostics,
     DeterministicFakeEvidenceClassifier,
     EvidenceClassifierProvider,
     _collect_matches,
@@ -192,6 +194,56 @@ def test_excerpt_does_not_absorb_direct_marker_from_next_sentence() -> None:
     assert record.support_level is SupportLevel.INDIRECT
     assert record.supporting_excerpt == "The method transfers to a related-domain task."
     assert "demonstrates" not in record.supporting_excerpt
+
+
+def _diagnostic_outcomes(
+    support_levels: Sequence[SupportLevel | str],
+) -> list[_ClassificationOutcome]:
+    slots = list(EvidenceSlot)
+    return [
+        _ClassificationOutcome(
+            record={"evidence_slot": slots[index], "support_level": support_level},
+            rejection_kind="none",
+        )
+        for index, support_level in enumerate(support_levels)
+    ]
+
+
+@pytest.mark.parametrize(
+    ("support_levels", "same_support_warning", "missing_support_warning"),
+    [
+        ([SupportLevel.DIRECT, SupportLevel.DIRECT, SupportLevel.DIRECT], True, True),
+        ([SupportLevel.DIRECT, SupportLevel.INDIRECT, SupportLevel.DIRECT], False, False),
+        ([SupportLevel.DIRECT, SupportLevel.HYPOTHETICAL, SupportLevel.DIRECT], False, False),
+        ([SupportLevel.INDIRECT, SupportLevel.INDIRECT, SupportLevel.INDIRECT], True, False),
+    ],
+)
+def test_support_level_diagnostic_warnings_are_type_explicit(
+    support_levels: Sequence[SupportLevel],
+    same_support_warning: bool,
+    missing_support_warning: bool,
+) -> None:
+    diagnostics = _build_quality_diagnostics(_diagnostic_outcomes(support_levels))
+    warnings = set(diagnostics.warnings)
+
+    assert ("ALL_RECORDS_SAME_SUPPORT_LEVEL" in warnings) is same_support_warning
+    assert ("NO_INDIRECT_OR_HYPOTHETICAL_RECORDS" in warnings) is missing_support_warning
+
+
+def test_support_level_diagnostics_accept_serialized_values() -> None:
+    diagnostics = _build_quality_diagnostics(
+        _diagnostic_outcomes(
+            [SupportLevel.DIRECT.value, SupportLevel.INDIRECT.value, SupportLevel.DIRECT.value]
+        )
+    )
+
+    assert "ALL_RECORDS_SAME_SUPPORT_LEVEL" not in diagnostics.warnings
+    assert "NO_INDIRECT_OR_HYPOTHETICAL_RECORDS" not in diagnostics.warnings
+
+
+def test_unknown_support_level_fails_closed_in_diagnostics() -> None:
+    with pytest.raises(ValueError):
+        _build_quality_diagnostics(_diagnostic_outcomes(["UNKNOWN_SUPPORT_LEVEL"]))
 
 
 def test_title_only_marker_uses_title_excerpt() -> None:
