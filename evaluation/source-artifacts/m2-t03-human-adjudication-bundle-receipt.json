@@ -1,9 +1,9 @@
 {
   "bundle_path": "evaluation/source-artifacts/m2-t03-human-adjudication-bundle.json",
-  "bundle_sha256": "8353273504bc35bcc82910c0ae73b8a1a14adde8c78927145cb8e8329b3c07e0",
+  "bundle_sha256": "f6ae1ef7089f7830d506d7dc5040ab16df890ce040637a8568dc3ab055c447e5",
   "candidate_count": 33,
   "exit_code": 0,
-  "generated_from_commit": "b51fb5e3de86b0c1c49ebf5cbf02be227b1e9651",
+  "generated_from_commit": "19f6bb77447c791ff1c711ed918e1a501cd5604a",
   "human_fields_empty": true,
   "human_review": "not_started",
   "m2_t04": "not_started",
@@ -12,8 +12,12 @@
   "real_arxiv_requests": false,
   "real_model_run": false,
   "receipt_version": "m2-t03-human-adjudication-receipt.v1",
+  "review_template": {
+    "path": "evaluation/source-artifacts/m2-t03-human-adjudication-review-template.json",
+    "sha256": "540a472c8bffa78e8f2a9f77a4d0cec574fd99231d7b38912dd8d4a682c9815b"
+  },
   "runner_path": "scripts/build_m2_t03_human_adjudication_bundle.py",
-  "runner_sha256": "d2c46eb506514b9248029bb1f688506caeac661ef8205512a241fbb2c0203dd3",
+  "runner_sha256": "80a13d5e66e9c98135c75aea4b50bfc707d207216ec3b94e6cedc0f2f603a1d1",
   "scoring_eligible": false,
   "task_id": "M2-T03"
 }

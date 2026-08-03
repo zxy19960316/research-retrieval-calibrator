@@ -10,7 +10,7 @@
     "sha256": "2bd80d2b6a10bfe531ea2ca3b7570768fd1a78e5d05efca96fc28464d72baee8"
   },
   "generated_at_utc": "2026-08-03T12:30:00Z",
-  "generated_from_commit": "b51fb5e3de86b0c1c49ebf5cbf02be227b1e9651",
+  "generated_from_commit": "19f6bb77447c791ff1c711ed918e1a501cd5604a",
   "intent_context": {
     "canonical_intent_sha256": "3bb7c50d4993eb217979333eae192c2a3c8d5ca1099ecc60c137e4efecdbe5fe",
     "repair_manifest": {
@@ -62,14 +62,14 @@
         "title": "Unsupervised Visual and Textual Information Fusion in Multimedia Retrieval - A Graph-based Point of View"
       },
       "human_adjudication": {
-        "decision": null,
         "evidence_slot": null,
         "grounded_reason": null,
         "notes": null,
         "reviewed_at_utc": null,
         "reviewer_id": null,
         "support_level": null,
-        "supporting_excerpt": null
+        "supporting_excerpt": null,
+        "verdict": null
       },
       "machine_advisory": {
         "advisory_only": true,
@@ -105,14 +105,14 @@
         "title": "Scientific Literature Text Mining and the Case for Open Access"
       },
       "human_adjudication": {
-        "decision": null,
         "evidence_slot": null,
         "grounded_reason": null,
         "notes": null,
         "reviewed_at_utc": null,
         "reviewer_id": null,
         "support_level": null,
-        "supporting_excerpt": null
+        "supporting_excerpt": null,
+        "verdict": null
       },
       "machine_advisory": {
         "advisory_only": true,
@@ -148,14 +148,14 @@
         "title": "Efficient Graph-based Word Sense Induction by Distributional Inclusion Vector Embeddings"
       },
       "human_adjudication": {
-        "decision": null,
         "evidence_slot": null,
         "grounded_reason": null,
         "notes": null,
         "reviewed_at_utc": null,
         "reviewer_id": null,
         "support_level": null,
-        "supporting_excerpt": null
+        "supporting_excerpt": null,
+        "verdict": null
       },
       "machine_advisory": {
         "advisory_only": true,
@@ -191,14 +191,14 @@
         "title": "Embedding-based Scientific Literature Discovery in a Text Editor Application"
       },
       "human_adjudication": {
-        "decision": null,
         "evidence_slot": null,
         "grounded_reason": null,
         "notes": null,
         "reviewed_at_utc": null,
         "reviewer_id": null,
         "support_level": null,
-        "supporting_excerpt": null
+        "supporting_excerpt": null,
+        "verdict": null
       },
       "machine_advisory": {
         "advisory_only": true,
@@ -234,14 +234,14 @@
         "title": "COVID-19 Knowledge Graph: Accelerating Information Retrieval and Discovery for Scientific Literature"
       },
       "human_adjudication": {
-        "decision": null,
         "evidence_slot": null,
         "grounded_reason": null,
         "notes": null,
         "reviewed_at_utc": null,
         "reviewer_id": null,
         "support_level": null,
-        "supporting_excerpt": null
+        "supporting_excerpt": null,
+        "verdict": null
       },
       "machine_advisory": {
         "advisory_only": true,
@@ -277,14 +277,14 @@
         "title": "Decontamination of the scientific literature"
       },
       "human_adjudication": {
-        "decision": null,
         "evidence_slot": null,
         "grounded_reason": null,
         "notes": null,
         "reviewed_at_utc": null,
         "reviewer_id": null,
         "support_level": null,
-        "supporting_excerpt": null
+        "supporting_excerpt": null,
+        "verdict": null
       },
       "machine_advisory": {
         "advisory_only": true,
@@ -320,14 +320,14 @@
         "title": "SciLit: A Platform for Joint Scientific Literature Discovery, Summarization and Citation Generation"
       },
       "human_adjudication": {
-        "decision": null,
         "evidence_slot": null,
         "grounded_reason": null,
         "notes": null,
         "reviewed_at_utc": null,
         "reviewer_id": null,
         "support_level": null,
-        "supporting_excerpt": null
+        "supporting_excerpt": null,
+        "verdict": null
       },
       "machine_advisory": {
         "advisory_only": true,
@@ -363,14 +363,14 @@
         "title": "A Practical Entity Linking System for Tables in Scientific Literature"
       },
       "human_adjudication": {
-        "decision": null,
         "evidence_slot": null,
         "grounded_reason": null,
         "notes": null,
         "reviewed_at_utc": null,
         "reviewer_id": null,
         "support_level": null,
-        "supporting_excerpt": null
+        "supporting_excerpt": null,
+        "verdict": null
       },
       "machine_advisory": {
         "advisory_only": true,
@@ -406,14 +406,14 @@
         "title": "Clinfo.ai: An Open-Source Retrieval-Augmented Large Language Model System for Answering Medical Questions using Scientific Literature"
       },
       "human_adjudication": {
-        "decision": null,
         "evidence_slot": null,
         "grounded_reason": null,
         "notes": null,
         "reviewed_at_utc": null,
         "reviewer_id": null,
         "support_level": null,
-        "supporting_excerpt": null
+        "supporting_excerpt": null,
+        "verdict": null
       },
       "machine_advisory": {
         "advisory_only": true,
@@ -449,14 +449,14 @@
         "title": "Graph-Based Retriever Captures the Long Tail of Biomedical Knowledge"
       },
       "human_adjudication": {
-        "decision": null,
         "evidence_slot": null,
         "grounded_reason": null,
         "notes": null,
         "reviewed_at_utc": null,
         "reviewer_id": null,
         "support_level": null,
-        "supporting_excerpt": null
+        "supporting_excerpt": null,
+        "verdict": null
       },
       "machine_advisory": {
         "advisory_only": true,
@@ -492,14 +492,14 @@
         "title": "Knowledge Discovery in Optical Music Recognition: Enhancing Information Retrieval with Instance Segmentation"
       },
       "human_adjudication": {
-        "decision": null,
         "evidence_slot": null,
         "grounded_reason": null,
         "notes": null,
         "reviewed_at_utc": null,
         "reviewer_id": null,
         "support_level": null,
-        "supporting_excerpt": null
+        "supporting_excerpt": null,
+        "verdict": null
       },
       "machine_advisory": {
         "advisory_only": true,
@@ -535,14 +535,14 @@
         "title": "SciLitLLM: How to Adapt LLMs for Scientific Literature Understanding"
       },
       "human_adjudication": {
-        "decision": null,
         "evidence_slot": null,
         "grounded_reason": null,
         "notes": null,
         "reviewed_at_utc": null,
         "reviewer_id": null,
         "support_level": null,
-        "supporting_excerpt": null
+        "supporting_excerpt": null,
+        "verdict": null
       },
       "machine_advisory": {
         "advisory_only": true,
@@ -578,14 +578,14 @@
         "title": "TOBUGraph: Knowledge Graph-Based Retrieval for Enhanced LLM Performance Beyond RAG"
       },
       "human_adjudication": {
-        "decision": null,
         "evidence_slot": null,
         "grounded_reason": null,
         "notes": null,
         "reviewed_at_utc": null,
         "reviewer_id": null,
         "support_level": null,
-        "supporting_excerpt": null
+        "supporting_excerpt": null,
+        "verdict": null
       },
       "machine_advisory": {
         "advisory_only": true,
@@ -621,14 +621,14 @@
         "title": "Ranking Narrative Query Graphs for Biomedical Document Retrieval (Technical Report)"
       },
       "human_adjudication": {
-        "decision": null,
         "evidence_slot": null,
         "grounded_reason": null,
         "notes": null,
         "reviewed_at_utc": null,
         "reviewer_id": null,
         "support_level": null,
-        "supporting_excerpt": null
+        "supporting_excerpt": null,
+        "verdict": null
       },
       "machine_advisory": {
         "advisory_only": true,
@@ -664,14 +664,14 @@
         "title": "Personalized Graph-Based Retrieval for Large Language Models"
       },
       "human_adjudication": {
-        "decision": null,
         "evidence_slot": null,
         "grounded_reason": null,
         "notes": null,
         "reviewed_at_utc": null,
         "reviewer_id": null,
         "support_level": null,
-        "supporting_excerpt": null
+        "supporting_excerpt": null,
+        "verdict": null
       },
       "machine_advisory": {
         "advisory_only": true,
@@ -707,14 +707,14 @@
         "title": "Optimizing open-domain question answering with graph-based retrieval augmented generation"
       },
       "human_adjudication": {
-        "decision": null,
         "evidence_slot": null,
         "grounded_reason": null,
         "notes": null,
         "reviewed_at_utc": null,
         "reviewer_id": null,
         "support_level": null,
-        "supporting_excerpt": null
+        "supporting_excerpt": null,
+        "verdict": null
       },
       "machine_advisory": {
         "advisory_only": true,
@@ -750,14 +750,14 @@
         "title": "Accelerating Causal Network Discovery of Alzheimer Disease Biomarkers via Scientific Literature-based Retrieval Augmented Generation"
       },
       "human_adjudication": {
-        "decision": null,
         "evidence_slot": null,
         "grounded_reason": null,
         "notes": null,
         "reviewed_at_utc": null,
         "reviewer_id": null,
         "support_level": null,
-        "supporting_excerpt": null
+        "supporting_excerpt": null,
+        "verdict": null
       },
       "machine_advisory": {
         "advisory_only": true,
@@ -793,14 +793,14 @@
         "title": "GraphRunner: A Multi-Stage Framework for Efficient and Accurate Graph-Based Retrieval"
       },
       "human_adjudication": {
-        "decision": null,
         "evidence_slot": null,
         "grounded_reason": null,
         "notes": null,
         "reviewed_at_utc": null,
         "reviewer_id": null,
         "support_level": null,
-        "supporting_excerpt": null
+        "supporting_excerpt": null,
+        "verdict": null
       },
       "machine_advisory": {
         "advisory_only": true,
@@ -836,14 +836,14 @@
         "title": "zERExtractor:An Automated Platform for Enzyme-Catalyzed Reaction Data Extraction from Scientific Literature"
       },
       "human_adjudication": {
-        "decision": null,
         "evidence_slot": null,
         "grounded_reason": null,
         "notes": null,
         "reviewed_at_utc": null,
         "reviewer_id": null,
         "support_level": null,
-        "supporting_excerpt": null
+        "supporting_excerpt": null,
+        "verdict": null
       },
       "machine_advisory": {
         "advisory_only": true,
@@ -879,14 +879,14 @@
         "title": "SciTopic: Enhancing Topic Discovery in Scientific Literature through Advanced LLM"
       },
       "human_adjudication": {
-        "decision": null,
         "evidence_slot": null,
         "grounded_reason": null,
         "notes": null,
         "reviewed_at_utc": null,
         "reviewer_id": null,
         "support_level": null,
-        "supporting_excerpt": null
+        "supporting_excerpt": null,
+        "verdict": null
       },
       "machine_advisory": {
         "advisory_only": true,
@@ -922,14 +922,14 @@
         "title": "MatPROV: A Provenance Graph Dataset of Material Synthesis Extracted from Scientific Literature"
       },
       "human_adjudication": {
-        "decision": null,
         "evidence_slot": null,
         "grounded_reason": null,
         "notes": null,
         "reviewed_at_utc": null,
         "reviewer_id": null,
         "support_level": null,
-        "supporting_excerpt": null
+        "supporting_excerpt": null,
+        "verdict": null
       },
       "machine_advisory": {
         "advisory_only": true,
@@ -965,14 +965,14 @@
         "title": "SciGPT: A Large Language Model for Scientific Literature Understanding and Knowledge Discovery"
       },
       "human_adjudication": {
-        "decision": null,
         "evidence_slot": null,
         "grounded_reason": null,
         "notes": null,
         "reviewed_at_utc": null,
         "reviewer_id": null,
         "support_level": null,
-        "supporting_excerpt": null
+        "supporting_excerpt": null,
+        "verdict": null
       },
       "machine_advisory": {
         "advisory_only": true,
@@ -1008,14 +1008,14 @@
         "title": "LeMat-Synth: a multi-modal toolbox to curate broad synthesis procedure databases from scientific literature"
       },
       "human_adjudication": {
-        "decision": null,
         "evidence_slot": null,
         "grounded_reason": null,
         "notes": null,
         "reviewed_at_utc": null,
         "reviewer_id": null,
         "support_level": null,
-        "supporting_excerpt": null
+        "supporting_excerpt": null,
+        "verdict": null
       },
       "machine_advisory": {
         "advisory_only": true,
@@ -1051,14 +1051,14 @@
         "title": "Biomedical Hypothesis Explainability with Graph-Based Context Retrieval"
       },
       "human_adjudication": {
-        "decision": null,
         "evidence_slot": null,
         "grounded_reason": null,
         "notes": null,
         "reviewed_at_utc": null,
         "reviewer_id": null,
         "support_level": null,
-        "supporting_excerpt": null
+        "supporting_excerpt": null,
+        "verdict": null
       },
       "machine_advisory": {
         "advisory_only": true,
@@ -1094,14 +1094,14 @@
         "title": "fastbmRAG: A Fast Graph-Based RAG Framework for Efficient Processing of Large-Scale Biomedical Literature"
       },
       "human_adjudication": {
-        "decision": null,
         "evidence_slot": null,
         "grounded_reason": null,
         "notes": null,
         "reviewed_at_utc": null,
         "reviewer_id": null,
         "support_level": null,
-        "supporting_excerpt": null
+        "supporting_excerpt": null,
+        "verdict": null
       },
       "machine_advisory": {
         "advisory_only": true,
@@ -1137,14 +1137,14 @@
         "title": "SciRAG: Adaptive, Citation-Aware, and Outline-Guided Retrieval and Synthesis for Scientific Literature"
       },
       "human_adjudication": {
-        "decision": null,
         "evidence_slot": null,
         "grounded_reason": null,
         "notes": null,
         "reviewed_at_utc": null,
         "reviewer_id": null,
         "support_level": null,
-        "supporting_excerpt": null
+        "supporting_excerpt": null,
+        "verdict": null
       },
       "machine_advisory": {
         "advisory_only": true,
@@ -1180,14 +1180,14 @@
         "title": "Intelligent Scientific Literature Explorer using Machine Learning (ISLE)"
       },
       "human_adjudication": {
-        "decision": null,
         "evidence_slot": null,
         "grounded_reason": null,
         "notes": null,
         "reviewed_at_utc": null,
         "reviewer_id": null,
         "support_level": null,
-        "supporting_excerpt": null
+        "supporting_excerpt": null,
+        "verdict": null
       },
       "machine_advisory": {
         "advisory_only": true,
@@ -1223,14 +1223,14 @@
         "title": "Query-Efficient Agentic Graph Extraction Attacks on GraphRAG Systems"
       },
       "human_adjudication": {
-        "decision": null,
         "evidence_slot": null,
         "grounded_reason": null,
         "notes": null,
         "reviewed_at_utc": null,
         "reviewer_id": null,
         "support_level": null,
-        "supporting_excerpt": null
+        "supporting_excerpt": null,
+        "verdict": null
       },
       "machine_advisory": {
         "advisory_only": true,
@@ -1266,14 +1266,14 @@
         "title": "Enhancing Scientific Literature Chatbots with Retrieval-Augmented Generation: A Performance Evaluation of Vector and Graph-Based Systems"
       },
       "human_adjudication": {
-        "decision": null,
         "evidence_slot": null,
         "grounded_reason": null,
         "notes": null,
         "reviewed_at_utc": null,
         "reviewer_id": null,
         "support_level": null,
-        "supporting_excerpt": null
+        "supporting_excerpt": null,
+        "verdict": null
       },
       "machine_advisory": {
         "advisory_only": true,
@@ -1309,14 +1309,14 @@
         "title": "Paper2Data: Large-Scale LLM Extraction and Metadata Structuring of Global Urban Data from Scientific Literature"
       },
       "human_adjudication": {
-        "decision": null,
         "evidence_slot": null,
         "grounded_reason": null,
         "notes": null,
         "reviewed_at_utc": null,
         "reviewer_id": null,
         "support_level": null,
-        "supporting_excerpt": null
+        "supporting_excerpt": null,
+        "verdict": null
       },
       "machine_advisory": {
         "advisory_only": true,
@@ -1352,14 +1352,14 @@
         "title": "Tensor Manifold-Based Graph-Vector Fusion for AI-Native Academic Literature Retrieval"
       },
       "human_adjudication": {
-        "decision": null,
         "evidence_slot": null,
         "grounded_reason": null,
         "notes": null,
         "reviewed_at_utc": null,
         "reviewer_id": null,
         "support_level": null,
-        "supporting_excerpt": null
+        "supporting_excerpt": null,
+        "verdict": null
       },
       "machine_advisory": {
         "advisory_only": true,
@@ -1395,14 +1395,14 @@
         "title": "AutoResearchBench: Benchmarking AI Agents on Complex Scientific Literature Discovery"
       },
       "human_adjudication": {
-        "decision": null,
         "evidence_slot": null,
         "grounded_reason": null,
         "notes": null,
         "reviewed_at_utc": null,
         "reviewer_id": null,
         "support_level": null,
-        "supporting_excerpt": null
+        "supporting_excerpt": null,
+        "verdict": null
       },
       "machine_advisory": {
         "advisory_only": true,
@@ -1438,14 +1438,14 @@
         "title": "ARIA: A Causal-Aware Framework for Rescuing LLM Reasoning in Trustworthy Materials Discovery"
       },
       "human_adjudication": {
-        "decision": null,
         "evidence_slot": null,
         "grounded_reason": null,
         "notes": null,
         "reviewed_at_utc": null,
         "reviewer_id": null,
         "support_level": null,
-        "supporting_excerpt": null
+        "supporting_excerpt": null,
+        "verdict": null
       },
       "machine_advisory": {
         "advisory_only": true,
@@ -1522,13 +1522,20 @@
     "m2_t04_started": false,
     "machine_labels_are_advisory": true,
     "network_forbidden": true,
+    "protocol": {
+      "path": "docs/reviews/m2-t03-human-adjudication-protocol.md",
+      "sha256": "41b02244d0b183a87f4089ce5814ddf8eb6505c4f5f2d0ea9c4ba2d09c063cb2"
+    },
     "real_arxiv_requests": false,
     "real_model_run": false,
     "source_fields": [
       "paper_id",
       "title",
       "abstract",
-      "source_identity"
+      "source",
+      "source_id",
+      "url",
+      "ResearchIntent"
     ]
   },
   "status_boundary": {

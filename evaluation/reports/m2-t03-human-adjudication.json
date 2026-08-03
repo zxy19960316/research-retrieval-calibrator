@@ -2,11 +2,15 @@
   "artifact": [
     {
       "path": "evaluation/source-artifacts/m2-t03-human-adjudication-bundle.json",
-      "sha256": "8353273504bc35bcc82910c0ae73b8a1a14adde8c78927145cb8e8329b3c07e0"
+      "sha256": "f6ae1ef7089f7830d506d7dc5040ab16df890ce040637a8568dc3ab055c447e5"
     },
     {
       "path": "evaluation/source-artifacts/m2-t03-human-adjudication-bundle-receipt.json",
-      "sha256": "e73adcc402f400da9b0d53cfef8e8dd5e207d76d011beaee95b478c682bbc6d0"
+      "sha256": "98403bd719db349d2d7ddbcbd2ac7554d42bc6cd316fbbed7479e19ac151e7f4"
+    },
+    {
+      "path": "evaluation/source-artifacts/m2-t03-human-adjudication-review-template.json",
+      "sha256": "540a472c8bffa78e8f2a9f77a4d0cec574fd99231d7b38912dd8d4a682c9815b"
     }
   ],
   "candidate_count": 33,
@@ -17,7 +21,7 @@
     "build_bundle": 0
   },
   "generated_at_utc": "2026-08-03T12:30:00Z",
-  "generated_from_commit": "b51fb5e3de86b0c1c49ebf5cbf02be227b1e9651",
+  "generated_from_commit": "19f6bb77447c791ff1c711ed918e1a501cd5604a",
   "human_fields_nonempty_count": 0,
   "human_review": "pending",
   "input_artifacts": [
@@ -36,6 +40,10 @@
     {
       "path": "evaluation/source-artifacts/m2-t03-evidence-classification-run.json",
       "sha256": "2bd80d2b6a10bfe531ea2ca3b7570768fd1a78e5d05efca96fc28464d72baee8"
+    },
+    {
+      "path": "docs/reviews/m2-t03-human-adjudication-protocol.md",
+      "sha256": "41b02244d0b183a87f4089ce5814ddf8eb6505c4f5f2d0ea9c4ba2d09c063cb2"
     },
     {
       "path": "STATUS.md",
