@@ -45,6 +45,8 @@ jobs:
         run: python scripts/validate_phase.py M0
       - name: Validate completed M1 evidence
         run: python scripts/validate_m1_evidence.py
+      - name: Validate M1 frozen intent replay repair
+        run: python scripts/validate_m1_frozen_intent_replay_repair.py
       - name: Validate completed M2-T01 evidence
         run: python scripts/validate_m2_t01_evidence.py
       - name: Validate completed M2-T02 evidence
