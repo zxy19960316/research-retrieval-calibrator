@@ -1,9 +1,9 @@
 {
   "report_version": "m2-t03-evidence-classification.v1",
   "task_id": "M2-T03",
-  "implementation_commit": "5a83231f5bfb263191c052bac0be7b1f33f4f9fd",
-  "validated_commit": "5a83231f5bfb263191c052bac0be7b1f33f4f9fd",
-  "timestamp_utc": "2026-08-03T06:29:00Z",
+  "implementation_commit": "824075c53ddeeb5cdb988e916f21db2c5c800ec9",
+  "validated_commit": "824075c53ddeeb5cdb988e916f21db2c5c800ec9",
+  "timestamp_utc": "2026-08-03T07:09:08Z",
   "python_version": "3.12.10",
   "dependency_versions": {
     "pydantic": "2.13.4",
@@ -33,7 +33,7 @@
     "result_path": "evaluation/source-artifacts/m2-t03-evidence-classification-run.json",
     "result_sha256": "2bd80d2b6a10bfe531ea2ca3b7570768fd1a78e5d05efca96fc28464d72baee8",
     "receipt_path": "evaluation/source-artifacts/m2-t03-evidence-classification-run-receipt.json",
-    "receipt_sha256": "9217e593b50bd4e5cdedc374cf67c9398a286f0a8ef4010817a3b33a4c695c7b"
+    "receipt_sha256": "0bc69ad7a4398c8070c2ba96949f7b9a023c4940b83913f38e1ba6cd41beeec4"
   },
   "record_count": 33,
   "slot_distribution": {
@@ -77,7 +77,7 @@
     },
     {
       "name": "focused_tests",
-      "command": "python -m pytest -q tests/unit/test_m2_t03_evidence_classification_provider.py tests/unit/test_m2_t03_evidence_classification_runner.py tests/contract/test_m2_t03_evidence_classification.py tests/contract/test_m2_t03_evidence_classification_evidence.py tests/contract/test_project_docs_validation.py",
+      "command": "python -m pytest -q tests/unit/test_m2_t03_evidence_classification_provider.py tests/unit/test_m2_t03_evidence_classification_runner.py tests/contract/test_m2_t03_evidence_classification.py tests/contract/test_m2_t03_evidence_classification_evidence.py tests/contract/test_m2_t03_evidence_validation.py tests/contract/test_project_docs_validation.py",
       "exit_code": 0
     },
     {
@@ -164,9 +164,9 @@
     "m2_t03_validator": 0
   },
   "test_totals": {
-    "focused": "78 passed",
-    "full_non_packaging": "1114 passed, 1 deselected",
-    "packaging": "1 passed, 1114 deselected"
+    "focused": "85 passed",
+    "full_non_packaging": "1121 passed, 1 deselected",
+    "packaging": "1 passed, 1121 deselected"
   },
   "not_run": {
     "real_model": true,

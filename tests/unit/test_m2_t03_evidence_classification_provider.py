@@ -7,10 +7,10 @@ from collections.abc import Sequence
 import pytest
 
 from app.adapters.evidence_classification import (
-    _ClassificationOutcome,
-    _build_quality_diagnostics,
     DeterministicFakeEvidenceClassifier,
     EvidenceClassifierProvider,
+    _build_quality_diagnostics,
+    _ClassificationOutcome,
     _collect_matches,
     _source_fragments,
 )
