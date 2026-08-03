@@ -23,7 +23,28 @@
 
 通过标准：批次切分不改变结果顺序；模型失败时不把未运行分数当 0 分继续静默排序。
 
-### M2-T03：分项评分
+### M2-T03：证据槽位分类
+
+只根据论文标题和摘要进行分类，不得读取正文、引用次数、作者声誉、期刊等级、排序分数、用户反馈或网络补充内容。输出至少包括：
+
+- evidence slot
+- support level
+- grounded reason
+- supporting source text or excerpt
+- source text hash
+- classifier/prompt/schema version
+
+固定槽位为 `PROBLEM_EXISTENCE`、`CURRENT_METHODS`、`METHOD_TRANSFERABILITY`、`IMPLEMENTATION_PATH` 和 `EVALUATION_BASIS`；固定支持级别为 `DIRECT`、`INDIRECT` 和 `HYPOTHETICAL`。未知槽位或支持级别必须拒绝，不得映射为默认项。
+
+通过标准至少包括：
+
+- 只能依据标题和摘要，不得从正文外推断结论。
+- 理由超出来源文本时必须拒绝；无摘要时不得伪造摘要内容。
+- 无摘要只能在标题足以支持时明确标记 title-only，摘录只能来自标题；否则拒绝。
+- `INDIRECT` 必须明确说明该证据为间接迁移依据，仍需在目标问题中验证。
+- deterministic fake、真实模型和人工抽查必须分开报告，不得把解释性输出直接当作来源依据。
+
+### M2-T04：六分项评分
 
 实现并分别保存：
 
@@ -31,16 +52,10 @@
 - dense similarity
 - concept match
 - query branch score
-- evidence slot score
+- evidence slot score（由更早的 M2-T03 提供）
 - metadata quality
 
-通过标准：总分可从配置和分项精确重算；缺失分项触发明确错误；权重和模型版本进入快照。
-
-### M2-T04：证据槽位分类
-
-只根据标题和摘要输出固定 evidence slot、support level 和理由。测试覆盖直接、间接、假设、无摘要和超出来源文本的断言。
-
-通过标准：间接迁移理由明确“仍需验证”；模型输出未知枚举或无文本依据时拒绝。
+通过标准保持：总分可由配置和分项精确重算；缺少任一必需分项时明确失败；权重、计算方法和模型/规则版本进入快照；不得使用隐藏默认值。
 
 ### M2-T05：多样性选择与首轮报告
 

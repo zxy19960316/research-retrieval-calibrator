@@ -16,7 +16,7 @@
 |---|---|---:|---|
 | M0 产品与评测契约 | COMPLETE | 4/4 | M0-T01 domain contracts, M0-T02 state-machine guard, M0-T03 evaluation contracts, and M0-T04 evidence gate validated |
 | M1 首轮真实召回 | COMPLETE | 4/4 | M1-T01 意图 IR、澄清问题与四路线查询规划、M1-T02 arXiv adapter contract、M1-T03 确定性标准化和保守去重，以及 M1-T04 real arXiv CLI retrieval、缓存回放和证据均已验证 |
-| M2 首轮排序与选择 | IN_PROGRESS | 3/5 | M2-T01 EmbeddingProvider 与真实 BGE-M3 已验证；M2-T02 RerankerProvider、固定 BGE reranker、真实 33 候选排序与完成证据已验证；M2-T03 证据槽位分类与确定性证据已验证；下一任务 M2-T04 |
+| M2 首轮排序与选择 | IN_PROGRESS | 2/5 | M2-T01 EmbeddingProvider 与真实 BGE-M3 已验证；M2-T02 RerankerProvider、固定 BGE reranker、真实 33 候选排序与完成证据已验证；M2-T03 contract 已实现但质量收口待完成；下一任务 M2-T03 质量收口 |
 | M3 反馈与第二轮校准 | BLOCKED_BY_M2 | 0/5 | 尚未生成 |
 | M4 十题离线评测 | BLOCKED_BY_M3 | 0/4 | 尚未生成 |
 | M5 OpenAI 兼容服务 | BLOCKED_BY_M4 | 0/4 | 尚未生成 |
@@ -29,18 +29,19 @@
 | 日期 | 版本 | 说明 |
 |---|---|---|
 | 2026-07-26 | v0.1 | 建立独立 RRC 仓库、风险优先阶段顺序和 M0-M6 执行门禁 |
+| 2026-08-03 | v0.2 | 修正 M2-T03/T04 的执行依赖顺序：证据槽位分类先于依赖该结果的六分项评分。不改变阶段任务总数、已有完成状态或产品指标。 |
 
 ## 下一动作
 
-M0-T01、M0-T02、M0-T03、M0-T03R 与 M0-T04 已完成：领域契约、状态机、十题评测模板与指标、负向抑制修正，以及机器可读的证据报告和阶段自校验均已通过。M1-T01 至 M1-T04 已完成：M1-T04R1 的 fresh-cache real arXiv smoke 返回 12 个 HTTP 200，产生 51 条原始记录和 33 条去重候选，source-ID/URL coverage 均为 100%，metadata projection mismatch count 为 0、Metadata Hallucination Rate 为 0；真实模式最小请求间隔为 3.0 秒，观测到的最小请求起始间隔为 4.016 秒，累计 11 次等待共 32.984 秒；同配置 real-cache 回放产生 0 次传输、12 次缓存命中且候选一致。前两次 real 尝试各有一次传输失败，未被作为完成证据。M2-T03 已完成证据槽位分类；下一动作：`M2-T04`。
+M0-T01、M0-T02、M0-T03、M0-T03R 与 M0-T04 已完成：领域契约、状态机、十题评测模板与指标、负向抑制修正，以及机器可读的证据报告和阶段自校验均已通过。M1-T01 至 M1-T04 已完成：M1-T04R1 的 fresh-cache real arXiv smoke 返回 12 个 HTTP 200，产生 51 条原始记录和 33 条去重候选，source-ID/URL coverage 均为 100%，metadata projection mismatch count 为 0、Metadata Hallucination Rate 为 0；真实模式最小请求间隔为 3.0 秒，观测到的最小请求起始间隔为 4.016 秒，累计 11 次等待共 32.984 秒；同配置 real-cache 回放产生 0 次传输、12 次缓存命中且候选一致。前两次 real 尝试各有一次传输失败，未被作为完成证据。下一动作：`M2-T03 质量收口`。
 
 ## M2-T02 reranker evidence
 
-`evaluation/reports/m2-t02-reranker.json` records the completed local BGE reranker evidence. The fixed 33-candidate CPU float32 run passed with one provider instance/load, 17 serial calls, 33 scored candidates, batch sizes `16 x 2 + 1`, zero cache hits, and no replay or rerun. The result and execution receipt remain hash-bound; M2-T02 is a completed historical gate, while the current phase is `IN_PROGRESS 3/5` after M2-T03. The next task is M2-T04; M3 remains `BLOCKED_BY_M2 0/5`.
+`evaluation/reports/m2-t02-reranker.json` records the completed local BGE reranker evidence. The fixed 33-candidate CPU float32 run passed with one provider instance/load, 17 serial calls, 33 scored candidates, batch sizes `16 x 2 + 1`, zero cache hits, and no replay or rerun. The result and execution receipt remain hash-bound; M2-T02 is a completed historical gate, while the current phase remains `IN_PROGRESS 2/5` during M2-T03 quality closure. The next task is M2-T03 quality closure; M3 remains `BLOCKED_BY_M2 0/5`.
 
 ## M2-T03 evidence classification
 
-`evaluation/reports/m2-t03-evidence-classification.json` records the closed M2-T03 evidence-slot classification contract and the fixed 33-candidate deterministic fake run. It preserves paper-ID and source-text hashes, emits slot/support/reason records with no rejected or title-only records, and keeps real-model classification and human review explicitly not run. M2-T04 six-item scoring and M2-T05 diversity selection remain out of scope.
+`evaluation/reports/m2-t03-evidence-classification.json` records the closed M2-T03 evidence-slot classification contract and deterministic fake reproducibility evidence only. It is `completion_scope=contract_only` and `scoring_eligible=false`; the artifact is not evidence of real classification quality and cannot provide the M2-T04 evidence-slot score. Real-model classification and human review remain explicitly not run, and M2-T04 six-item scoring/M2-T05 diversity selection remain out of scope. The next task is M2-T03 quality closure.
 
 ## M1-T03 normalization and deduplication evidence
 
