@@ -1,9 +1,9 @@
 {
   "report_version": "m2-t03-evidence-classification.v1",
   "task_id": "M2-T03",
-  "implementation_commit": "e0c1a6d0c8f169a21f23632ac970d64246dd162e",
-  "validated_commit": "ebb19eebfd804dfda2adbf8c65aeecbac17968fe",
-  "timestamp_utc": "2026-08-03T05:22:17Z",
+  "implementation_commit": "5a83231f5bfb263191c052bac0be7b1f33f4f9fd",
+  "validated_commit": "5a83231f5bfb263191c052bac0be7b1f33f4f9fd",
+  "timestamp_utc": "2026-08-03T06:29:00Z",
   "python_version": "3.12.10",
   "dependency_versions": {
     "pydantic": "2.13.4",
@@ -31,17 +31,17 @@
   ],
   "artifact": {
     "result_path": "evaluation/source-artifacts/m2-t03-evidence-classification-run.json",
-    "result_sha256": "8c2b91771c1456aac4d347ccf74dec9e0b583f6a08f192e157f0fb1538719a5d",
+    "result_sha256": "2bd80d2b6a10bfe531ea2ca3b7570768fd1a78e5d05efca96fc28464d72baee8",
     "receipt_path": "evaluation/source-artifacts/m2-t03-evidence-classification-run-receipt.json",
-    "receipt_sha256": "3110d04099132417dcf8fb08a8f4e3e648cb96587690184ac7be3ed0575af40a"
+    "receipt_sha256": "9217e593b50bd4e5cdedc374cf67c9398a286f0a8ef4010817a3b33a4c695c7b"
   },
   "record_count": 33,
   "slot_distribution": {
     "PROBLEM_EXISTENCE": 3,
     "CURRENT_METHODS": 8,
     "METHOD_TRANSFERABILITY": 0,
-    "IMPLEMENTATION_PATH": 7,
-    "EVALUATION_BASIS": 13
+    "IMPLEMENTATION_PATH": 5,
+    "EVALUATION_BASIS": 15
   },
   "support_level_distribution": {
     "DIRECT": 31,
@@ -164,9 +164,9 @@
     "m2_t03_validator": 0
   },
   "test_totals": {
-    "focused": "62 passed",
-    "full_non_packaging": "1098 passed, 1 deselected",
-    "packaging": "1 passed, 1098 deselected"
+    "focused": "78 passed",
+    "full_non_packaging": "1114 passed, 1 deselected",
+    "packaging": "1 passed, 1114 deselected"
   },
   "not_run": {
     "real_model": true,
