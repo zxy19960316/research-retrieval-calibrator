@@ -389,22 +389,19 @@ def _candidate_audit(
             if left.get(field) != right.get(field)
         )
     _validate_protected_candidate_snapshot(repository_root, replay_payload)
-    return cast(
-        M1ReplayCandidateAudit,
-        M1ReplayCandidateAudit.model_validate(
-            {
-                "candidate_count": len(replay_payload),
-                "candidate_order_equal": candidate_order_equal,
-                "candidate_identity_equal": candidate_identity_equal,
-                "candidate_payload_equal": first_payload == replay_payload,
-                "candidate_delta_fields": sorted(delta_fields),
-                "protected_candidate_snapshot_path": PROTECTED_CANDIDATE_SNAPSHOT.as_posix(),
-                "protected_candidate_snapshot_sha256": EXPECTED_PROTECTED_CANDIDATE_SNAPSHOT_SHA256,
-                "replay_candidate_array_sha256": _sha256(
-                    _canonical_json_bytes(replay_payload)
-                ),
-            }
-        ),
+    return M1ReplayCandidateAudit.model_validate(
+        {
+            "candidate_count": len(replay_payload),
+            "candidate_order_equal": candidate_order_equal,
+            "candidate_identity_equal": candidate_identity_equal,
+            "candidate_payload_equal": first_payload == replay_payload,
+            "candidate_delta_fields": sorted(delta_fields),
+            "protected_candidate_snapshot_path": PROTECTED_CANDIDATE_SNAPSHOT.as_posix(),
+            "protected_candidate_snapshot_sha256": EXPECTED_PROTECTED_CANDIDATE_SNAPSHOT_SHA256,
+            "replay_candidate_array_sha256": _sha256(
+                _canonical_json_bytes(replay_payload)
+            ),
+        }
     )
 
 

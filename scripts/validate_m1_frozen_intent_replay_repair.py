@@ -9,7 +9,7 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Any, cast
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -279,7 +279,7 @@ def _validate_manifest(
         errors.append("repair manifest JSON is unavailable")
         return None
     try:
-        return cast(M1ReplayRepairManifest, M1ReplayRepairManifest.model_validate(payload))
+        return M1ReplayRepairManifest.model_validate(payload)
     except ValidationError:
         errors.append("repair manifest schema is invalid or contains unknown fields")
         return None
