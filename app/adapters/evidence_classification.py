@@ -6,6 +6,7 @@ import re
 from collections.abc import Sequence
 from typing import Protocol
 
+from app.models.enums import EvidenceSlot, SupportLevel
 from app.models.evidence_classification import (
     EVIDENCE_CLASSIFICATION_VERSION,
     MAX_SUPPORTING_EXCERPT_LENGTH,
@@ -14,7 +15,6 @@ from app.models.evidence_classification import (
     EvidenceClassifierDescriptor,
     build_grounded_reason,
 )
-from app.models.enums import EvidenceSlot, SupportLevel
 
 _FAKE_DESCRIPTOR = EvidenceClassifierDescriptor(
     provider_name="deterministic_fake",

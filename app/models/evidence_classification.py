@@ -29,6 +29,7 @@ EvidenceClassificationErrorCode = Literal[
     "INSUFFICIENT_SOURCE_TEXT",
     "RESULT_CONFLICT",
     "RESULT_PUBLICATION_FAILED",
+    "FIXED_INPUT_INVALID",
 ]
 
 EVIDENCE_CLASSIFICATION_ERROR_CODES: tuple[EvidenceClassificationErrorCode, ...] = (
@@ -41,6 +42,7 @@ EVIDENCE_CLASSIFICATION_ERROR_CODES: tuple[EvidenceClassificationErrorCode, ...]
     "INSUFFICIENT_SOURCE_TEXT",
     "RESULT_CONFLICT",
     "RESULT_PUBLICATION_FAILED",
+    "FIXED_INPUT_INVALID",
 )
 
 
@@ -74,7 +76,7 @@ def normalize_source_text(value: str, *, field_name: str) -> str:
     """Normalize one source field without inventing or silently dropping text."""
 
     if not isinstance(value, str):
-        raise ValueError(f"{field_name} must be a string")
+        raise TypeError(f"{field_name} must be a string")
     normalized = value.replace("\r\n", "\n").replace("\r", "\n").strip()
     if not normalized:
         raise ValueError(f"{field_name} must be non-blank after trimming")

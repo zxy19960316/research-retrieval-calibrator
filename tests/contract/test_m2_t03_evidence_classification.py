@@ -17,6 +17,7 @@ from app.core.evidence_classification import (
     source_text_sha256,
     validate_classification_record,
 )
+from app.models.enums import EvidenceSlot, SupportLevel
 from app.models.evidence_classification import (
     EVIDENCE_CLASSIFICATION_VERSION,
     EvidenceClassificationBatch,
@@ -27,7 +28,6 @@ from app.models.evidence_classification import (
     EvidenceClassifierDescriptor,
     serialize_source_text,
 )
-from app.models.enums import EvidenceSlot, SupportLevel
 
 
 def _input(

@@ -7,6 +7,7 @@ from collections.abc import Mapping, Sequence
 from pydantic import ValidationError
 
 from app.adapters.evidence_classification import EvidenceClassifierProvider
+from app.models.embedding import FrozenCandidate
 from app.models.evidence_classification import (
     EVIDENCE_CLASSIFICATION_VERSION,
     EvidenceClassificationBatch,
@@ -19,7 +20,6 @@ from app.models.evidence_classification import (
     build_grounded_reason,
     source_text_sha256,
 )
-from app.models.embedding import FrozenCandidate
 
 __all__ = [
     "build_classification_input",
