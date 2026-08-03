@@ -1,7 +1,7 @@
 {
   "candidates": [
     {
-      "abstract": null,
+      "abstract": "Multimedia collections are more than ever growing in size and diversity. Effective multimedia retrieval systems are thus critical to access these datasets from the end-user perspective and in a scalable way. We are interested in repositories of image/text multimedia objects and we study multimodal information fusion techniques in the context of content based multimedia information retrieval. We focus on graph based methods which have proven to provide state-of-the-art performances. We particularly examine two of such methods : cross-media similarities and random walk based scores. From a theoretical viewpoint, we propose a unifying graph based framework which encompasses the two aforementioned approaches. Our proposal allows us to highlight the core features one should consider when using a graph based technique for the combination of visual and textual information. We compare cross-media and random walk based results using three different real-world datasets. From a practical standpoint, our extended empirical analysis allow us to provide insights and guidelines about the use of graph based methods for multimodal information fusion in content based multimedia information retrieval.",
       "authors": [
         "Gabriela Csurka",
         "Julien Ah-Pine",
@@ -28,7 +28,7 @@
       "year": 2014
     },
     {
-      "abstract": null,
+      "abstract": "\"Open access\" has become a central theme of journal reform in academic publishing. In this article, I examine the relationship between open access publishing and an important infrastructural element of a modern research enterprise, scientific literature text mining, or the use of data analytic techniques to conduct meta-analyses and investigations into the scientific corpus. I give a brief history of the open access movement, discuss novel journalistic practices, and an overview of data-driven investigation of the scientific corpus. I argue that particularly in an era where the veracity of many research studies has been called into question, scientific literature text mining should be one of the key motivations for open access publishing, not only in the basic sciences, but in the engineering and applied sciences as well. The enormous benefits of unrestricted access to the research literature should prompt scholars from all disciplines to lend their vocal support to enabling legal, wholesale access to the scientific literature as part of a data science pipeline.",
       "authors": [
         "Gopal P. Sarma"
       ],
@@ -53,7 +53,7 @@
       "year": 2016
     },
     {
-      "abstract": null,
+      "abstract": "Word sense induction (WSI), which addresses polysemy by unsupervised discovery of multiple word senses, resolves ambiguities for downstream NLP tasks and also makes word representations more interpretable. This paper proposes an accurate and efficient graph-based method for WSI that builds a global non-negative vector embedding basis (which are interpretable like topics) and clusters the basis indexes in the ego network of each polysemous word. By adopting distributional inclusion vector embeddings as our basis formation model, we avoid the expensive step of nearest neighbor search that plagues other graph-based methods without sacrificing the quality of sense clusters. Experiments on three datasets show that our proposed method produces similar or better sense clusters and embeddings compared with previous state-of-the-art methods while being significantly more efficient.",
       "authors": [
         "Haw-Shiuan Chang",
         "Amol Agrawal",
@@ -84,7 +84,7 @@
       "year": 2018
     },
     {
-      "abstract": null,
+      "abstract": "Each claim in a research paper requires all relevant prior knowledge to be discovered, assimilated, and appropriately cited. However, despite the availability of powerful search engines and sophisticated text editing software, discovering relevant papers and integrating the knowledge into a manuscript remain complex tasks associated with high cognitive load. To define comprehensive search queries requires strong motivation from authors, irrespective of their familiarity with the research field. Moreover, switching between independent applications for literature discovery, bibliography management, reading papers, and writing text burdens authors further and interrupts their creative process. Here, we present a web application that combines text editing and literature discovery in an interactive user interface. The application is equipped with a search engine that couples Boolean keyword filtering with nearest neighbor search over text embeddings, providing a discovery experience tuned to an author's manuscript and his interests. Our application aims to take a step towards more enjoyable and effortless academic writing. The demo of the application (https://SciEditorDemo2020.herokuapp.com/) and a short video tutorial (https://youtu.be/pkdVU60IcRc) are available online.",
       "authors": [
         "Onur Gökçe",
         "Jonathan Prada",
@@ -113,7 +113,7 @@
       "year": 2020
     },
     {
-      "abstract": null,
+      "abstract": "The coronavirus disease (COVID-19) has claimed the lives of over 350,000 people and infected more than 6 million people worldwide. Several search engines have surfaced to provide researchers with additional tools to find and retrieve information from the rapidly growing corpora on COVID-19. These engines lack extraction and visualization tools necessary to retrieve and interpret complex relations inherent to scientific literature. Moreover, because these engines mainly rely upon semantic information, their ability to capture complex global relationships across documents is limited, which reduces the quality of similarity-based article recommendations for users. In this work, we present the COVID-19 Knowledge Graph (CKG), a heterogeneous graph for extracting and visualizing complex relationships between COVID-19 scientific articles. The CKG combines semantic information with document topological information for the application of similar document retrieval. The CKG is constructed using the latent schema of the data, and then enriched with biomedical entity information extracted from the unstructured text of articles using scalable AWS technologies to form relations in the graph. Finally, we propose a document similarity engine that leverages low-dimensional graph embeddings from the CKG with semantic embeddings for similar article retrieval. Analysis demonstrates the quality of relationships in the CKG and shows that it can be used to uncover meaningful information in COVID-19 scientific articles. The CKG helps power www.cord19.aws and is publicly available.",
       "authors": [
         "Colby Wise",
         "Vassilis N. Ioannidis",
@@ -147,7 +147,7 @@
       "year": 2020
     },
     {
-      "abstract": null,
+      "abstract": "Research misconduct and frauds pollute the scientific literature. Honest errors and malevolent data fabrication, image manipulation, journal hijacking, and plagiarism passed peer review unnoticed. Problematic papers deceive readers, authors citing them, and AI-powered literature-based discovery. Flagship publishers accepted hundreds flawed papers despite claiming to enforce peer review. This application ambitions to decontaminate the scientific literature using curative and preventive actions.",
       "authors": [
         "Guillaume Cabanac"
       ],
@@ -176,7 +176,7 @@
       "year": 2022
     },
     {
-      "abstract": null,
+      "abstract": "Scientific writing involves retrieving, summarizing, and citing relevant papers, which can be time-consuming processes in large and rapidly evolving fields. By making these processes inter-operable, natural language processing (NLP) provides opportunities for creating end-to-end assistive writing tools. We propose SciLit, a pipeline that automatically recommends relevant papers, extracts highlights, and suggests a reference sentence as a citation of a paper, taking into consideration the user-provided context and keywords. SciLit efficiently recommends papers from large databases of hundreds of millions of papers using a two-stage pre-fetching and re-ranking literature search system that flexibly deals with addition and removal of a paper database. We provide a convenient user interface that displays the recommended papers as extractive summaries and that offers abstractively-generated citing sentences which are aligned with the provided context and which mention the chosen keyword(s). Our assistive tool for literature discovery and scientific writing is available at https://scilit.vercel.app",
       "authors": [
         "Nianlong Gu",
         "Richard H. R. Hahnloser"
@@ -202,7 +202,7 @@
       "year": 2023
     },
     {
-      "abstract": null,
+      "abstract": "Entity linking is an important step towards constructing knowledge graphs that facilitate advanced question answering over scientific documents, including the retrieval of relevant information included in tables within these documents. This paper introduces a general-purpose system for linking entities to items in the Wikidata knowledge base. It describes how we adapt this system for linking domain-specific entities, especially for those entities embedded within tables drawn from COVID-19-related scientific literature. We describe the setup of an efficient offline instance of the system that enables our entity-linking approach to be more feasible in practice. As part of a broader approach to infer the semantic meaning of scientific tables, we leverage the structural and semantic characteristics of the tables to improve overall entity linking performance.",
       "authors": [
         "Varish Mulwad",
         "Tim Finin",
@@ -232,7 +232,7 @@
       "year": 2023
     },
     {
-      "abstract": null,
+      "abstract": "The quickly-expanding nature of published medical literature makes it challenging for clinicians and researchers to keep up with and summarize recent, relevant findings in a timely manner. While several closed-source summarization tools based on large language models (LLMs) now exist, rigorous and systematic evaluations of their outputs are lacking. Furthermore, there is a paucity of high-quality datasets and appropriate benchmark tasks with which to evaluate these tools. We address these issues with four contributions: we release Clinfo.ai, an open-source WebApp that answers clinical questions based on dynamically retrieved scientific literature; we specify an information retrieval and abstractive summarization task to evaluate the performance of such retrieval-augmented LLM systems; we release a dataset of 200 questions and corresponding answers derived from published systematic reviews, which we name PubMed Retrieval and Synthesis (PubMedRS-200); and report benchmark results for Clinfo.ai and other publicly available OpenQA systems on PubMedRS-200.",
       "authors": [
         "Alejandro Lozano",
         "Scott L Fleming",
@@ -262,7 +262,7 @@
       "year": 2023
     },
     {
-      "abstract": null,
+      "abstract": "Large language models (LLMs) are transforming the way information is retrieved with vast amounts of knowledge being summarized and presented via natural language conversations. Yet, LLMs are prone to highlight the most frequently seen pieces of information from the training set and to neglect the rare ones. In the field of biomedical research, latest discoveries are key to academic and industrial actors and are obscured by the abundance of an ever-increasing literature corpus (the information overload problem). Surfacing new associations between biomedical entities, e.g., drugs, genes, diseases, with LLMs becomes a challenge of capturing the long-tail knowledge of the biomedical scientific production. To overcome this challenge, Retrieval Augmented Generation (RAG) has been proposed to alleviate some of the shortcomings of LLMs by augmenting the prompts with context retrieved from external datasets. RAG methods typically select the context via maximum similarity search over text embeddings. In this study, we show that RAG methods leave out a significant proportion of relevant information due to clusters of over-represented concepts in the biomedical literature. We introduce a novel information-retrieval method that leverages a knowledge graph to downsample these clusters and mitigate the information overload problem. Its retrieval performance is about twice better than embedding similarity alternatives on both precision and recall. Finally, we demonstrate that both embedding similarity and knowledge graph retrieval methods can be advantageously combined into a hybrid model that outperforms both, enabling potential improvements to biomedical question-answering models.",
       "authors": [
         "Julien Delile",
         "Srayanta Mukherjee",
@@ -290,7 +290,7 @@
       "year": 2024
     },
     {
-      "abstract": null,
+      "abstract": "Optical Music Recognition (OMR) automates the transcription of musical notation from images into machine-readable formats like MusicXML, MEI, or MIDI, significantly reducing the costs and time of manual transcription. This study explores knowledge discovery in OMR by applying instance segmentation using Mask R-CNN to enhance the detection and delineation of musical symbols in sheet music. Unlike Optical Character Recognition (OCR), OMR must handle the intricate semantics of Common Western Music Notation (CWMN), where symbol meanings depend on shape, position, and context. Our approach leverages instance segmentation to manage the density and overlap of musical symbols, facilitating more precise information retrieval from music scores. Evaluations on the DoReMi and MUSCIMA++ datasets demonstrate substantial improvements, with our method achieving a mean Average Precision (mAP) of up to 59.70\\% in dense symbol environments, achieving comparable results to object detection. Furthermore, using traditional computer vision techniques, we add a parallel step for staff detection to infer the pitch for the recognised symbols. This study emphasises the role of pixel-wise segmentation in advancing accurate music symbol recognition, contributing to knowledge discovery in OMR. Our findings indicate that instance segmentation provides more precise representations of musical symbols, particularly in densely populated scores, advancing OMR technology. We make our implementation, pre-processing scripts, trained models, and evaluation results publicly available to support further research and development.",
       "authors": [
         "Elona Shatri",
         "George Fazekas"
@@ -316,7 +316,7 @@
       "year": 2024
     },
     {
-      "abstract": null,
+      "abstract": "Scientific literature understanding is crucial for extracting targeted information and garnering insights, thereby significantly advancing scientific discovery. Despite the remarkable success of Large Language Models (LLMs), they face challenges in scientific literature understanding, primarily due to (1) a lack of scientific knowledge and (2) unfamiliarity with specialized scientific tasks. To develop an LLM specialized in scientific literature understanding, we propose a hybrid strategy that integrates continual pre-training (CPT) and supervised fine-tuning (SFT), to simultaneously infuse scientific domain knowledge and enhance instruction-following capabilities for domain-specific tasks.cIn this process, we identify two key challenges: (1) constructing high-quality CPT corpora, and (2) generating diverse SFT instructions. We address these challenges through a meticulous pipeline, including PDF text extraction, parsing content error correction, quality filtering, and synthetic instruction creation. Applying this strategy, we present a suite of LLMs: SciLitLLM, specialized in scientific literature understanding. These models demonstrate promising performance on scientific literature understanding benchmarks. Our contributions are threefold: (1) We present an effective framework that integrates CPT and SFT to adapt LLMs to scientific literature understanding, which can also be easily adapted to other domains. (2) We propose an LLM-based synthesis method to generate diverse and high-quality scientific instructions, resulting in a new instruction set -- SciLitIns -- for supervised fine-tuning in less-represented scientific domains. (3) SciLitLLM achieves promising performance improvements on scientific literature understanding benchmarks.",
       "authors": [
         "Sihang Li",
         "Jin Huang",
@@ -351,7 +351,7 @@
       "year": 2024
     },
     {
-      "abstract": null,
+      "abstract": "Retrieval-Augmented Generation (RAG) is one of the leading and most widely used techniques for enhancing LLM retrieval capabilities, but it still faces significant limitations in commercial use cases. RAG primarily relies on the query-chunk text-to-text similarity in the embedding space for retrieval and can fail to capture deeper semantic relationships across chunks, is highly sensitive to chunking strategies, and is prone to hallucinations. To address these challenges, we propose TOBUGraph, a graph-based retrieval framework that first constructs the knowledge graph from unstructured data dynamically and automatically. Using LLMs, TOBUGraph extracts structured knowledge and diverse relationships among data, going beyond RAG's text-to-text similarity. Retrieval is achieved through graph traversal, leveraging the extracted relationships and structures to enhance retrieval accuracy, eliminating the need for chunking configurations while reducing hallucination. We demonstrate TOBUGraph's effectiveness in TOBU, a real-world application in production for personal memory organization and retrieval. Our evaluation using real user data demonstrates that TOBUGraph outperforms multiple RAG implementations in both precision and recall, significantly improving user experience through improved retrieval accuracy.",
       "authors": [
         "Savini Kashmira",
         "Jayanaka L. Dantanarayana",
@@ -383,7 +383,7 @@
       "year": 2024
     },
     {
-      "abstract": null,
+      "abstract": "Keyword-based searches are today's standard in digital libraries. Yet, complex retrieval scenarios like in scientific knowledge bases, need more sophisticated access paths. Although each document somewhat contributes to a domain's body of knowledge, the exact structure between keywords, i.e., their possible relationships, and the contexts spanned within each single document will be crucial for effective retrieval. Following this logic, individual documents can be seen as small-scale knowledge graphs on which graph queries can provide focused document retrieval. We implemented a full-fledged graph-based discovery system for the biomedical domain and demonstrated its benefits in the past. Unfortunately, graph-based retrieval methods generally follow an 'exact match' paradigm, which severely hampers search efficiency, since exact match results are hard to rank by relevance. This paper extends our existing discovery system and contributes effective graph-based unsupervised ranking methods, a new query relaxation paradigm, and ontological rewriting. These extensions improve the system further so that users can retrieve results with higher precision and higher recall due to partial matching and ontological rewriting.",
       "authors": [
         "Hermann Kroll",
         "Pascal Sackhoff",
@@ -413,7 +413,7 @@
       "year": 2024
     },
     {
-      "abstract": null,
+      "abstract": "As large language models (LLMs) evolve, their ability to deliver personalized and context-aware responses offers transformative potential for improving user experiences. Existing personalization approaches, however, often rely solely on user history to augment the prompt, limiting their effectiveness in generating tailored outputs, especially in cold-start scenarios with sparse data. To address these limitations, we propose Personalized Graph-based Retrieval-Augmented Generation (PGraphRAG), a framework that leverages user-centric knowledge graphs to enrich personalization. By directly integrating structured user knowledge into the retrieval process and augmenting prompts with user-relevant context, PGraphRAG enhances contextual understanding and output quality. We also introduce the Personalized Graph-based Benchmark for Text Generation, designed to evaluate personalized text generation tasks in real-world settings where user history is sparse or unavailable. Experimental results show that PGraphRAG significantly outperforms state-of-the-art personalization methods across diverse tasks, demonstrating the unique advantages of graph-based retrieval for personalization.",
       "authors": [
         "Steven Au",
         "Cameron J. Dimacali",
@@ -447,7 +447,7 @@
       "year": 2025
     },
     {
-      "abstract": null,
+      "abstract": "In this work, we benchmark various graph-based retrieval-augmented generation (RAG) systems across a broad spectrum of query types, including OLTP-style (fact-based) and OLAP-style (thematic) queries, to address the complex demands of open-domain question answering (QA). Traditional RAG methods often fall short in handling nuanced, multi-document synthesis tasks. By structuring knowledge as graphs, we can facilitate the retrieval of context that captures greater semantic depth and enhances language model operations. We explore graph-based RAG methodologies and introduce TREX, a novel, cost-effective alternative that combines graph-based and vector-based retrieval techniques. Our benchmarking across four diverse datasets highlights the strengths of different RAG methodologies, demonstrates TREX's ability to handle multiple open-domain QA types, and reveals the limitations of current evaluation methods. In a real-world technical support case study, we demonstrate how TREX solutions can surpass conventional vector-based RAG in efficiently synthesizing data from heterogeneous sources. Our findings underscore the potential of augmenting large language models with advanced retrieval and orchestration capabilities, advancing scalable, graph-based AI solutions.",
       "authors": [
         "Joyce Cahoon",
         "Prerna Singh",
@@ -480,7 +480,7 @@
       "year": 2025
     },
     {
-      "abstract": null,
+      "abstract": "The causal relationships between biomarkers are essential for disease diagnosis and medical treatment planning. One notable application is Alzheimer's disease (AD) diagnosis, where certain biomarkers may influence the presence of others, enabling early detection, precise disease staging, targeted treatments, and improved monitoring of disease progression. However, understanding these causal relationships is complex and requires extensive research. Constructing a comprehensive causal network of biomarkers demands significant effort from human experts, who must analyze a vast number of research papers, and have bias in understanding diseases' biomarkers and their relation. This raises an important question: Can advanced large language models (LLMs), such as those utilizing retrieval-augmented generation (RAG), assist in building causal networks of biomarkers for further medical analysis? To explore this, we collected 200 AD-related research papers published over the past 25 years and then integrated scientific literature with RAG to extract AD biomarkers and generate causal relations among them. Given the high-risk nature of the medical diagnosis, we applied uncertainty estimation to assess the reliability of the generated causal edges and examined the faithfulness and scientificness of LLM reasoning using both automatic and human evaluation. We find that RAG enhances the ability of LLMs to generate more accurate causal networks from scientific papers. However, the overall performance of LLMs in identifying causal relations of AD biomarkers is still limited. We hope this study will inspire further foundational research on AI-driven analysis of AD biomarkers causal network discovery.",
       "authors": [
         "Xiaofan Zhou",
         "Liangjie Huang",
@@ -511,7 +511,7 @@
       "year": 2025
     },
     {
-      "abstract": null,
+      "abstract": "Conventional Retrieval Augmented Generation (RAG) approaches are common in text-based applications. However, they struggle with structured, interconnected datasets like knowledge graphs, where understanding underlying relationships is crucial for accurate retrieval. A common direction in graph-based retrieval employs iterative, rule-based traversal guided by Large Language Models (LLMs). Such existing iterative methods typically combine reasoning with single hop traversal at each step, making them vulnerable to LLM reasoning errors and hallucinations that ultimately hinder the retrieval of relevant information. To address these limitations, we propose GraphRunner, a novel graph-based retrieval framework that operates in three distinct stages: planning, verification, and execution. This introduces high-level traversal actions that enable multi-hop exploration in a single step. It also generates a holistic traversal plan, which is verified against the graph structure and pre-defined traversal actions, reducing reasoning errors and detecting hallucinations before execution. GraphRunner significantly reduces LLM reasoning errors and detects hallucinations through validation. Our evaluation using the GRBench dataset shows that GraphRunner consistently outperforms existing approaches, achieving 10-50% performance improvements over the strongest baseline while reducing inference cost by 3.0-12.9x and response generation time by 2.5-7.1x, making it significantly more robust and efficient for graph-based retrieval tasks.",
       "authors": [
         "Savini Kashmira",
         "Jayanaka L. Dantanarayana",
@@ -540,7 +540,7 @@
       "year": 2025
     },
     {
-      "abstract": null,
+      "abstract": "The rapid expansion of enzyme kinetics literature has outpaced the curation capabilities of major biochemical databases, creating a substantial barrier to AI-driven modeling and knowledge discovery. We present zERExtractor, an automated and extensible platform for comprehensive extraction of enzyme-catalyzed reaction and activity data from scientific literature. zERExtractor features a unified, modular architecture that supports plug-and-play integration of state-of-the-art models, including large language models (LLMs), as interchangeable components, enabling continuous system evolution alongside advances in AI. Our pipeline combines domain-adapted deep learning, advanced OCR, semantic entity recognition, and prompt-driven LLM modules, together with human expert corrections, to extract kinetic parameters (e.g., kcat, Km), enzyme sequences, substrate SMILES, experimental conditions, and molecular diagrams from heterogeneous document formats. Through active learning strategies integrating AI-assisted annotation, expert validation, and iterative refinement, the system adapts rapidly to new data sources. We also release a large benchmark dataset comprising over 1,000 annotated tables and 5,000 biological fields from 270 P450-related enzymology publications. Benchmarking demonstrates that zERExtractor consistently outperforms existing baselines in table recognition (Acc 89.9%), molecular image interpretation (up to 99.1%), and relation extraction (accuracy 94.2%). zERExtractor bridges the longstanding data gap in enzyme kinetics with a flexible, plugin-ready framework and high-fidelity extraction, laying the groundwork for future AI-powered enzyme modeling and biochemical knowledge discovery.",
       "authors": [
         "Rui Zhou",
         "Haohui Ma",
@@ -576,7 +576,7 @@
       "year": 2025
     },
     {
-      "abstract": null,
+      "abstract": "Topic discovery in scientific literature provides valuable insights for researchers to identify emerging trends and explore new avenues for investigation, facilitating easier scientific information retrieval. Many machine learning methods, particularly deep embedding techniques, have been applied to discover research topics. However, most existing topic discovery methods rely on word embedding to capture the semantics and lack a comprehensive understanding of scientific publications, struggling with complex, high-dimensional text relationships. Inspired by the exceptional comprehension of textual information by large language models (LLMs), we propose an advanced topic discovery method enhanced by LLMs to improve scientific topic identification, namely SciTopic. Specifically, we first build a textual encoder to capture the content from scientific publications, including metadata, title, and abstract. Next, we construct a space optimization module that integrates entropy-based sampling and triplet tasks guided by LLMs, enhancing the focus on thematic relevance and contextual intricacies between ambiguous instances. Then, we propose to fine-tune the textual encoder based on the guidance from the LLMs by optimizing the contrastive loss of the triplets, forcing the text encoder to better discriminate instances of different topics. Finally, extensive experiments conducted on three real-world datasets of scientific publications demonstrate that SciTopic outperforms the state-of-the-art (SOTA) scientific topic discovery methods, enabling researchers to gain deeper and faster insights.",
       "authors": [
         "Pengjiang Li",
         "Zaitian Wang",
@@ -607,7 +607,7 @@
       "year": 2025
     },
     {
-      "abstract": null,
+      "abstract": "Synthesis procedures play a critical role in materials research, as they directly affect material properties. With data-driven approaches increasingly accelerating materials discovery, there is growing interest in extracting synthesis procedures from scientific literature as structured data. However, existing studies often rely on rigid, domain-specific schemas with predefined fields for structuring synthesis procedures or assume that synthesis procedures are linear sequences of operations, which limits their ability to capture the structural complexity of real-world procedures. To address these limitations, we adopt PROV-DM, an international standard for provenance information, which supports flexible, graph-based modeling of procedures. We present MatPROV, a dataset of PROV-DM-compliant synthesis procedures extracted from scientific literature using large language models. MatPROV captures structural complexities and causal relationships among materials, operations, and conditions through visually intuitive directed graphs. This representation enables machine-interpretable synthesis knowledge, opening opportunities for future research such as automated synthesis planning and optimization.",
       "authors": [
         "Hirofumi Tsuruta",
         "Masaya Kumagai"
@@ -634,7 +634,7 @@
       "year": 2025
     },
     {
-      "abstract": null,
+      "abstract": "Scientific literature is growing exponentially, creating a critical bottleneck for researchers to efficiently synthesize knowledge. While general-purpose Large Language Models (LLMs) show potential in text processing, they often fail to capture scientific domain-specific nuances (e.g., technical jargon, methodological rigor) and struggle with complex scientific tasks, limiting their utility for interdisciplinary research. To address these gaps, this paper presents SciGPT, a domain-adapted foundation model for scientific literature understanding and ScienceBench, an open source benchmark tailored to evaluate scientific LLMs. Built on the Qwen3 architecture, SciGPT incorporates three key innovations: (1) low-cost domain distillation via a two-stage pipeline to balance performance and efficiency; (2) a Sparse Mixture-of-Experts (SMoE) attention mechanism that cuts memory consumption by 55\\% for 32,000-token long-document reasoning; and (3) knowledge-aware adaptation integrating domain ontologies to bridge interdisciplinary knowledge gaps. Experimental results on ScienceBench show that SciGPT outperforms GPT-4o in core scientific tasks including sequence labeling, generation, and inference. It also exhibits strong robustness in unseen scientific tasks, validating its potential to facilitate AI-augmented scientific discovery.",
       "authors": [
         "Fengyu She",
         "Nan Wang",
@@ -664,7 +664,7 @@
       "year": 2025
     },
     {
-      "abstract": null,
+      "abstract": "The development of synthesis procedures remains a fundamental challenge in materials discovery, with procedural knowledge scattered across decades of scientific literature in unstructured formats that are challenging for systematic analysis. In this paper, we propose a multi-modal toolbox that employs large language models (LLMs) and vision language models (VLMs) to automatically extract and organize synthesis procedures and performance data from materials science publications, covering text and figures. We curated 81k open-access papers, yielding LeMat-Synth (v 1.0): a dataset containing synthesis procedures spanning 35 synthesis methods and 16 material classes, structured according to an ontology specific to materials science. The extraction quality is rigorously evaluated on a subset of 2.5k synthesis procedures through a combination of expert annotations and a scalable LLM-as-a-judge framework. Beyond the dataset, we release a modular, open-source software library designed to support community-driven extension to new corpora and synthesis domains. Altogether, this work provides an extensible infrastructure to transform unstructured literature into machine-readable information. This lays the groundwork for predictive modeling of synthesis procedures as well as modeling synthesis--structure--property relationships.",
       "authors": [
         "Magdalena Lederbauer",
         "Siddharth Betala",
@@ -707,7 +707,7 @@
       "year": 2025
     },
     {
-      "abstract": null,
+      "abstract": "We introduce an explainability method for biomedical hypothesis generation systems, built on top of the novel Hypothesis Generation Context Retriever framework. Our approach combines semantic graph-based retrieval and relevant data-restrictive training to simulate real-world discovery constraints. Integrated with large language models (LLMs) via retrieval-augmented generation, the system explains hypotheses with contextual evidence using published scientific literature. We also propose a novel feedback loop approach, which iteratively identifies and corrects flawed parts of LLM-generated explanations, refining both the evidence paths and supporting context. We demonstrate the performance of our method with multiple large language models and evaluate the explanation and context retrieval quality through both expert-curated assessment and large-scale automated analysis. Our code is available at: https://github.com/IlyaTyagin/HGCR.",
       "authors": [
         "Ilya Tyagin",
         "Saeideh Valipour",
@@ -738,7 +738,7 @@
       "year": 2025
     },
     {
-      "abstract": null,
+      "abstract": "Large language models (LLMs) are rapidly transforming various domains, including biomedicine and healthcare, and demonstrate remarkable potential from scientific research to new drug discovery. Graph-based retrieval-augmented generation (RAG) systems, as a useful application of LLMs, can improve contextual reasoning through structured entity and relationship identification from long-context knowledge, e.g. biomedical literature. Even though many advantages over naive RAGs, most of graph-based RAGs are computationally intensive, which limits their application to large-scale dataset. To address this issue, we introduce fastbmRAG, an fast graph-based RAG optimized for biomedical literature. Utilizing well organized structure of biomedical papers, fastbmRAG divides the construction of knowledge graph into two stages, first drafting graphs using abstracts; and second, refining them using main texts guided by vector-based entity linking, which minimizes redundancy and computational load. Our evaluations demonstrate that fastbmRAG is over 10x faster than existing graph-RAG tools and achieve superior coverage and accuracy to input knowledge. FastbmRAG provides a fast solution for quickly understanding, summarizing, and answering questions about biomedical literature on a large scale. FastbmRAG is public available in https://github.com/menggf/fastbmRAG.",
       "authors": [
         "Guofeng Meng",
         "Li Shen",
@@ -768,7 +768,7 @@
       "year": 2025
     },
     {
-      "abstract": null,
+      "abstract": "The accelerating growth of scientific publications has intensified the need for scalable, trustworthy systems to synthesize knowledge across diverse literature. While recent retrieval-augmented generation (RAG) methods have improved access to scientific information, they often overlook citation graph structure, adapt poorly to complex queries, and yield fragmented, hard-to-verify syntheses. We introduce SciRAG, an open-source framework for scientific literature exploration that addresses these gaps through three key innovations: (1) adaptive retrieval that flexibly alternates between sequential and parallel evidence gathering; (2) citation-aware symbolic reasoning that leverages citation graphs to organize and filter supporting documents; and (3) outline-guided synthesis that plans, critiques, and refines answers to ensure coherence and transparent attribution. Extensive experiments across multiple benchmarks such as QASA and ScholarQA demonstrate that SciRAG outperforms prior systems in factual accuracy and synthesis quality, establishing a new foundation for reliable, large-scale scientific knowledge aggregation.",
       "authors": [
         "Hang Ding",
         "Yilun Zhao",
@@ -798,7 +798,7 @@
       "year": 2025
     },
     {
-      "abstract": null,
+      "abstract": "The rapid acceleration of scientific publishing has created substantial challenges for researchers attempting to discover, contextualize, and interpret relevant literature. Traditional keyword-based search systems provide limited semantic understanding, while existing AI-driven tools typically focus on isolated tasks such as retrieval, clustering, or bibliometric visualization. This paper presents an integrated system for scientific literature exploration that combines large-scale data acquisition, hybrid retrieval, semantic topic modeling, and heterogeneous knowledge graph construction. The system builds a comprehensive corpus by merging full-text data from arXiv with structured metadata from OpenAlex. A hybrid retrieval architecture fuses BM25 lexical search with embedding-based semantic search using Reciprocal Rank Fusion. Topic modeling is performed on retrieved results using BERTopic or non-negative matrix factorization depending on computational resources. A knowledge graph unifies papers, authors, institutions, countries, and extracted topics into an interpretable structure. The system provides a multi-layered exploration environment that reveals not only relevant publications but also the conceptual and relational landscape surrounding a query. Evaluation across multiple queries demonstrates improvements in retrieval relevance, topic coherence, and interpretability. The proposed framework contributes an extensible foundation for AI-assisted scientific discovery.",
       "authors": [
         "Sina Jani",
         "Arman Heidari",
@@ -826,7 +826,7 @@
       "year": 2025
     },
     {
-      "abstract": null,
+      "abstract": "Graph-based retrieval-augmented generation (GraphRAG) systems construct knowledge graphs over document collections to support multi-hop reasoning. While prior work shows that GraphRAG responses may leak retrieved subgraphs, the feasibility of query-efficient reconstruction of the hidden graph structure remains unexplored under realistic query budgets. We study a budget-constrained black-box setting where an adversary adaptively queries the system to steal its latent entity-relation graph. We propose AGEA (Agentic Graph Extraction Attack), a framework that leverages a novelty-guided exploration-exploitation strategy, external graph memory modules, and a two-stage graph extraction pipeline combining lightweight discovery with LLM-based filtering. We evaluate AGEA on medical, agriculture, and literary datasets across Microsoft-GraphRAG and LightRAG systems. Under identical query budgets, AGEA significantly outperforms prior attack baselines, recovering up to 90% of entities and relationships while maintaining high precision. These results demonstrate that modern GraphRAG systems are highly vulnerable to structured, agentic extraction attacks, even under strict query limits. The code is available at https://github.com/shuashua0608/AGEA.",
       "authors": [
         "Shuhua Yang",
         "Jiahao Zhang",
@@ -855,7 +855,7 @@
       "year": 2026
     },
     {
-      "abstract": null,
+      "abstract": "This paper investigates the enhancement of scientific literature chatbots through retrieval-augmented generation (RAG), with a focus on evaluating vector- and graph-based retrieval systems. The proposed chatbot leverages both structured (graph) and unstructured (vector) databases to access scientific articles and gray literature, enabling efficient triage of sources according to research objectives. To systematically assess performance, we examine two use-case scenarios: retrieval from a single uploaded document and retrieval from a large-scale corpus. Benchmark test sets were generated using a GPT model, with selected outputs annotated for evaluation. The comparative analysis emphasizes retrieval accuracy and response relevance, providing insight into the strengths and limitations of each approach. The findings demonstrate the potential of hybrid RAG systems to improve accessibility to scientific knowledge and to support evidence-based decision making.",
       "authors": [
         "Hamideh Ghanadian",
         "Amin Kamali",
@@ -884,7 +884,7 @@
       "year": 2026
     },
     {
-      "abstract": null,
+      "abstract": "Urban data support a wide range of applications across multiple disciplines. However, at the global scale, there is no unified platform for urban data discovery. As a result, researchers often have to manually search through websites or scientific literature to identify relevant datasets. To address this problem, we curate an open urban data discovery portal, \\textit{UrbanDataMiner}, which supports dataset-level search and filtering over more than 60{,}000 urban datasets extracted from over 15{,}000 Nature-affiliated publications. \\textit{UrbanDataMiner} is enabled by \\textit{Paper2Data}, a novel large-scale LLM-driven pipeline that automatically identifies dataset mentions in scientific papers and structures them using a unified urban data metadata schema. Human-annotated evaluation demonstrates that \\textit{Paper2Data} achieves high recall (approximately 90\\%) in dataset identification and high field-level precision (above 80\\%). In addition, \\textit{UrbanDataMiner} can retrieve over 9\\% of datasets that are not easily discoverable through general-purpose search engines such as Google. Overall, our work provides the first large-scale, literature-derived infrastructure for urban data discovery and enables more systematic and reusable data-driven research across disciplines. Our code and data are publicly available\\footnote{https://github.com/Yourunwen/Paper2Data}.",
       "authors": [
         "Runwen You",
         "Tong Xia",
@@ -917,7 +917,7 @@
       "year": 2026
     },
     {
-      "abstract": null,
+      "abstract": "The rapid development of large language models and AI agents has triggered a paradigm shift in academic literature retrieval, putting forward new demands for fine-grained, time-aware, and programmable retrieval. Existing graph-vector fusion methods still face bottlenecks such as matrix dependence, storage explosion, semantic dilution, and lack of AI-native support. This paper proposes a geometry-unified graph-vector fusion framework based on tensor manifold theory, which formally proves that an academic literature graph is a discrete projection of a tensor manifold, realizing the native unification of graph topology and vector geometric embedding. Based on this theoretical conclusion, we design four core modules: matrix-independent temporal diffusion signature update, hierarchical temporal manifold encoding, temporal Riemannian manifold indexing, and AI-agent programmable retrieval. Theoretical analysis and complexity proof show that all core algorithms have linear time and space complexity, which can adapt to large-scale dynamic academic literature graphs. This research provides a new theoretical framework and engineering solution for AI-native academic literature retrieval, promoting the industrial application of graph-vector fusion technology in the academic field.",
       "authors": [
         "Xing Wei",
         "Yang Yu"
@@ -943,7 +943,7 @@
       "year": 2026
     },
     {
-      "abstract": null,
+      "abstract": "Autonomous scientific research is significantly advanced thanks to the development of AI agents. One key step in this process is finding the right scientific literature, whether to explore existing knowledge for a research problem, or to acquire evidence for verifying assumptions and supporting claims. To assess AI agents' capability in driving this process, we present AutoResearchBench, a dedicated benchmark for autonomous scientific literature discovery. AutoResearchBench consists of two complementary task types: (1) Deep Research, which requires tracking down a specific target paper through a progressive, multi-step probing process, and (2) Wide Research, which requires comprehensively collecting a set of papers satisfying given conditions. Compared to previous benchmarks on agentic web browsing, AutoResearchBench is distinguished along three dimensions: it is research-oriented, calling for in-depth comprehension of scientific concepts; literature-focused, demanding fine-grained utilization of detailed information; and open-ended, involving an unknown number of qualified papers and thus requiring deliberate reasoning and search throughout. These properties make AutoResearchBench uniquely suited for evaluating autonomous research capabilities, and extraordinarily challenging. Even the most powerful LLMs, despite having largely conquered general agentic web-browsing benchmarks such as BrowseComp, achieve only 9.39% accuracy on Deep Research and 9.31% IoU on Wide Research, while many other strong baselines fall below 5%. We publicly release the dataset and evaluation pipeline to facilitate future research in this direction. We publicly release the dataset, evaluation pipeline, and code at https://github.com/CherYou/AutoResearchBench.",
       "authors": [
         "Lei Xiong",
         "Kun Luo",
@@ -987,7 +987,7 @@
       "year": 2026
     },
     {
-      "abstract": null,
+      "abstract": "Generative models have revolutionized the process of materials discovery, yet they often fail to satisfy underlying physical causality. Through an analysis of Large Language Models (LLMs) augmented with knowledge graphs derived from current literature, we uncover a phenomenon termed contextual tunneling, where models \"over-anchor\" on narrow, retrieved evidence while suppressing global physical reasoning. To address this problem, we introduce ARIA, a causal-aware framework that conditions knowledge use on mechanistic completeness. ARIA routes each query through a three-tier cascade: (i) direct causal reasoning when complete evidence chains of Process-Structure-Property (PSP) are available, (ii) physics-informed analogical transfer for sparse or novel material systems, and (iii) explicit parametric fallback when external evidence is incomplete. As a proof of concept, we construct a Knowledge Graph (KG) containing 2,839 extracted PSP relations from peer-reviewed articles in the materials literature and evaluate ARIA on forward prediction and inverse design tasks for two-dimensional (2D) materials. ARIA mitigates contextual tunneling, improves over unaugmented and naive KG-augmented baselines, and provides further gains when an online literature search is used for evidence enrichment. Crucially, ARIA produces auditable causal traces, enabling physically grounded and trustworthy AI-assisted materials discovery.",
       "authors": [
         "Yi Cao",
         "Liaoyaqi Wang",
