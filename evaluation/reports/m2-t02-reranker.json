@@ -1,0 +1,214 @@
+{
+  "report_version": "m2-t02-reranker.v1",
+  "phase": "M2",
+  "task_id": "M2-T02",
+  "baseline_commit": "cdadca0ad4b49098aa115a9c05b9728ccd8eb7a0",
+  "implementation_commit": "5a7cf46f52b20dd0b1af92ea29a25639995ff01e",
+  "live_execution_commit": "c1f95238480d8cfe69a79f705d98caadbf372220",
+  "evidence_commit": "5195a4eabfccdd64dac61f2efdc2dfc4a92242ae",
+  "validated_commit": "5195a4eabfccdd64dac61f2efdc2dfc4a92242ae",
+  "validated_inputs": [
+    {
+      "path": "evaluation/snapshots/m2/m1-candidates.v1.json",
+      "sha256": "4a2aec0fd0a1d22adc801fd3bc506e5da89895d1276cd572e2ac64014c162448"
+    },
+    {
+      "path": "evaluation/snapshots/m2/m1-candidates.v1.manifest.json",
+      "sha256": "b6ce7cfab2e5df6b8c84b77fb38c6f573de7429d37a9688d7b4c62e27f8546a8"
+    },
+    {
+      "path": "evaluation/source-artifacts/m2-t02-reranker-selection.json",
+      "sha256": "19e86cf2176969236e70ff9770ac086a5555d40892c0bfa913ac768eb752604b"
+    },
+    {
+      "path": "evaluation/source-artifacts/m2-t02-reranker-runtime-installation.json",
+      "sha256": "feb79ad507afb4bb7027e5aa49765b941414fe6e9a9e3ac024e7eba6d2ced831"
+    },
+    {
+      "path": "evaluation/source-artifacts/m2-t02-reranker-snapshot-download.json",
+      "sha256": "5114ce6ef2ca637f950e1683bfc7003029daff4f0f228ca6b909d0c97fb84bf8"
+    },
+    {
+      "path": "evaluation/source-artifacts/m2-t02-reranker-preflight.json",
+      "sha256": "103a73cc82674c2c1f1139a72a7a3d1a880029a7c01d292f52de24d6dc781b06"
+    },
+    {
+      "path": "evaluation/source-artifacts/m2-t02-reranker-preflight-run-receipt.json",
+      "sha256": "fe5ea3c239de9f1f62bdc0204c812f27984af254b08ab39a125e4ca709e05d28"
+    },
+    {
+      "path": "evaluation/source-artifacts/m2-t02-reranker-candidate-run.json",
+      "sha256": "0a751dbc35bfa8d07433796113939412bfbdffd4c5c13043c90390bccfc5c35b"
+    },
+    {
+      "path": "evaluation/source-artifacts/m2-t02-reranker-candidate-run-receipt.json",
+      "sha256": "0c9ca1339a2385a9c6940f8c53bd4711c62b8faf9f3f4cf98710ff465d56ec9a"
+    },
+    {
+      "path": "scripts/run_m2_t02_candidate_reranking.py",
+      "sha256": "3ad6c629b2f6b1f28c3119f9f7d810226e28e6d572535e28b0de6566ef8f63b1"
+    }
+  ],
+  "automated_checks": [
+    {
+      "name": "focused_evidence_tests",
+      "evidence_type": "automated",
+      "status": "passed",
+      "exit_code": 0,
+      "command": "py -3.12 -m pytest -q tests/contract/test_m2_t01_evidence_validation.py tests/contract/test_m2_t02_evidence_validation.py tests/contract/test_m2_t02_candidate_reranking_evidence.py",
+      "result": "118 passed"
+    },
+    {
+      "name": "full_regression",
+      "evidence_type": "automated",
+      "status": "passed",
+      "exit_code": 0,
+      "command": "py -3.12 -m pytest -q",
+      "result": "1049 passed"
+    },
+    {
+      "name": "ruff",
+      "evidence_type": "automated",
+      "status": "passed",
+      "exit_code": 0,
+      "command": "py -3.12 -m ruff check app evaluation scripts tests",
+      "result": "All checks passed"
+    },
+    {
+      "name": "ruff_import_order",
+      "evidence_type": "automated",
+      "status": "passed",
+      "exit_code": 0,
+      "command": "py -3.12 -m ruff check --select I app evaluation scripts tests",
+      "result": "All checks passed"
+    },
+    {
+      "name": "mypy",
+      "evidence_type": "automated",
+      "status": "passed",
+      "exit_code": 0,
+      "command": "py -3.12 -m mypy app evaluation scripts",
+      "result": "Success: no issues found in 47 source files"
+    },
+    {
+      "name": "project_docs_validation",
+      "evidence_type": "automated",
+      "status": "passed",
+      "exit_code": 0,
+      "command": "py -3.12 scripts/validate_project_docs.py",
+      "result": "passed"
+    },
+    {
+      "name": "m0_evidence_validation",
+      "evidence_type": "automated",
+      "status": "passed",
+      "exit_code": 0,
+      "command": "py -3.12 scripts/validate_phase.py M0",
+      "result": "passed"
+    },
+    {
+      "name": "m1_evidence_validation",
+      "evidence_type": "automated",
+      "status": "passed",
+      "exit_code": 0,
+      "command": "py -3.12 scripts/validate_m1_evidence.py",
+      "result": "passed"
+    },
+    {
+      "name": "m2_t01_evidence_validation",
+      "evidence_type": "automated",
+      "status": "passed",
+      "exit_code": 0,
+      "command": "py -3.12 scripts/validate_m2_t01_evidence.py",
+      "result": "passed"
+    },
+    {
+      "name": "m2_t02_evidence_validation",
+      "evidence_type": "automated",
+      "status": "passed",
+      "exit_code": 0,
+      "command": "py -3.12 scripts/validate_m2_t02_evidence.py",
+      "result": "passed"
+    },
+    {
+      "name": "pip_check",
+      "evidence_type": "automated",
+      "status": "passed",
+      "exit_code": 0,
+      "command": "py -3.12 -m pip check",
+      "result": "No broken requirements found"
+    }
+  ],
+  "fake_evidence": {
+    "classification": "deterministic_fake",
+    "status": "passed",
+    "contract_paths": [
+      "tests/contract/test_m2_t02_candidate_reranking.py",
+      "tests/contract/test_m2_t02_candidate_reranking_evidence.py",
+      "tests/unit/test_m2_t02_candidate_reranking_runner.py",
+      "tests/unit/test_bge_reranker_provider.py"
+    ]
+  },
+  "real_model_evidence": {
+    "classification": "real_local_cpu_float32",
+    "result_path": "evaluation/source-artifacts/m2-t02-reranker-candidate-run.json",
+    "result_sha256": "0a751dbc35bfa8d07433796113939412bfbdffd4c5c13043c90390bccfc5c35b",
+    "receipt_path": "evaluation/source-artifacts/m2-t02-reranker-candidate-run-receipt.json",
+    "receipt_sha256": "0c9ca1339a2385a9c6940f8c53bd4711c62b8faf9f3f4cf98710ff465d56ec9a",
+    "runner_path": "scripts/run_m2_t02_candidate_reranking.py",
+    "runner_sha256": "3ad6c629b2f6b1f28c3119f9f7d810226e28e6d572535e28b0de6566ef8f63b1",
+    "model_id": "BAAI/bge-reranker-v2-m3",
+    "model_revision": "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e",
+    "runtime": {
+      "python_version": "3.12.10",
+      "torch_distribution_version": "2.4.1+cpu",
+      "transformers_version": "4.53.2",
+      "huggingface_hub_version": "0.34.3",
+      "safetensors_version": "0.5.3",
+      "tokenizers_version": "0.21.2",
+      "pydantic_version": "2.9.2",
+      "torch_cuda_version": null,
+      "torch_cuda_available": false,
+      "device": "cpu",
+      "dtype": "float32",
+      "local_files_only": true,
+      "trust_remote_code": false
+    },
+    "execution": {
+      "candidate_count": 33,
+      "configured_top_k": 50,
+      "effective_top_k": 33,
+      "batch_size": 2,
+      "batch_count": 17,
+      "batch_sizes": [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1],
+      "provider_instance_count": 1,
+      "runtime_load_count": 1,
+      "provider_call_count": 17,
+      "provider_scored_count": 33,
+      "cache_hits": 0
+    },
+    "duration_seconds": 79.034
+  },
+  "acceptance": {
+    "batch_partition_invariance": "passed",
+    "provider_failure_fail_closed": "passed",
+    "partial_scores_not_published": "passed",
+    "raw_scores_preserved": "passed",
+    "normalization_method": "global_min_max",
+    "deterministic_tie_break": "paper_id_ascending",
+    "fixed_candidate_count": 33,
+    "real_model_run": "passed"
+  },
+  "not_run": {
+    "additional_model_rerun": false,
+    "b3_replay": false,
+    "benchmark": false,
+    "manual_relevance_judgement": false,
+    "m2_t03_started": false
+  },
+  "status_after_evidence": {
+    "m2": "IN_PROGRESS 2/5",
+    "m3": "BLOCKED_BY_M2 0/5",
+    "next_task": "M2-T03"
+  }
+}

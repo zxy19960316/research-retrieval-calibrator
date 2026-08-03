@@ -1,0 +1,96 @@
+{
+  "report_version": "m2-t02-reranker-preflight.v1",
+  "phase": "M2",
+  "task_id": "M2-T02",
+  "baseline_commit": "7a234ff2684f24030dde91b3df6fe8483aa92688",
+  "decision_status": "cpu_float32_preflight_passed",
+  "platform": {
+    "system": "Windows",
+    "machine": "AMD64",
+    "python_version": "3.12.10"
+  },
+  "model": {
+    "provider_name": "bge_reranker_v2_m3",
+    "model_id": "BAAI/bge-reranker-v2-m3",
+    "revision": "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e"
+  },
+  "snapshot": {
+    "selection_path": "evaluation/source-artifacts/m2-t02-reranker-selection.json",
+    "download_evidence_path": "evaluation/source-artifacts/m2-t02-reranker-snapshot-download.json",
+    "snapshot_path": "models/m2-t02/bge-reranker-v2-m3/953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e",
+    "preparation_status": "REUSED",
+    "download_evidence_status": "downloaded_and_verified",
+    "file_count": 7,
+    "exact_file_closure": true,
+    "digest_verification": "passed",
+    "downloader_calls": 0,
+    "disk_usage_calls": 0
+  },
+  "runtime": {
+    "torch_distribution_version": "2.4.1+cpu",
+    "torch_base_version": "2.4.1",
+    "transformers_version": "4.53.2",
+    "huggingface_hub_version": "0.34.3",
+    "safetensors_version": "0.5.3",
+    "tokenizers_version": "0.21.2",
+    "torch_cuda_version": null,
+    "torch_cuda_available": false
+  },
+  "offline_policy": {
+    "HF_HUB_OFFLINE": "1",
+    "TRANSFORMERS_OFFLINE": "1",
+    "HF_HUB_DISABLE_IMPLICIT_TOKEN": "1",
+    "HF_HUB_DISABLE_TELEMETRY": "1",
+    "local_files_only": true,
+    "network_forbidden": true
+  },
+  "memory": {
+    "system_total_physical_memory_bytes": 16873545728,
+    "system_available_physical_memory_before_bytes": 8793714688,
+    "process_working_set_before_bytes": 121421824,
+    "process_peak_working_set_after_load_bytes": 452280320,
+    "process_peak_working_set_after_inference_bytes": 1676398592
+  },
+  "tokenizer": {
+    "local_files_only": true,
+    "trust_remote_code": false,
+    "padding": true,
+    "truncation": true,
+    "max_length": 512,
+    "return_tensors": "pt",
+    "batch_size": 2
+  },
+  "model_load": {
+    "local_files_only": true,
+    "trust_remote_code": false,
+    "use_safetensors": true,
+    "torch_dtype": "float32",
+    "device": "cpu",
+    "eval_mode": true
+  },
+  "inference": {
+    "torch_inference_mode": true,
+    "batch_size": 2,
+    "max_length": 512,
+    "fixture_sha256": "8eaccc1ca1f0942a1800fc66332ccec5d80adc7c8594f9f0a440ea14d1eb288e",
+    "logits_shape": [
+      2,
+      1
+    ],
+    "logits_dtype": "float32",
+    "logits_all_finite": true,
+    "logits_persisted": false,
+    "model_device": "cpu",
+    "inputs_device": "cpu"
+  },
+  "execution_state": {
+    "snapshot_reused": true,
+    "tokenizer_loaded": true,
+    "model_loaded": true,
+    "minimal_preflight_inference_run": true,
+    "preflight_logits_generated": true,
+    "preflight_logits_persisted": false,
+    "full_candidate_reranking_run": false,
+    "real_candidate_scores_generated": false
+  }
+}

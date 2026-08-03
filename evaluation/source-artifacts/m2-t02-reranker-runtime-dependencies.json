@@ -1,0 +1,157 @@
+{
+  "report_version": "m2-t02-reranker-runtime-dependencies.v1.2",
+  "phase": "M2",
+  "task_id": "M2-T02",
+  "baseline_commit": "00a323d89bbca08d21e13322da3a9b7c25e3ffa5",
+  "decision_status": "selected_and_clean_environment_verified",
+  "python": {
+    "requires_python": ">=3.12,<3.13",
+    "tested_minor": "3.12"
+  },
+  "packages": [
+    {
+      "name": "torch",
+      "version": "2.4.1",
+      "role": "cpu_float32_tensor_runtime",
+      "python_compatibility": ">=3.8.0; PyPI metadata classifies Python 3.12 support and publishes Windows wheels",
+      "license": "BSD-3-Clause",
+      "source_type": "pypi_project_metadata",
+      "source_reference": "https://pypi.org/pypi/torch/2.4.1/json",
+      "selection_reason": "Reuses the project's embedding torch==2.4.1 lock for a shared Python 3.12 environment: FlagEmbedding 1.3.5 declares torch>=1.6.0 and transformers 4.53.2 declares torch>=2.1; 2.4.1 satisfies both, supports Python 3.12 and Windows, and PyTorch publishes an official CPU-only wheel index. Reusing the shared pin avoids an unnecessary shared-Torch upgrade risk."
+    },
+    {
+      "name": "transformers",
+      "version": "4.53.2",
+      "role": "standard_auto_tokenizer_and_sequence_classification_runtime",
+      "python_compatibility": ">=3.9.0; PyPI metadata classifies Python 3.12 support",
+      "license": "Apache-2.0",
+      "source_type": "pypi_project_metadata",
+      "source_reference": "https://pypi.org/pypi/transformers/4.53.2/json",
+      "selection_reason": "Pinned stable release whose official Auto APIs provide AutoTokenizer and AutoModelForSequenceClassification; B0.1 locks BAAI/bge-reranker-v2-m3 to standard transformers with trust_remote_code disabled."
+    },
+    {
+      "name": "huggingface-hub",
+      "version": "0.34.3",
+      "role": "pinned_revision_file_download_client",
+      "python_compatibility": ">=3.8.0; PyPI metadata classifies Python 3.12 support",
+      "license": "Apache-2.0",
+      "source_type": "pypi_project_metadata",
+      "source_reference": "https://pypi.org/pypi/huggingface-hub/0.34.3/json",
+      "selection_reason": "Pinned stable release whose official file-download API accepts a revision and local_files_only, matching the locked model revision and offline-preflight policy."
+    },
+    {
+      "name": "safetensors",
+      "version": "0.5.3",
+      "role": "safe_weight_format_reader",
+      "python_compatibility": ">=3.7; cp38-abi3 Windows wheel is compatible with CPython 3.12",
+      "license": "Apache-2.0",
+      "source_type": "pypi_project_metadata",
+      "source_reference": "https://pypi.org/pypi/safetensors/0.5.3/json",
+      "selection_reason": "Pinned stable release satisfies transformers 4.53.2 declared safetensors>=0.4.3 requirement and the locked model policy requires safetensors weights."
+    },
+    {
+      "name": "tokenizers",
+      "version": "0.21.2",
+      "role": "fast_tokenizer_backend_required_by_transformers",
+      "python_compatibility": ">=3.9; cp39-abi3 Windows wheel and PyPI metadata classify Python 3.12 support",
+      "license": "Apache-2.0",
+      "source_type": "pypi_project_metadata",
+      "source_reference": "https://pypi.org/pypi/tokenizers/0.21.2/json",
+      "selection_reason": "Pinned stable release satisfies transformers 4.53.2 declared tokenizers>=0.21,<0.22 dependency range."
+    }
+  ],
+  "environment_policy": {
+    "environment_strategy": "shared_embedding_and_reranker",
+    "python_version": "3.12",
+    "torch_version": "2.4.1",
+    "torch_distribution": "cpu_only",
+    "torch_install_source": "official_pytorch_cpu_index",
+    "combined_extras_install_required": true,
+    "separate_runtime_environments": false
+  },
+  "compatibility_policy": {
+    "flagembedding_version": "1.3.5",
+    "flagembedding_torch_requirement": ">=1.6.0",
+    "flagembedding_transformers_requirement": ">=4.44.2",
+    "transformers_torch_requirement": ">=2.1",
+    "transformers_hub_requirement": ">=0.30.0,<1.0",
+    "transformers_tokenizers_requirement": ">=0.21,<0.22",
+    "transformers_safetensors_requirement": ">=0.4.3",
+    "declared_requirements_satisfied": true
+  },
+  "runtime_policy": {
+    "device": "cpu",
+    "dtype": "float32",
+    "model_id": "BAAI/bge-reranker-v2-m3",
+    "model_revision": "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e",
+    "local_files_only_after_download": true,
+    "trust_remote_code": false,
+    "use_safetensors": true,
+    "network_during_preflight": "forbidden"
+  },
+  "verification_state": {
+    "dependencies_installed_in_clean_environment": true,
+    "model_downloaded": false,
+    "tokenizer_loaded": false,
+    "model_loaded": false,
+    "inference_run": false,
+    "real_scores_generated": false
+  },
+  "sources": [
+    {
+      "source_type": "pypi_project_metadata",
+      "source_reference": "https://pypi.org/pypi/torch/2.4.1/json",
+      "queried_on": "2026-08-01"
+    },
+    {
+      "source_type": "pytorch_previous_versions_cpu_installation_documentation",
+      "source_reference": "https://pytorch.org/get-started/previous-versions/",
+      "queried_on": "2026-08-01"
+    },
+    {
+      "source_type": "pypi_project_metadata",
+      "source_reference": "https://pypi.org/pypi/FlagEmbedding/1.3.5/json",
+      "queried_on": "2026-08-01"
+    },
+    {
+      "source_type": "pypi_project_metadata",
+      "source_reference": "https://pypi.org/pypi/transformers/4.53.2/json",
+      "queried_on": "2026-08-01"
+    },
+    {
+      "source_type": "transformers_installation_documentation",
+      "source_reference": "https://huggingface.co/docs/transformers/v4.53.2/en/installation",
+      "queried_on": "2026-08-01"
+    },
+    {
+      "source_type": "transformers_official_release_notes",
+      "source_reference": "https://github.com/huggingface/transformers/releases/tag/v4.53.2",
+      "queried_on": "2026-08-01"
+    },
+    {
+      "source_type": "pypi_project_metadata",
+      "source_reference": "https://pypi.org/pypi/huggingface-hub/0.34.3/json",
+      "queried_on": "2026-08-01"
+    },
+    {
+      "source_type": "huggingface_hub_file_download_documentation",
+      "source_reference": "https://huggingface.co/docs/huggingface_hub/v0.34.3/en/package_reference/file_download",
+      "queried_on": "2026-08-01"
+    },
+    {
+      "source_type": "huggingface_hub_official_release_notes",
+      "source_reference": "https://github.com/huggingface/huggingface_hub/releases/tag/v0.34.3",
+      "queried_on": "2026-08-01"
+    },
+    {
+      "source_type": "pypi_project_metadata",
+      "source_reference": "https://pypi.org/pypi/safetensors/0.5.3/json",
+      "queried_on": "2026-08-01"
+    },
+    {
+      "source_type": "pypi_project_metadata",
+      "source_reference": "https://pypi.org/pypi/tokenizers/0.21.2/json",
+      "queried_on": "2026-08-01"
+    }
+  ]
+}

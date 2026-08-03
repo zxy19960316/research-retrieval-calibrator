@@ -708,14 +708,28 @@ def _validate_committed_b2_precompletion(repository_root: Path, errors: list[str
 
 
 def _validate_status(payload: dict[str, Any], errors: list[str], repository_root: Path) -> None:
-    expected = {"m2": "IN_PROGRESS 1/5", "m3": "BLOCKED_BY_M2"}
-    if payload.get("status_after_evidence") != expected:
-        errors.append("status_after_evidence must declare M2 IN_PROGRESS 1/5 and M3 BLOCKED_BY_M2")
+    status_after = payload.get("status_after_evidence")
+    if not isinstance(status_after, dict):
+        errors.append("status_after_evidence must be an object")
+        status_after = {}
+    m2_status = status_after.get("m2")
+    accepted_m2 = isinstance(m2_status, str) and bool(
+        re.fullmatch(r"IN_PROGRESS [1-4]/5", m2_status)
+        or m2_status == "COMPLETE 5/5"
+    )
+    if not accepted_m2 or status_after.get("m3") not in {"BLOCKED_BY_M2", "BLOCKED_BY_M2 0/5"}:
+        errors.append(
+            "status_after_evidence must declare M2 IN_PROGRESS 1-4/5 or COMPLETE 5/5 and M3 BLOCKED_BY_M2"
+        )
     phases = _parse_status(repository_root, errors)
     if phases.get("M1") != ("COMPLETE", 4, 4):
         errors.append("completed M2-T01 evidence must retain M1 COMPLETE 4/4")
-    if phases.get("M2") != ("IN_PROGRESS", 1, 5):
-        errors.append("completed M2-T01 evidence requires M2 IN_PROGRESS 1/5")
+    phase_m2 = phases.get("M2")
+    accepted_phase_m2 = phase_m2 in {
+        ("IN_PROGRESS", completed, 5) for completed in range(1, 5)
+    } or phase_m2 == ("COMPLETE", 5, 5)
+    if not accepted_phase_m2:
+        errors.append("completed M2-T01 evidence requires M2 IN_PROGRESS 1-4/5 or COMPLETE 5/5")
     if phases.get("M3") != ("BLOCKED_BY_M2", 0, 5):
         errors.append("completed M2-T01 evidence must retain M3 BLOCKED_BY_M2 0/5")
 
