@@ -51,6 +51,97 @@ STATUS_ROW_PATTERN = re.compile(
     r"^\|\s*(M\d+)\s+[^|]*\|\s*([A-Z0-9_]+)\s*\|\s*(\d+)/(\d+)\s*\|",
     re.MULTILINE,
 )
+NEXT_TASK_PATTERN = re.compile(
+    r"下一动作：\s*\W*(M\d+-T\d{2})",
+    re.MULTILINE,
+)
+
+
+def extract_phase_task_ids(phase: str, text: str) -> list[str]:
+    return re.findall(
+        rf"^### ({re.escape(phase)}-T\d{{2}})：",
+        text,
+        flags=re.MULTILINE,
+    )
+
+
+def validate_dynamic_status_delegation(
+    readme: str, agent: str, errors: list[str]
+) -> None:
+    if "STATUS.md" not in readme or "唯一权威来源" not in readme:
+        errors.append("README.md must delegate dynamic status to STATUS.md")
+    if re.search(r"当前(?:活动)?阶段\s*(?:为|是)\s*M\d+", readme):
+        errors.append("README.md contains a hard-coded dynamic phase")
+    if "STATUS.md" not in agent or "唯一权威来源" not in agent:
+        errors.append("agent.md must delegate dynamic status to STATUS.md")
+    if re.search(r"当前(?:活动)?阶段\s*(?:为|是)\s*M\d+", agent):
+        errors.append("agent.md contains a hard-coded dynamic phase")
+    if re.search(r"M\d+\s*(?:尚未完成|已完成|为当前)", agent):
+        errors.append("agent.md contains a hard-coded dynamic phase status")
+    if "不重复维护动态阶段编号" not in agent:
+        errors.append("agent.md must not duplicate dynamic phase numbering")
+
+
+def validate_status_handoff(status: str, phase_text: str, errors: list[str]) -> None:
+    current_phases = CURRENT_PHASE_PATTERN.findall(status)
+    if len(current_phases) != 1 or current_phases[0] not in EXPECTED_TASKS:
+        errors.append("STATUS.md current phase is unavailable for next-task validation")
+        return
+
+    next_task_match = NEXT_TASK_PATTERN.search(status)
+    if next_task_match is None:
+        errors.append("STATUS.md must declare an explicit next task")
+        return
+
+    current_phase = current_phases[0]
+    next_task = next_task_match.group(1)
+    if next_task not in extract_phase_task_ids(current_phase, phase_text):
+        errors.append(
+            f"next task {next_task} does not belong to current phase {current_phase}"
+        )
+
+
+def validate_m2_task_contract(status: str, phase_text: str, errors: list[str]) -> None:
+    expected_headers = [
+        "### M2-T01：EmbeddingProvider 与冻结向量",
+        "### M2-T02：RerankerProvider",
+        "### M2-T03：证据槽位分类",
+        "### M2-T04：六分项评分",
+        "### M2-T05：多样性选择与首轮报告",
+    ]
+    observed_headers = re.findall(
+        r"^### M2-T\d{2}：.*$",
+        phase_text,
+        flags=re.MULTILINE,
+    )
+    if observed_headers != expected_headers:
+        errors.append(
+            f"M2 task IDs/order mismatch: expected {expected_headers}, observed {observed_headers}"
+        )
+
+    t04_match = re.search(
+        r"^### M2-T04：.*?(?=^### M2-T05：|\Z)",
+        phase_text,
+        flags=re.MULTILINE | re.DOTALL,
+    )
+    t04_section = t04_match.group(0) if t04_match else ""
+    if not re.search(
+        r"evidence slot score.*M2-T03.*提供",
+        t04_section,
+        flags=re.IGNORECASE | re.DOTALL,
+    ):
+        errors.append(
+            "M2-T04 evidence slot score must be supplied by earlier M2-T03"
+        )
+
+    rows = {
+        phase: (phase_status, int(completed), int(total))
+        for phase, phase_status, completed, total in STATUS_ROW_PATTERN.findall(status)
+    }
+    if rows.get("M2") != ("IN_PROGRESS", 2, 5):
+        errors.append("M2 baseline must remain IN_PROGRESS 2/5")
+    if rows.get("M3") != ("BLOCKED_BY_M2", 0, 5):
+        errors.append("M3 baseline must remain BLOCKED_BY_M2 0/5")
 
 
 def validate_required_files(errors: list[str]) -> None:
@@ -66,7 +157,7 @@ def validate_phase_tasks(errors: list[str]) -> None:
             errors.append(f"missing phase file: {path.relative_to(ROOT)}")
             continue
         text = path.read_text(encoding="utf-8")
-        task_ids = re.findall(rf"^### ({phase}-T\d{{2}})\uff1a", text, flags=re.MULTILINE)
+        task_ids = extract_phase_task_ids(phase, text)
         expected_ids = [f"{phase}-T{index:02d}" for index in range(1, expected_count + 1)]
         if task_ids != expected_ids:
             errors.append(
@@ -189,6 +280,18 @@ def main() -> int:
     validate_phase_tasks(errors)
     validate_local_links(errors)
     validate_status(errors)
+    readme_path = ROOT / "README.md"
+    agent_path = ROOT / "agent.md"
+    status_path = ROOT / "STATUS.md"
+    m2_phase_path = ROOT / "docs" / "phases" / PHASE_FILES["M2"]
+    if all(path.is_file() for path in (readme_path, agent_path, status_path, m2_phase_path)):
+        readme = readme_path.read_text(encoding="utf-8")
+        agent = agent_path.read_text(encoding="utf-8")
+        status = status_path.read_text(encoding="utf-8")
+        m2_phase = m2_phase_path.read_text(encoding="utf-8")
+        validate_dynamic_status_delegation(readme, agent, errors)
+        validate_status_handoff(status, m2_phase, errors)
+        validate_m2_task_contract(status, m2_phase, errors)
     if errors:
         for error in errors:
             print(f"ERROR: {error}")

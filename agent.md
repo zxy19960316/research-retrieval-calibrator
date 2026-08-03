@@ -109,10 +109,10 @@ Research Retrieval Calibrator（RRC）是一个独立、轻量的跨学科文献
 - 禁止 `git reset --hard`、强制推送、重写已共享历史或提交密钥/缓存/模型权重。
 - 新依赖必须说明用途、体积、许可证和是否影响离线运行。
 
-## 10. 当前接力点
+## 10. 动态项目状态
 
-当前活动阶段为 M0，入口文件是：
+当前活动阶段、当前任务、允许执行范围和阶段门禁，
+均以 STATUS.md 为唯一权威来源。
 
-`docs/phases/M0-product-and-evaluation-contracts.md`
-
-M0 尚未完成。不要从 FastAPI 接口、arXiv 联网检索或模型下载开始。
+开始任何任务前必须读取 STATUS.md；
+agent.md 不重复维护动态阶段编号或任务进度。
