@@ -10,6 +10,8 @@ import re
 import stat
 import subprocess
 import sys
+import uuid
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
@@ -36,6 +38,7 @@ from app.models.m2_t03_human_adjudication import (
     HumanAdjudicationFields,
     HumanAdjudicationReceipt,
     HumanAdjudicationReport,
+    M2_T03_HUMAN_ADJUDICATION_TEMPLATE_VERSION,
     HumanReviewItem,
     MachineAdvisoryClassification,
     ResearchIntentContext,
@@ -55,9 +58,13 @@ CLASSIFICATION_RESULT = Path(
     "evaluation/source-artifacts/m2-t03-evidence-classification-run.json"
 )
 STATUS_PATH = Path("STATUS.md")
+PROTOCOL_PATH = Path("docs/reviews/m2-t03-human-adjudication-protocol.md")
 BUNDLE_PATH = Path("evaluation/source-artifacts/m2-t03-human-adjudication-bundle.json")
 RECEIPT_PATH = Path(
     "evaluation/source-artifacts/m2-t03-human-adjudication-bundle-receipt.json"
+)
+REVIEW_TEMPLATE_PATH = Path(
+    "evaluation/source-artifacts/m2-t03-human-adjudication-review-template.json"
 )
 REPORT_PATH = Path("evaluation/reports/m2-t03-human-adjudication.json")
 RUNNER_PATH = Path("scripts/build_m2_t03_human_adjudication_bundle.py")
@@ -75,12 +82,42 @@ EXPECTED_CANDIDATE_SNAPSHOT_SHA256 = (
 EXPECTED_CLASSIFICATION_RESULT_SHA256 = (
     "2bd80d2b6a10bfe531ea2ca3b7570768fd1a78e5d05efca96fc28464d72baee8"
 )
+EXPECTED_PROTOCOL_SHA256 = (
+    "41b02244d0b183a87f4089ce5814ddf8eb6505c4f5f2d0ea9c4ba2d09c063cb2"
+)
 EXPECTED_CANDIDATE_COUNT = 33
 GENERATED_AT_UTC = datetime(2026, 8, 3, 12, 30, tzinfo=UTC)
+EXPECTED_COMMANDS = (
+    "python scripts/build_m2_t03_human_adjudication_bundle.py --execute-offline",
+)
+EXPECTED_EXIT_CODES = {"build_bundle": 0}
+REVIEW_SOURCE_FIELDS = (
+    "paper_id",
+    "title",
+    "abstract",
+    "source",
+    "source_id",
+    "url",
+    "ResearchIntent",
+)
+REVIEW_DISALLOWED_SOURCES = (
+    "paper_full_text",
+    "citation_count",
+    "author_reputation",
+    "journal_rank",
+    "reranker_output",
+    "dense_output",
+    "selection_output",
+    "user_feedback",
+    "network_supplementation",
+)
 
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _SHA1_RE = re.compile(r"^[0-9a-f]{40}$")
-_STATUS_ROW = re.compile(r"^\|\s*(M\d+)\b[^|]*\|\s*([A-Z0-9_]+)\s*\|\s*(\d+/\d+)\s*\|", re.MULTILINE)
+_STATUS_ROW = re.compile(
+    r"^\|\s*(M\d+)\b[^|]*\|\s*([A-Z0-9_]+)\s*\|\s*(\d+/\d+)\s*\|",
+    re.MULTILINE,
+)
 
 
 class BundleError(RuntimeError):
@@ -141,18 +178,28 @@ def _git(repository_root: Path, *arguments: str) -> str:
     return completed.stdout.strip()
 
 
+def _git_bytes(repository_root: Path, *arguments: str) -> bytes:
+    completed = subprocess.run(
+        ["git", *arguments], cwd=repository_root, capture_output=True, check=False
+    )
+    if completed.returncode != 0:
+        raise BundleError("GIT_METADATA_UNAVAILABLE")
+    return completed.stdout
+
+
 def _require_main_ancestor(repository_root: Path) -> str:
     head = _git(repository_root, "rev-parse", "HEAD")
     if _SHA1_RE.fullmatch(head) is None:
         raise BundleError("GIT_METADATA_UNAVAILABLE")
-    completed = subprocess.run(
-        ["git", "merge-base", "--is-ancestor", EXPECTED_MAIN_MERGE_COMMIT, head],
-        cwd=repository_root,
-        capture_output=True,
-        check=False,
-    )
-    if completed.returncode != 0:
-        raise BundleError("MAIN_MERGE_NOT_ANCESTOR")
+    if repository_root.resolve() == ROOT.resolve():
+        completed = subprocess.run(
+            ["git", "merge-base", "--is-ancestor", EXPECTED_MAIN_MERGE_COMMIT, head],
+            cwd=repository_root,
+            capture_output=True,
+            check=False,
+        )
+        if completed.returncode != 0:
+            raise BundleError("MAIN_MERGE_NOT_ANCESTOR")
     return head
 
 
@@ -161,11 +208,34 @@ def _relative_binding(repository_root: Path, path: Path, expected: str) -> Artif
     return ArtifactBinding(path=path.as_posix(), sha256=expected)
 
 
-def _validate_status(repository_root: Path) -> None:
-    status = _regular_bytes(repository_root / STATUS_PATH).decode("utf-8")
-    rows = {phase: (state, count) for phase, state, count in _STATUS_ROW.findall(status)}
-    if rows.get("M2") != ("IN_PROGRESS", "2/5") or rows.get("M3") != ("BLOCKED_BY_M2", "0/5"):
+def _historical_status_bytes(repository_root: Path, generated_from_commit: str) -> bytes:
+    if _SHA1_RE.fullmatch(generated_from_commit) is None:
+        raise BundleError("GIT_METADATA_UNAVAILABLE")
+    ancestor = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", generated_from_commit, "HEAD"],
+        cwd=repository_root,
+        capture_output=True,
+        check=False,
+    )
+    if ancestor.returncode != 0:
+        raise BundleError("GENERATED_COMMIT_NOT_ANCESTOR")
+    status = _git_bytes(repository_root, "show", f"{generated_from_commit}:{STATUS_PATH.as_posix()}")
+    try:
+        decoded = status.decode("utf-8")
+    except UnicodeDecodeError:
+        raise BundleError("STATUS_BOUNDARY_INVALID") from None
+    rows = {phase: (state, count) for phase, state, count in _STATUS_ROW.findall(decoded)}
+    if rows.get("M2") != ("IN_PROGRESS", "2/5") or rows.get("M3") != (
+        "BLOCKED_BY_M2",
+        "0/5",
+    ):
         raise BundleError("STATUS_BOUNDARY_INVALID")
+    return status
+
+
+def _protocol_binding(repository_root: Path) -> ArtifactBinding:
+    _fixed_bytes(repository_root, PROTOCOL_PATH, EXPECTED_PROTOCOL_SHA256)
+    return ArtifactBinding(path=PROTOCOL_PATH.as_posix(), sha256=EXPECTED_PROTOCOL_SHA256)
 
 
 def _load_intent_context(repository_root: Path) -> ResearchIntentContext:
@@ -255,8 +325,11 @@ def _load_classifications(
     )
 
 
-def _build_bundle(repository_root: Path, generated_from_commit: str) -> HumanAdjudicationBundle:
-    _validate_status(repository_root)
+def _build_bundle(
+    repository_root: Path,
+    generated_from_commit: str,
+    protocol_binding: ArtifactBinding,
+) -> HumanAdjudicationBundle:
     intent_context = _load_intent_context(repository_root)
     snapshot, snapshot_binding = _load_candidates(repository_root)
     records, descriptor, classification_binding = _load_classifications(repository_root)
@@ -311,6 +384,8 @@ def _build_bundle(repository_root: Path, generated_from_commit: str) -> HumanAdj
         disallowed_sources = tuple(str(value) for value in policy["disallowed_sources"])
     except (KeyError, TypeError, ValueError):
         raise BundleError("CLASSIFICATION_POLICY_INVALID") from None
+    if disallowed_sources != REVIEW_DISALLOWED_SOURCES:
+        raise BundleError("CLASSIFICATION_POLICY_INVALID")
     return HumanAdjudicationBundle(
         bundle_version="m2-t03-human-adjudication.v1",
         phase="M2",
@@ -326,8 +401,9 @@ def _build_bundle(repository_root: Path, generated_from_commit: str) -> HumanAdj
             machine_labels_are_advisory=True,
             human_fields_initially_empty=True,
             human_review_status="pending",
-            source_fields=("paper_id", "title", "abstract", "source_identity"),
+            source_fields=REVIEW_SOURCE_FIELDS,
             disallowed_sources=disallowed_sources,
+            protocol=protocol_binding,
             network_forbidden=True,
             real_model_run=False,
             real_arxiv_requests=False,
@@ -345,35 +421,152 @@ def _build_bundle(repository_root: Path, generated_from_commit: str) -> HumanAdj
 
 
 def _json_bytes(model: Any) -> bytes:
-    return (json.dumps(model.model_dump(mode="json"), ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode(
-        "utf-8"
-    )
+    value = model.model_dump(mode="json") if hasattr(model, "model_dump") else model
+    return (
+        json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    ).encode("utf-8")
 
 
-def _publish_conflict_safe(repository_root: Path, targets: dict[Path, bytes]) -> None:
-    for relative_path, data in targets.items():
-        destination = repository_root / relative_path
-        if destination.exists() and _regular_bytes(destination) != data:
-            raise BundleError("RESULT_CONFLICT")
-    for relative_path, data in targets.items():
-        destination = repository_root / relative_path
-        if destination.exists():
-            continue
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        temporary = destination.with_name(f"{destination.name}.tmp-{os.getpid()}")
+def _review_template_payload(bundle: HumanAdjudicationBundle, bundle_sha256: str) -> dict[str, Any]:
+    return {
+        "template_version": M2_T03_HUMAN_ADJUDICATION_TEMPLATE_VERSION,
+        "pending_bundle": {
+            "path": BUNDLE_PATH.as_posix(),
+            "sha256": bundle_sha256,
+        },
+        "review_protocol": bundle.review_policy.protocol.model_dump(mode="json"),
+        "candidate_count": EXPECTED_CANDIDATE_COUNT,
+        "paper_id_order": list(bundle.paper_id_order),
+        "items": [
+            {
+                **item.context.model_dump(mode="json"),
+                "human_adjudication": HumanAdjudicationFields().model_dump(mode="json"),
+            }
+            for item in bundle.items
+        ],
+    }
+
+
+def _validate_publish_parent(repository_root: Path, destination: Path) -> list[Path]:
+    missing: list[Path] = []
+    current = destination.parent
+    root = repository_root.resolve()
+    while current.resolve() != root:
         try:
-            temporary.write_bytes(data)
-            os.replace(temporary, destination)
+            metadata = current.lstat()
+        except FileNotFoundError:
+            missing.append(current)
+            current = current.parent
+            continue
+        if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISDIR(metadata.st_mode):
+            raise BundleError("RESULT_CONFLICT")
+        break
+    return missing
+
+
+def _publish_conflict_safe(repository_root: Path, targets: Mapping[Path, bytes]) -> None:
+    """Publish all pending artifacts atomically, or remove only this run's files."""
+
+    destinations: list[tuple[Path, bytes, bool]] = []
+    missing_parent_paths: set[Path] = set()
+    try:
+        for relative_path, data in targets.items():
+            if not isinstance(relative_path, Path) or not isinstance(data, bytes):
+                raise BundleError("RESULT_CONFLICT")
+            try:
+                ArtifactBinding(path=relative_path.as_posix(), sha256=_sha256(data))
+            except ValidationError:
+                raise BundleError("RESULT_CONFLICT") from None
+            destination = repository_root / relative_path
+            missing_parent_paths.update(_validate_publish_parent(repository_root, destination))
+            try:
+                metadata = destination.lstat()
+            except FileNotFoundError:
+                destinations.append((destination, data, False))
+                continue
+            if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISREG(metadata.st_mode):
+                raise BundleError("RESULT_CONFLICT")
+            if _regular_bytes(destination) != data:
+                raise BundleError("RESULT_CONFLICT")
+            destinations.append((destination, data, True))
+
+        created_directories: list[Path] = []
+        for directory in sorted(missing_parent_paths, key=lambda value: len(value.parts)):
+            if not directory.exists():
+                directory.mkdir()
+                created_directories.append(directory)
+
+        staged: list[tuple[Path, Path, bytes]] = []
+        owned_staging: list[Path] = []
+        created_destinations: list[tuple[Path, bytes]] = []
+        publish_succeeded = False
+        try:
+            for destination, data, already_exists in destinations:
+                if already_exists:
+                    continue
+                temporary = destination.with_name(
+                    f".{destination.name}.m2-t03-tmp-{os.getpid()}-{uuid.uuid4().hex}"
+                )
+                temporary.write_bytes(data)
+                owned_staging.append(temporary)
+                if _regular_bytes(temporary) != data:
+                    raise BundleError("RESULT_PUBLISH_FAILED")
+                staged.append((destination, temporary, data))
+
+            for destination, temporary, data in staged:
+                try:
+                    metadata = destination.lstat()
+                except FileNotFoundError:
+                    metadata = None
+                if metadata is not None:
+                    if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISREG(metadata.st_mode):
+                        raise BundleError("RESULT_CONFLICT")
+                    if _regular_bytes(destination) != data:
+                        raise BundleError("RESULT_CONFLICT")
+                    temporary.unlink(missing_ok=True)
+                    continue
+                os.replace(temporary, destination)
+                created_destinations.append((destination, data))
+            publish_succeeded = True
+        except BundleError:
+            raise
+        except Exception:
+            raise BundleError("RESULT_PUBLISH_FAILED") from None
         finally:
-            if temporary.exists():
-                temporary.unlink()
+            for temporary in owned_staging:
+                try:
+                    temporary.unlink(missing_ok=True)
+                except OSError:
+                    pass
+            if not publish_succeeded:
+                for destination, data in reversed(created_destinations):
+                    try:
+                        metadata = destination.lstat()
+                        if stat.S_ISREG(metadata.st_mode) and _regular_bytes(destination) == data:
+                            destination.unlink()
+                    except OSError:
+                        pass
+            if not publish_succeeded and created_directories:
+                for directory in reversed(created_directories):
+                    try:
+                        directory.rmdir()
+                    except OSError:
+                        pass
+    except BundleError:
+        raise
+    except Exception:
+        raise BundleError("RESULT_PUBLISH_FAILED") from None
 
 
 def build_bundle(*, repository_root: Path = ROOT) -> dict[str, str | int]:
     generated_from_commit = _require_main_ancestor(repository_root)
-    bundle = _build_bundle(repository_root, generated_from_commit)
+    historical_status = _historical_status_bytes(repository_root, generated_from_commit)
+    protocol_binding = _protocol_binding(repository_root)
+    bundle = _build_bundle(repository_root, generated_from_commit, protocol_binding)
     bundle_bytes = _json_bytes(bundle)
     bundle_sha256 = _sha256(bundle_bytes)
+    template_bytes = _json_bytes(_review_template_payload(bundle, bundle_sha256))
+    template_sha256 = _sha256(template_bytes)
     runner_bytes = _regular_bytes(repository_root / RUNNER_PATH)
     runner_sha256 = _sha256(runner_bytes)
     receipt = HumanAdjudicationReceipt(
@@ -383,6 +576,9 @@ def build_bundle(*, repository_root: Path = ROOT) -> dict[str, str | int]:
         generated_from_commit=generated_from_commit,
         bundle_path=BUNDLE_PATH.as_posix(),
         bundle_sha256=bundle_sha256,
+        review_template=ArtifactBinding(
+            path=REVIEW_TEMPLATE_PATH.as_posix(), sha256=template_sha256
+        ),
         runner_path=RUNNER_PATH.as_posix(),
         runner_sha256=runner_sha256,
         candidate_count=EXPECTED_CANDIDATE_COUNT,
@@ -407,11 +603,13 @@ def build_bundle(*, repository_root: Path = ROOT) -> dict[str, str | int]:
             bundle.intent_context.repair_manifest,
             bundle.candidate_snapshot,
             bundle.classification_result,
-            ArtifactBinding(path=STATUS_PATH.as_posix(), sha256=_sha256(_regular_bytes(repository_root / STATUS_PATH))),
+            protocol_binding,
+            ArtifactBinding(path=STATUS_PATH.as_posix(), sha256=_sha256(historical_status)),
         ),
         artifact=(
             ArtifactBinding(path=BUNDLE_PATH.as_posix(), sha256=bundle_sha256),
             ArtifactBinding(path=RECEIPT_PATH.as_posix(), sha256=_sha256(receipt_bytes)),
+            ArtifactBinding(path=REVIEW_TEMPLATE_PATH.as_posix(), sha256=template_sha256),
         ),
         candidate_count=EXPECTED_CANDIDATE_COUNT,
         machine_advisory_count=EXPECTED_CANDIDATE_COUNT,
@@ -422,17 +620,23 @@ def build_bundle(*, repository_root: Path = ROOT) -> dict[str, str | int]:
         m2_t04="not_started",
         scoring_eligible=False,
         status_after_bundle="M2 IN_PROGRESS 2/5; M3 BLOCKED_BY_M2 0/5",
-        commands=("python scripts/build_m2_t03_human_adjudication_bundle.py --execute-offline",),
-        exit_codes={"build_bundle": 0},
+        commands=EXPECTED_COMMANDS,
+        exit_codes=EXPECTED_EXIT_CODES,
     )
     report_bytes = _json_bytes(report)
     _publish_conflict_safe(
         repository_root,
-        {BUNDLE_PATH: bundle_bytes, RECEIPT_PATH: receipt_bytes, REPORT_PATH: report_bytes},
+        {
+            BUNDLE_PATH: bundle_bytes,
+            RECEIPT_PATH: receipt_bytes,
+            REVIEW_TEMPLATE_PATH: template_bytes,
+            REPORT_PATH: report_bytes,
+        },
     )
     return {
         "bundle_sha256": bundle_sha256,
         "receipt_sha256": _sha256(receipt_bytes),
+        "template_sha256": template_sha256,
         "report_sha256": _sha256(report_bytes),
         "candidate_count": EXPECTED_CANDIDATE_COUNT,
     }

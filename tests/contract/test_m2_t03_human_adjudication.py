@@ -65,7 +65,7 @@ def test_validator_accepts_the_committed_bundle() -> None:
 
 def test_validator_rejects_any_prefilled_human_decision(tmp_path: Path) -> None:
     payload = copy.deepcopy(_bundle_payload())
-    payload["items"][0]["human_adjudication"]["decision"] = "CONFIRM"  # type: ignore[index]
+    payload["items"][0]["human_adjudication"]["verdict"] = "SUPPORTED"  # type: ignore[index]
     mutated = tmp_path / "bundle.json"
     mutated.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 

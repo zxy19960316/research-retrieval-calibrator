@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from datetime import datetime
+from pathlib import PurePosixPath, PureWindowsPath
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models.enums import EvidenceSlot, SupportLevel
 from app.models.evidence_classification import (
@@ -17,6 +18,7 @@ from app.models.project import ResearchIntent
 M2_T03_HUMAN_ADJUDICATION_VERSION = "m2-t03-human-adjudication.v1"
 M2_T03_HUMAN_ADJUDICATION_RECEIPT_VERSION = "m2-t03-human-adjudication-receipt.v1"
 M2_T03_HUMAN_ADJUDICATION_REPORT_VERSION = "m2-t03-human-adjudication-report.v1"
+M2_T03_HUMAN_ADJUDICATION_TEMPLATE_VERSION = "m2-t03-human-adjudication-template.v1"
 
 
 class SourceBinding(BaseModel):
@@ -37,13 +39,28 @@ class ArtifactBinding(BaseModel):
     path: str = Field(min_length=1)
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 
+    @field_validator("path")
+    @classmethod
+    def require_safe_relative_posix_path(cls, value: str) -> str:
+        if (
+            not value.strip()
+            or "\\" in value
+            or value in {".", ".."}
+            or ".." in PurePosixPath(value).parts
+            or PurePosixPath(value).is_absolute()
+            or PureWindowsPath(value).is_absolute()
+            or bool(PureWindowsPath(value).drive)
+        ):
+            raise ValueError("ArtifactBinding.path must be a safe relative POSIX path")
+        return value
+
 
 class HumanAdjudicationFields(BaseModel):
     """The empty human fields carried by every newly generated review item."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    decision: Literal["CONFIRM", "REVISE", "REJECT"] | None = None
+    verdict: Literal["SUPPORTED", "REJECTED"] | None = None
     evidence_slot: EvidenceSlot | None = None
     support_level: SupportLevel | None = None
     grounded_reason: str | None = Field(default=None, max_length=1200)
@@ -112,8 +129,12 @@ class ReviewPolicy(BaseModel):
     machine_labels_are_advisory: Literal[True]
     human_fields_initially_empty: Literal[True]
     human_review_status: Literal["pending"]
-    source_fields: tuple[Literal["paper_id", "title", "abstract", "source_identity"], ...]
+    source_fields: tuple[
+        Literal["paper_id", "title", "abstract", "source", "source_id", "url", "ResearchIntent"],
+        ...,
+    ]
     disallowed_sources: tuple[str, ...]
+    protocol: ArtifactBinding
     network_forbidden: Literal[True]
     real_model_run: Literal[False]
     real_arxiv_requests: Literal[False]
@@ -163,6 +184,7 @@ class HumanAdjudicationReceipt(BaseModel):
     generated_from_commit: str = Field(pattern=r"^[0-9a-f]{40}$")
     bundle_path: str = Field(min_length=1)
     bundle_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    review_template: ArtifactBinding
     runner_path: str = Field(min_length=1)
     runner_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     candidate_count: Literal[33]
@@ -187,7 +209,7 @@ class HumanAdjudicationReport(BaseModel):
     generated_from_commit: str = Field(pattern=r"^[0-9a-f]{40}$")
     generated_at_utc: datetime
     input_artifacts: tuple[ArtifactBinding, ...] = Field(min_length=1)
-    artifact: tuple[ArtifactBinding, ArtifactBinding]
+    artifact: tuple[ArtifactBinding, ArtifactBinding, ArtifactBinding]
     candidate_count: Literal[33]
     machine_advisory_count: Literal[33]
     human_fields_nonempty_count: Literal[0]
