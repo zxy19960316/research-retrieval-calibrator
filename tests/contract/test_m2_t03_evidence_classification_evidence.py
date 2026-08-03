@@ -38,6 +38,24 @@ def test_run_report_has_exact_closed_top_level_and_record_schemas(tmp_path: Path
         "candidate_count",
         "paper_id_order",
     }
+    assert set(report["execution"]) == {  # type: ignore[index]
+        "evidence_type",
+        "provider_call_count",
+        "record_count",
+        "title_only_count",
+        "rejected_count",
+        "slot_distribution",
+        "support_level_distribution",
+        "quality_diagnostics",
+    }
+    assert set(report["execution"]["quality_diagnostics"]) == {  # type: ignore[index]
+        "observed_slot_count",
+        "observed_support_level_count",
+        "all_records_same_support_level",
+        "generic_marker_only_count",
+        "ambiguous_rejection_count",
+        "warnings",
+    }
     records = report["records"]
     assert isinstance(records, list)
     assert all(

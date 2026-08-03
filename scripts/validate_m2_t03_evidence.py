@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from app.models.evidence_classification import EvidenceClassificationQualityDiagnostics
 from scripts.run_m2_t03_evidence_classification import (
     CANDIDATE_MANIFEST_PATH,
     CANDIDATE_SNAPSHOT_PATH,
@@ -55,8 +56,11 @@ REPORT_FIELDS = {
     "record_count",
     "slot_distribution",
     "support_level_distribution",
+    "quality_diagnostics",
     "title_only_count",
     "rejected_count",
+    "completion_scope",
+    "scoring_eligible",
     "evidence_types",
     "human_judged",
     "commands",
@@ -79,9 +83,9 @@ EXPECTED_NOT_RUN = {
     "m2_t05": True,
 }
 EXPECTED_STATUS = {
-    "m2": "IN_PROGRESS 3/5",
+    "m2": "IN_PROGRESS 2/5",
     "m3": "BLOCKED_BY_M2 0/5",
-    "next_task": "M2-T04",
+    "next_task": "M2-T03 quality closure",
 }
 
 
@@ -101,6 +105,12 @@ def _as_mapping(value: object) -> dict[str, object]:
     if not isinstance(value, dict) or any(not isinstance(key, str) for key in value):
         raise ValueError
     return cast(dict[str, object], value)
+
+
+def _require_nonnegative_int(value: object) -> int:
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        raise ValueError
+    return value
 
 
 def _load_json(path: Path) -> dict[str, object]:
@@ -195,6 +205,9 @@ def _validate_artifacts(report: Mapping[str, object], errors: list[str]) -> None
         receipt = _load_json(ROOT / FORMAL_RECEIPT_PATH)
         validate_classification_run_report(result)
         validate_classification_receipt(receipt, report=result)
+        result_execution = _as_mapping(result["execution"])
+        if report["quality_diagnostics"] != result_execution["quality_diagnostics"]:
+            raise ValueError
     except (OSError, TypeError, ValueError, KeyError):
         errors.append("formal M2-T03 artifact or receipt failed validation")
 
@@ -236,12 +249,12 @@ def _validate_status(report: Mapping[str, object], errors: list[str]) -> None:
             phase: (state, int(done), int(total))
             for phase, state, done, total in STATUS_ROW.findall(status_text)
         }
-        if rows.get("M2") != ("IN_PROGRESS", 3, 5):
-            errors.append("STATUS.md does not show M2 IN_PROGRESS 3/5")
+        if rows.get("M2") != ("IN_PROGRESS", 2, 5):
+            errors.append("STATUS.md does not show M2 IN_PROGRESS 2/5")
         if rows.get("M3") != ("BLOCKED_BY_M2", 0, 5):
             errors.append("STATUS.md does not retain M3 BLOCKED_BY_M2 0/5")
-        if "M2-T04" not in status_text:
-            errors.append("STATUS.md does not hand off to M2-T04")
+        if "M2-T03" not in status_text or "质量收口" not in status_text:
+            errors.append("STATUS.md does not hand off to M2-T03 quality closure")
     except OSError:
         errors.append("STATUS.md is unavailable")
 
@@ -273,7 +286,8 @@ def validate_m2_t03_evidence(
         dependencies = _as_mapping(report["dependency_versions"])
         if not dependencies or any(not isinstance(key, str) or not isinstance(value, str) for key, value in dependencies.items()):
             raise ValueError
-        if report["record_count"] != EXPECTED_CANDIDATE_COUNT:
+        record_count = _require_nonnegative_int(report["record_count"])
+        if record_count != EXPECTED_CANDIDATE_COUNT:
             raise ValueError
         slot_distribution = _as_mapping(report["slot_distribution"])
         support_distribution = _as_mapping(report["support_level_distribution"])
@@ -285,9 +299,28 @@ def validate_m2_t03_evidence(
             "EVALUATION_BASIS",
         } or set(support_distribution) != {"DIRECT", "INDIRECT", "HYPOTHETICAL"}:
             raise ValueError
-        if any(type(value) is not int or value < 0 for value in [*slot_distribution.values(), *support_distribution.values()]):
+        slot_counts = [_require_nonnegative_int(value) for value in slot_distribution.values()]
+        support_counts = [_require_nonnegative_int(value) for value in support_distribution.values()]
+        title_only_count = _require_nonnegative_int(report["title_only_count"])
+        rejected_count = _require_nonnegative_int(report["rejected_count"])
+        if title_only_count + rejected_count > record_count:
             raise ValueError
-        if report["title_only_count"] != 0 or report["rejected_count"] != 0:
+        if sum(slot_counts) != record_count - rejected_count:
+            raise ValueError
+        if sum(support_counts) != record_count - rejected_count:
+            raise ValueError
+        diagnostics = EvidenceClassificationQualityDiagnostics.model_validate(
+            report["quality_diagnostics"]
+        )
+        if (
+            diagnostics.observed_slot_count != sum(value > 0 for value in slot_counts)
+            or diagnostics.observed_support_level_count
+            != sum(value > 0 for value in support_counts)
+            or diagnostics.generic_marker_only_count > rejected_count
+            or diagnostics.ambiguous_rejection_count > rejected_count
+        ):
+            raise ValueError
+        if report["completion_scope"] != "contract_only" or report["scoring_eligible"] is not False:
             raise ValueError
         if report["evidence_types"] != {
             "deterministic_fake": "passed",
@@ -296,6 +329,12 @@ def validate_m2_t03_evidence(
         }:
             raise ValueError
         if report["human_judged"] is not False or report["not_run"] != EXPECTED_NOT_RUN:
+            raise ValueError
+        residual_risks = report["residual_risks"]
+        if not isinstance(residual_risks, list) or not all(isinstance(item, str) for item in residual_risks):
+            raise ValueError
+        risk_text = " ".join(residual_risks).casefold()
+        if "contract" not in risk_text or "not eligible" not in risk_text or "m2-t04" not in risk_text:
             raise ValueError
         test_totals = _as_mapping(report["test_totals"])
         if not test_totals or any(not isinstance(key, str) for key in test_totals):

@@ -41,6 +41,7 @@ from app.models.evidence_classification import (
     EvidenceClassificationQualityDiagnostics,
     EvidenceClassificationRecord,
     EvidenceClassificationState,
+    EvidenceClassificationWarningCode,
     EvidenceClassifierDescriptor,
 )
 
@@ -511,7 +512,7 @@ def _derive_quality_diagnostics(
         in {EvidenceClassificationState.REJECTED, EvidenceClassificationState.INSUFFICIENT_SOURCE_TEXT}
         for record in records
     )
-    warnings: list[str] = []
+    warnings: list[EvidenceClassificationWarningCode] = []
     if len(slots) < 3:
         warnings.append("FEWER_THAN_THREE_SLOTS_OBSERVED")
     if support_levels and len(support_levels) == 1:
@@ -526,7 +527,7 @@ def _derive_quality_diagnostics(
         all_records_same_support_level=bool(support_levels) and len(support_levels) == 1,
         generic_marker_only_count=0,
         ambiguous_rejection_count=0,
-        warnings=warnings,  # type: ignore[arg-type]
+        warnings=warnings,
     )
 
 

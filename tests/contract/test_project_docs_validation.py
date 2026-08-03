@@ -247,7 +247,7 @@ def test_status_handoff_requires_next_task_in_current_phase() -> None:
     assert errors == []
 
     stale_status = status.replace(
-        "下一动作：`M2-T03：证据槽位分类`",
+        "下一动作：`M2-T03 质量收口`",
         "下一动作：`M1-T01`",
     )
     errors = []
@@ -288,3 +288,13 @@ def test_m2_task_contract_requires_order_dependency_and_two_of_five_baseline() -
     errors = []
     validator.validate_m2_task_contract(advanced_status, phase, errors)
     assert any("M2 baseline" in error for error in errors)
+
+
+def test_docs_workflow_validates_m2_t03_evidence() -> None:
+    root = Path(__file__).parents[2]
+    workflow = (root / ".github" / "workflows" / "docs-validation.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "- name: Validate completed M2-T03 evidence" in workflow
+    assert "run: python scripts/validate_m2_t03_evidence.py" in workflow

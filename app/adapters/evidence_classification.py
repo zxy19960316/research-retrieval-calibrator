@@ -14,6 +14,7 @@ from app.models.evidence_classification import (
     EvidenceClassificationInput,
     EvidenceClassificationQualityDiagnostics,
     EvidenceClassificationState,
+    EvidenceClassificationWarningCode,
     EvidenceClassifierDescriptor,
     build_grounded_reason,
 )
@@ -458,7 +459,7 @@ def _build_quality_diagnostics(
     generic_only_count = sum(outcome.rejection_kind == "generic_only" for outcome in outcomes)
     ambiguous_count = sum(outcome.rejection_kind == "ambiguous" for outcome in outcomes)
     rejected_count = sum(outcome.rejection_kind != "none" for outcome in outcomes)
-    warnings: list[str] = []
+    warnings: list[EvidenceClassificationWarningCode] = []
     if len(slots) < 3:
         warnings.append("FEWER_THAN_THREE_SLOTS_OBSERVED")
     if support_levels and len(support_levels) == 1:
@@ -475,7 +476,7 @@ def _build_quality_diagnostics(
         all_records_same_support_level=bool(support_levels) and len(support_levels) == 1,
         generic_marker_only_count=generic_only_count,
         ambiguous_rejection_count=ambiguous_count,
-        warnings=warnings,  # type: ignore[arg-type]
+        warnings=warnings,
     )
 
 
