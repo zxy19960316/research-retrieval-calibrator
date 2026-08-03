@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=68,<81", "wheel>=0.43,<1"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "research-retrieval-calibrator"
 version = "0.1.0"
@@ -10,9 +14,11 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+  "build>=1.2,<2",
   "mypy>=1.11,<2",
   "pytest>=8.3,<9",
   "ruff>=0.6,<1",
+  "wheel>=0.43,<1",
 ]
 embedding = [
   "FlagEmbedding==1.3.5",
@@ -29,9 +35,12 @@ reranker = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+markers = [
+  "packaging: build and validate wheel and editable installation artifacts",
+]
 
 [tool.setuptools.packages.find]
-include = ["app*", "evaluation*"]
+include = ["app*", "evaluation*", "scripts*"]
 
 [tool.ruff]
 line-length = 100

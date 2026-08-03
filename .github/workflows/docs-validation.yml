@@ -23,13 +23,18 @@ jobs:
           "jsonschema>=4.23,<5"
           "pydantic>=2.9,<3"
           "PyYAML>=6.0,<7"
+          "build>=1.2,<2"
           "pytest>=8.3,<9"
           "ruff>=0.6,<1"
           "mypy>=1.11,<2"
+          "setuptools>=68,<81"
+          "wheel>=0.43,<1"
       - name: Check installed dependencies
         run: python -m pip check
-      - name: Run tests
-        run: python -m pytest -q
+      - name: Run source tests
+        run: python -m pytest -q -m "not packaging"
+      - name: Build and verify installed wheel
+        run: python -m pytest -q -m packaging
       - name: Lint with Ruff
         run: python -m ruff check app evaluation scripts tests
       - name: Type check with mypy

@@ -15,7 +15,7 @@
 
 ## 当前状态
 
-当前处于 **M0：产品与评测契约冻结** 的可执行起点。实现者应先阅读：
+当前阶段、任务进度和执行门禁均以 [`STATUS.md`](STATUS.md) 为唯一权威来源。实现者应先阅读：
 
 - [`agent.md`](agent.md)：项目总览与 Codex 工作规则
 - [`PRODUCT_SPEC.md`](PRODUCT_SPEC.md)：产品规格 v0.1
