@@ -197,16 +197,30 @@ def test_missing_replay_fails_closed(tmp_path: Path) -> None:
     assert result.valid is False
 
 
-def test_implementation_commit_not_ancestor_of_head_fails_closed(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "field",
+    [
+        "implementation_commit",
+        "validated_commit",
+        "implementation_commits.intent_core",
+        "implementation_commits.repair_runner",
+        "implementation_commits.repair_validator",
+        "implementation_commits.repair_schema",
+    ],
+)
+def test_implementation_commit_not_ancestor_of_head_fails_closed(
+    tmp_path: Path,
+    field: str,
+) -> None:
     repository = _copy_validation_fixture(tmp_path)
-    _set_nested_json(repository / REPORT_PATH, ("implementation_commit",), "0" * 40)
+    _set_nested_json(repository / REPORT_PATH, tuple(field.split(".")), "0" * 40)
 
     result = validator.validate_m1_frozen_intent_replay_repair(
         report_path=REPORT_PATH,
         repository_root=repository,
     )
 
-    assert result.valid is False
+    assert result.valid is False, field
     assert any("not an ancestor" in error for error in result.errors)
 
 
@@ -257,25 +271,6 @@ def test_replay_assertion_mutations_fail_closed(
 ) -> None:
     repository = _copy_validation_fixture(tmp_path)
     _set_nested_json(repository / REPORT_PATH, ("replay_assertions", field), replacement)
-
-    result = validator.validate_m1_frozen_intent_replay_repair(
-        report_path=REPORT_PATH,
-        repository_root=repository,
-    )
-
-    assert result.valid is False, field
-
-
-@pytest.mark.parametrize(
-    "field",
-    ["intent_core", "repair_runner", "repair_validator", "repair_schema"],
-)
-def test_implementation_commit_map_non_ancestor_fails_closed(
-    tmp_path: Path,
-    field: str,
-) -> None:
-    repository = _copy_validation_fixture(tmp_path)
-    _set_nested_json(repository / REPORT_PATH, ("implementation_commits", field), "0" * 40)
 
     result = validator.validate_m1_frozen_intent_replay_repair(
         report_path=REPORT_PATH,
@@ -349,6 +344,40 @@ def test_test_total_mutations_fail_closed(tmp_path: Path, mutation: str) -> None
     )
 
     assert result.valid is False, mutation
+
+
+@pytest.mark.parametrize(
+    ("field", "replacement"),
+    [
+        ("remote_ci_run_id", "30804091518"),
+        ("remote_ci_head_sha", "6b37c70b8373f6cd02cd587f8bfb7f8fb16fecf9"),
+    ],
+)
+def test_report_remote_ci_fields_are_rejected_as_unknown(
+    tmp_path: Path,
+    field: str,
+    replacement: str,
+) -> None:
+    repository = _copy_validation_fixture(tmp_path)
+    report_path = repository / REPORT_PATH
+    payload = _read_json(report_path)
+    payload.pop(field, None)
+    payload[field] = replacement
+    _write_json(report_path, payload)
+
+    assert field not in validator.M1ReplayRepairReport.model_fields
+    result = validator.validate_m1_frozen_intent_replay_repair(
+        report_path=REPORT_PATH,
+        repository_root=repository,
+    )
+
+    assert result.valid is False, field
+
+
+def test_validator_has_no_remote_ci_ancestor_inversion() -> None:
+    source = Path(validator.__file__).read_text(encoding="utf-8")
+
+    assert "remote_ci_head_sha" not in source
 
 
 def _copy_validation_fixture(tmp_path: Path) -> Path:
