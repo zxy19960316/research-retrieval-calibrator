@@ -210,3 +210,81 @@ def test_status_validation_allows_m1_completion_then_m2_ready() -> None:
     )
 
     assert errors == []
+
+
+def test_dynamic_status_delegation_rejects_future_hard_coded_phase() -> None:
+    root = Path(__file__).parents[2]
+    readme = (root / "README.md").read_text(encoding="utf-8")
+    agent = (root / "agent.md").read_text(encoding="utf-8")
+
+    errors: list[str] = []
+    validator.validate_dynamic_status_delegation(readme, agent, errors)
+    assert errors == []
+
+    stale_agent = agent.replace(
+        "当前活动阶段、当前任务、允许执行范围和阶段门禁，\n均以 STATUS.md 为唯一权威来源。",
+        "当前活动阶段为 M1。",
+    )
+    errors = []
+    validator.validate_dynamic_status_delegation(readme, stale_agent, errors)
+    assert any("agent.md" in error and "dynamic phase" in error for error in errors)
+
+    stale_readme = readme + "\n当前阶段为 M1。\n"
+    errors = []
+    validator.validate_dynamic_status_delegation(stale_readme, agent, errors)
+    assert any("README.md" in error and "dynamic phase" in error for error in errors)
+
+
+def test_status_handoff_requires_next_task_in_current_phase() -> None:
+    root = Path(__file__).parents[2]
+    status = (root / "STATUS.md").read_text(encoding="utf-8")
+    phase = (root / "docs" / "phases" / "M2-ranking-and-round1-selection.md").read_text(
+        encoding="utf-8"
+    )
+
+    errors: list[str] = []
+    validator.validate_status_handoff(status, phase, errors)
+    assert errors == []
+
+    stale_status = status.replace(
+        "下一动作：`M2-T03：证据槽位分类`",
+        "下一动作：`M1-T01`",
+    )
+    errors = []
+    validator.validate_status_handoff(stale_status, phase, errors)
+    assert any("next task" in error for error in errors)
+
+
+def test_m2_task_contract_requires_order_dependency_and_two_of_five_baseline() -> None:
+    root = Path(__file__).parents[2]
+    status = (root / "STATUS.md").read_text(encoding="utf-8")
+    phase = (root / "docs" / "phases" / "M2-ranking-and-round1-selection.md").read_text(
+        encoding="utf-8"
+    )
+
+    errors: list[str] = []
+    validator.validate_m2_task_contract(status, phase, errors)
+    assert errors == []
+
+    swapped = phase.replace(
+        "### M2-T03：证据槽位分类", "### M2-T03：六分项评分"
+    ).replace("### M2-T04：六分项评分", "### M2-T04：证据槽位分类")
+    errors = []
+    validator.validate_m2_task_contract(status, swapped, errors)
+    assert any("M2 task IDs" in error for error in errors)
+
+    without_dependency = phase.replace(
+        "- evidence slot score（由更早的 M2-T03 提供）",
+        "- evidence slot score",
+    )
+    errors = []
+    validator.validate_m2_task_contract(status, without_dependency, errors)
+    assert any("evidence slot score" in error for error in errors)
+
+    advanced_status = status.replace(
+        "| M2 首轮排序与选择 | IN_PROGRESS | 2/5 |",
+        "| M2 首轮排序与选择 | IN_PROGRESS | 3/5 |",
+    )
+    errors = []
+    validator.validate_m2_task_contract(advanced_status, phase, errors)
+    assert any("M2 baseline" in error for error in errors)
