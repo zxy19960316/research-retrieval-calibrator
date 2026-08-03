@@ -136,8 +136,8 @@
   "implementation_commits": {
     "intent_core": "63bbf24a0f0aa15a6ee6d46f045addf8ad51fd50",
     "repair_runner": "67069c2b501fa2dc1880ea8c35420756fbcbf308",
-    "repair_schema": "7ab3f538f932e130dfee5a4189d09ff6667dedd5",
-    "repair_validator": "7ab3f538f932e130dfee5a4189d09ff6667dedd5"
+    "repair_schema": "56769945ed6fc4da185b7730ea0717ce9467fb7f",
+    "repair_validator": "56769945ed6fc4da185b7730ea0717ce9467fb7f"
   },
   "m2_historical_evidence": {
     "m2_progress": "IN_PROGRESS 2/5",
@@ -152,8 +152,6 @@
     "model_runs": true,
     "real_arxiv_requests": true
   },
-  "remote_ci_run_id": "30804091518",
-  "remote_ci_head_sha": "6b37c70b8373f6cd02cd587f8bfb7f8fb16fecf9",
   "root_cause": "replay reconstructed ResearchIntent using replay started_at",
   "repair": "replay reuses the exact first-run frozen ResearchIntent",
   "repair_artifact": {
@@ -195,12 +193,12 @@
   "test_totals": {
     "focused_repair_and_m2_tests": {
       "failed": 0,
-      "passed": 180
+      "passed": 184
     },
     "full_non_packaging_tests": {
       "deselected": 1,
       "failed": 0,
-      "passed": 1194
+      "passed": 1198
     },
     "m1_focused_tests": {
       "failed": 0,
@@ -208,16 +206,16 @@
     },
     "new_repair_contract": {
       "failed": 0,
-      "passed": 60
+      "passed": 64
     },
     "packaging_tests": {
-      "deselected": 1194,
+      "deselected": 1198,
       "failed": 0,
       "passed": 1
     }
   },
-  "timestamp_utc": "2026-08-03T11:11:06Z",
-  "validated_commit": "7ab3f538f932e130dfee5a4189d09ff6667dedd5",
+  "timestamp_utc": "2026-08-03T11:36:00Z",
+  "validated_commit": "56769945ed6fc4da185b7730ea0717ce9467fb7f",
   "protected_hashes": {
     "evaluation/reports/m1-rebaseline-2026-07-28.json": "3336d6a6a1123fd5204f2db1f11cc155dc080f3e440db0f3eab7a2f84d2287fd",
     "evaluation/reports/m1-validation.json": "92d5776c519f8da1e7924db71961a683a471a75dc12be81628e7772d23ace01d",
