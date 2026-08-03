@@ -1,0 +1,62 @@
+{
+  "artifact": [
+    {
+      "path": "evaluation/source-artifacts/m2-t03-human-adjudication-bundle.json",
+      "sha256": "f6ae1ef7089f7830d506d7dc5040ab16df890ce040637a8568dc3ab055c447e5"
+    },
+    {
+      "path": "evaluation/source-artifacts/m2-t03-human-adjudication-bundle-receipt.json",
+      "sha256": "98403bd719db349d2d7ddbcbd2ac7554d42bc6cd316fbbed7479e19ac151e7f4"
+    },
+    {
+      "path": "evaluation/source-artifacts/m2-t03-human-adjudication-review-template.json",
+      "sha256": "540a472c8bffa78e8f2a9f77a4d0cec574fd99231d7b38912dd8d4a682c9815b"
+    }
+  ],
+  "candidate_count": 33,
+  "commands": [
+    "python scripts/build_m2_t03_human_adjudication_bundle.py --execute-offline"
+  ],
+  "exit_codes": {
+    "build_bundle": 0
+  },
+  "generated_at_utc": "2026-08-03T12:30:00Z",
+  "generated_from_commit": "19f6bb77447c791ff1c711ed918e1a501cd5604a",
+  "human_fields_nonempty_count": 0,
+  "human_review": "pending",
+  "input_artifacts": [
+    {
+      "path": "evaluation/source-artifacts/m1-intent-replay-repair-2026-08-03/first-run/first-round.json",
+      "sha256": "ed4a4d89a247c535e6138644069094d3c59a046bdefd44a79e48a4f861f95afa"
+    },
+    {
+      "path": "evaluation/source-artifacts/m1-intent-replay-repair-2026-08-03/repair-manifest.json",
+      "sha256": "fb9b0f2db164f6b40b24802e2466f5a744589ee64e9bc65a77295c8444236df3"
+    },
+    {
+      "path": "evaluation/snapshots/m2/m1-candidates.v1.json",
+      "sha256": "4a2aec0fd0a1d22adc801fd3bc506e5da89895d1276cd572e2ac64014c162448"
+    },
+    {
+      "path": "evaluation/source-artifacts/m2-t03-evidence-classification-run.json",
+      "sha256": "2bd80d2b6a10bfe531ea2ca3b7570768fd1a78e5d05efca96fc28464d72baee8"
+    },
+    {
+      "path": "docs/reviews/m2-t03-human-adjudication-protocol.md",
+      "sha256": "41b02244d0b183a87f4089ce5814ddf8eb6505c4f5f2d0ea9c4ba2d09c063cb2"
+    },
+    {
+      "path": "STATUS.md",
+      "sha256": "35551276fb8553d7e15bd8a6b65f8916d3c47139c8ec2cfc18ddecbe504227fc"
+    }
+  ],
+  "m2_t04": "not_started",
+  "machine_advisory_count": 33,
+  "phase": "M2",
+  "real_arxiv_requests": "not_run",
+  "real_model_run": "not_run",
+  "report_version": "m2-t03-human-adjudication-report.v1",
+  "scoring_eligible": false,
+  "status_after_bundle": "M2 IN_PROGRESS 2/5; M3 BLOCKED_BY_M2 0/5",
+  "task_id": "M2-T03"
+}
