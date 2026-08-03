@@ -152,7 +152,7 @@
     "model_runs": true,
     "real_arxiv_requests": true
   },
-  "remote_ci_run_id": "30798199620",
+  "remote_ci_run_id": "30804091518",
   "root_cause": "replay reconstructed ResearchIntent using replay started_at",
   "repair": "replay reuses the exact first-run frozen ResearchIntent",
   "repair_artifact": {
