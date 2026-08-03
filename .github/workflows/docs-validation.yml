@@ -49,3 +49,5 @@ jobs:
         run: python scripts/validate_m2_t01_evidence.py
       - name: Validate completed M2-T02 evidence
         run: python scripts/validate_m2_t02_evidence.py
+      - name: Validate completed M2-T03 evidence
+        run: python scripts/validate_m2_t03_evidence.py

@@ -66,6 +66,26 @@ def test_completed_m2_t02_report_passes_the_production_summary_validator() -> No
     }
 
 
+def test_completed_m2_t02_report_survives_the_m2_t03_status_handoff(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = _load_report()
+    monkeypatch.setattr(
+        evidence,
+        "_parse_status",
+        lambda _root, _errors: {
+            "M1": ("COMPLETE", 4, 4),
+            "M2": evidence.POST_M2_T03_M2_STATUS,
+            "M3": ("BLOCKED_BY_M2", 0, 5),
+        },
+    )
+    errors: list[str] = []
+
+    evidence._validate_status(payload, errors, ROOT)
+
+    assert errors == []
+
+
 def test_validated_inputs_are_bound_to_git_blobs_not_worktree_bytes(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

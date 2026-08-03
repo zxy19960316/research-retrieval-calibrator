@@ -1,0 +1,188 @@
+{
+  "report_version": "m2-t03-evidence-classification.v1",
+  "task_id": "M2-T03",
+  "implementation_commit": "824075c53ddeeb5cdb988e916f21db2c5c800ec9",
+  "validated_commit": "824075c53ddeeb5cdb988e916f21db2c5c800ec9",
+  "timestamp_utc": "2026-08-03T07:09:08Z",
+  "python_version": "3.12.10",
+  "dependency_versions": {
+    "pydantic": "2.13.4",
+    "pytest": "8.4.2",
+    "mypy": "1.20.2",
+    "ruff": "0.16.0"
+  },
+  "input_artifacts": [
+    {
+      "path": "evaluation/snapshots/m2/m1-candidates.v1.json",
+      "sha256": "4a2aec0fd0a1d22adc801fd3bc506e5da89895d1276cd572e2ac64014c162448"
+    },
+    {
+      "path": "evaluation/snapshots/m2/m1-candidates.v1.manifest.json",
+      "sha256": "b6ce7cfab2e5df6b8c84b77fb38c6f573de7429d37a9688d7b4c62e27f8546a8"
+    },
+    {
+      "path": "evaluation/source-artifacts/m2-t02-reranker-candidate-run.json",
+      "sha256": "0a751dbc35bfa8d07433796113939412bfbdffd4c5c13043c90390bccfc5c35b"
+    },
+    {
+      "path": "evaluation/source-artifacts/m2-t02-reranker-candidate-run-receipt.json",
+      "sha256": "0c9ca1339a2385a9c6940f8c53bd4711c62b8faf9f3f4cf98710ff465d56ec9a"
+    }
+  ],
+  "artifact": {
+    "result_path": "evaluation/source-artifacts/m2-t03-evidence-classification-run.json",
+    "result_sha256": "2bd80d2b6a10bfe531ea2ca3b7570768fd1a78e5d05efca96fc28464d72baee8",
+    "receipt_path": "evaluation/source-artifacts/m2-t03-evidence-classification-run-receipt.json",
+    "receipt_sha256": "0bc69ad7a4398c8070c2ba96949f7b9a023c4940b83913f38e1ba6cd41beeec4"
+  },
+  "record_count": 33,
+  "slot_distribution": {
+    "PROBLEM_EXISTENCE": 3,
+    "CURRENT_METHODS": 8,
+    "METHOD_TRANSFERABILITY": 0,
+    "IMPLEMENTATION_PATH": 5,
+    "EVALUATION_BASIS": 15
+  },
+  "support_level_distribution": {
+    "DIRECT": 31,
+    "INDIRECT": 0,
+    "HYPOTHETICAL": 0
+  },
+  "quality_diagnostics": {
+    "observed_slot_count": 4,
+    "observed_support_level_count": 1,
+    "all_records_same_support_level": true,
+    "generic_marker_only_count": 2,
+    "ambiguous_rejection_count": 0,
+    "warnings": [
+      "ALL_RECORDS_SAME_SUPPORT_LEVEL",
+      "NO_INDIRECT_OR_HYPOTHETICAL_RECORDS"
+    ]
+  },
+  "title_only_count": 0,
+  "rejected_count": 2,
+  "completion_scope": "contract_only",
+  "scoring_eligible": false,
+  "evidence_types": {
+    "deterministic_fake": "passed",
+    "real_model": "not_run",
+    "human": "not_run"
+  },
+  "human_judged": false,
+  "commands": [
+    {
+      "name": "m2_t03_runner",
+      "command": "python scripts/run_m2_t03_evidence_classification.py --execute-deterministic-fake",
+      "exit_code": 0
+    },
+    {
+      "name": "focused_tests",
+      "command": "python -m pytest -q tests/unit/test_m2_t03_evidence_classification_provider.py tests/unit/test_m2_t03_evidence_classification_runner.py tests/contract/test_m2_t03_evidence_classification.py tests/contract/test_m2_t03_evidence_classification_evidence.py tests/contract/test_m2_t03_evidence_validation.py tests/contract/test_project_docs_validation.py",
+      "exit_code": 0
+    },
+    {
+      "name": "full_non_packaging",
+      "command": "python -m pytest -q -m \"not packaging\"",
+      "exit_code": 0
+    },
+    {
+      "name": "packaging",
+      "command": "python -m pytest -q -m packaging",
+      "exit_code": 0
+    },
+    {
+      "name": "ruff",
+      "command": "ruff check app evaluation scripts tests",
+      "exit_code": 0
+    },
+    {
+      "name": "ruff_import_order",
+      "command": "ruff check --select I app evaluation scripts tests",
+      "exit_code": 0
+    },
+    {
+      "name": "mypy",
+      "command": "python -m mypy app evaluation scripts",
+      "exit_code": 0
+    },
+    {
+      "name": "project_docs",
+      "command": "python scripts/validate_project_docs.py",
+      "exit_code": 0
+    },
+    {
+      "name": "m0_evidence",
+      "command": "python scripts/validate_phase.py M0",
+      "exit_code": 0
+    },
+    {
+      "name": "m1_evidence",
+      "command": "python scripts/validate_m1_evidence.py",
+      "exit_code": 0
+    },
+    {
+      "name": "m2_t01_evidence",
+      "command": "python scripts/validate_m2_t01_evidence.py",
+      "exit_code": 0
+    },
+    {
+      "name": "m2_t02_evidence",
+      "command": "python scripts/validate_m2_t02_evidence.py",
+      "exit_code": 0
+    },
+    {
+      "name": "pip_check",
+      "command": "python -m pip check",
+      "exit_code": 0
+    },
+    {
+      "name": "git_diff_check",
+      "command": "git diff --check",
+      "exit_code": 0
+    },
+    {
+      "name": "m2_t03_validator",
+      "command": "python scripts/validate_m2_t03_evidence.py",
+      "exit_code": 0
+    }
+  ],
+  "exit_codes": {
+    "m2_t03_runner": 0,
+    "focused_tests": 0,
+    "full_non_packaging": 0,
+    "packaging": 0,
+    "ruff": 0,
+    "ruff_import_order": 0,
+    "mypy": 0,
+    "project_docs": 0,
+    "m0_evidence": 0,
+    "m1_evidence": 0,
+    "m2_t01_evidence": 0,
+    "m2_t02_evidence": 0,
+    "pip_check": 0,
+    "git_diff_check": 0,
+    "m2_t03_validator": 0
+  },
+  "test_totals": {
+    "focused": "85 passed",
+    "full_non_packaging": "1121 passed, 1 deselected",
+    "packaging": "1 passed, 1121 deselected"
+  },
+  "not_run": {
+    "real_model": true,
+    "human_review": true,
+    "m2_t04": true,
+    "m2_t05": true
+  },
+  "residual_risks": [
+    "The deterministic fake artifact validates contracts and reproducibility only; it is not evidence of real classification quality.",
+    "It is not eligible to provide the evidence_slot_score used by M2-T04.",
+    "Real-model classification and human review remain not run.",
+    "M2-T04 six-item scoring and M2-T05 diversity selection remain not implemented and not run."
+  ],
+  "status_after_evidence": {
+    "m2": "IN_PROGRESS 2/5",
+    "m3": "BLOCKED_BY_M2 0/5",
+    "next_task": "M2-T03 quality closure"
+  }
+}

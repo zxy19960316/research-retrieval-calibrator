@@ -1,5 +1,14 @@
 """Pydantic contracts for Research Retrieval Calibrator records."""
 
+from app.models.evidence_classification import (
+    EvidenceClassificationBatch,
+    EvidenceClassificationError,
+    EvidenceClassificationInput,
+    EvidenceClassificationQualityDiagnostics,
+    EvidenceClassificationRecord,
+    EvidenceClassificationState,
+    EvidenceClassifierDescriptor,
+)
 from app.models.first_round import (
     CandidateOutput,
     FailureReport,
@@ -23,6 +32,13 @@ from app.models.planning import (
 __all__ = [
     "CandidateOutput",
     "ClarificationQuestion",
+    "EvidenceClassificationBatch",
+    "EvidenceClassificationError",
+    "EvidenceClassificationInput",
+    "EvidenceClassificationQualityDiagnostics",
+    "EvidenceClassificationRecord",
+    "EvidenceClassificationState",
+    "EvidenceClassifierDescriptor",
     "ExclusionTerm",
     "FailureReport",
     "FirstRoundConfig",

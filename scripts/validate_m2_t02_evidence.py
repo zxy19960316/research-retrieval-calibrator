@@ -54,6 +54,13 @@ RECEIPT_SHA256 = "0c9ca1339a2385a9c6940f8c53bd4711c62b8faf9f3f4cf98710ff465d56ec
 RUNNER_SHA256 = "3ad6c629b2f6b1f28c3119f9f7d810226e28e6d572535e28b0de6566ef8f63b1"
 PREFLIGHT_EXECUTION_COMMIT = "a50f1b9f5467c318dbbabe8807df6ede47d79b14"
 
+M2_T02_STATUS_AFTER_EVIDENCE = {
+    "m2": "IN_PROGRESS 2/5",
+    "m3": "BLOCKED_BY_M2 0/5",
+    "next_task": "M2-T03",
+}
+POST_M2_T03_M2_STATUS = ("IN_PROGRESS", 3, 5)
+
 VALIDATED_INPUT_HASHES = {
     "evaluation/snapshots/m2/m1-candidates.v1.json": "4a2aec0fd0a1d22adc801fd3bc506e5da89895d1276cd572e2ac64014c162448",
     "evaluation/snapshots/m2/m1-candidates.v1.manifest.json": "b6ce7cfab2e5df6b8c84b77fb38c6f573de7429d37a9688d7b4c62e27f8546a8",
@@ -514,11 +521,7 @@ def _validate_summary_sections(payload: Mapping[str, object], errors: list[str])
         errors.append("acceptance does not match the fixed M2-T02 gates")
     if payload.get("not_run") != EXPECTED_NOT_RUN:
         errors.append("not_run must explicitly keep replay, rerun, benchmark, judgement, and M2-T03 false")
-    if payload.get("status_after_evidence") != {
-        "m2": "IN_PROGRESS 2/5",
-        "m3": "BLOCKED_BY_M2 0/5",
-        "next_task": "M2-T03",
-    }:
+    if payload.get("status_after_evidence") != M2_T02_STATUS_AFTER_EVIDENCE:
         errors.append("status_after_evidence must point to M2-T03 with M3 blocked")
 
     real = _mapping(payload.get("real_model_evidence"))
@@ -579,16 +582,12 @@ def _validate_status(payload: Mapping[str, object], errors: list[str], repositor
     phases = _parse_status(repository_root, errors)
     if phases.get("M1") != ("COMPLETE", 4, 4):
         errors.append("M2-T02 completion must retain M1 COMPLETE 4/4")
-    if phases.get("M2") != ("IN_PROGRESS", 2, 5):
-        errors.append("M2-T02 completion requires M2 IN_PROGRESS 2/5")
+    if phases.get("M2") not in {("IN_PROGRESS", 2, 5), POST_M2_T03_M2_STATUS}:
+        errors.append("M2-T02 completion requires M2 IN_PROGRESS 2/5 or the M2-T03 handoff 3/5")
     if phases.get("M3") != ("BLOCKED_BY_M2", 0, 5):
         errors.append("M2-T02 completion must retain M3 BLOCKED_BY_M2 0/5")
-    if payload.get("status_after_evidence") != {
-        "m2": "IN_PROGRESS 2/5",
-        "m3": "BLOCKED_BY_M2 0/5",
-        "next_task": "M2-T03",
-    }:
-        errors.append("report status_after_evidence does not match STATUS.md")
+    if payload.get("status_after_evidence") != M2_T02_STATUS_AFTER_EVIDENCE:
+        errors.append("report status_after_evidence must preserve the historical M2-T02 completion state")
 
 
 def validate_m2_t02_evidence(
