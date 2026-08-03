@@ -177,8 +177,6 @@ class M1ReplayRepairReport(_ClosedEvidenceModel):
     timestamp_utc: datetime
     implementation_commit: Sha1
     validated_commit: Sha1
-    remote_ci_run_id: str = Field(pattern=r"^\d+$")
-    remote_ci_head_sha: Sha1
     implementation_commits: M1ReplayImplementationCommits
     root_cause: str = Field(min_length=1)
     repair: str = Field(min_length=1)

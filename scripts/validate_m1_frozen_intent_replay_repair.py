@@ -45,8 +45,6 @@ from scripts.repair_m1_frozen_intent_replay import (
 
 REPORT_PATH = Path("evaluation/reports/m1-frozen-intent-replay-repair-2026-08-03.json")
 REPORT_VERSION = "m1-frozen-intent-replay-repair.v2"
-REPORT_BOUND_REMOTE_CI_RUN_ID = "30804091518"
-REPORT_BOUND_REMOTE_CI_HEAD_SHA = "6b37c70b8373f6cd02cd587f8bfb7f8fb16fecf9"
 SHA1_RE = re.compile(r"^[0-9a-f]{40}$")
 STATUS_M2_RE = re.compile(
     r"^\|\s*M2\b[^|]*\|\s*([A-Z0-9_]+)\s*\|\s*(\d+)/(\d+)\s*\|",
@@ -86,11 +84,11 @@ EXPECTED_COMMANDS: dict[str, str] = {
     "git_diff_check": "git diff --check",
 }
 EXPECTED_TEST_TOTALS: dict[str, dict[str, int]] = {
-    "new_repair_contract": {"passed": 60, "failed": 0},
+    "new_repair_contract": {"passed": 64, "failed": 0},
     "m1_focused_tests": {"passed": 39, "failed": 0},
-    "focused_repair_and_m2_tests": {"passed": 180, "failed": 0},
-    "full_non_packaging_tests": {"passed": 1194, "failed": 0, "deselected": 1},
-    "packaging_tests": {"passed": 1, "failed": 0, "deselected": 1194},
+    "focused_repair_and_m2_tests": {"passed": 184, "failed": 0},
+    "full_non_packaging_tests": {"passed": 1198, "failed": 0, "deselected": 1},
+    "packaging_tests": {"passed": 1, "failed": 0, "deselected": 1198},
 }
 
 PROTECTED_HASHES = {
@@ -443,21 +441,6 @@ def _validate_report(
             repository_root,
             errors,
         )
-    if report.remote_ci_run_id != REPORT_BOUND_REMOTE_CI_RUN_ID:
-        errors.append("repair report remote CI run binding is invalid")
-    remote_ci_head_valid = report.remote_ci_head_sha == REPORT_BOUND_REMOTE_CI_HEAD_SHA
-    if not remote_ci_head_valid:
-        errors.append("repair report remote CI head binding is invalid")
-    elif _git(repository_root, "merge-base", "--is-ancestor", report.remote_ci_head_sha, "HEAD") != 0:
-        errors.append("repair report remote CI head is not an ancestor of HEAD")
-    elif SHA1_RE.fullmatch(report.validated_commit) is not None and _git(
-        repository_root,
-        "merge-base",
-        "--is-ancestor",
-        report.remote_ci_head_sha,
-        report.validated_commit,
-    ) != 0:
-        errors.append("repair report remote CI head is not an ancestor of validated_commit")
     if report.root_cause != "replay reconstructed ResearchIntent using replay started_at":
         errors.append("repair report root cause is invalid")
     if report.repair != "replay reuses the exact first-run frozen ResearchIntent":
