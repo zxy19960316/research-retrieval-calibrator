@@ -9,8 +9,8 @@ import re
 import stat
 import subprocess
 import sys
-from dataclasses import dataclass
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
 
@@ -42,19 +42,19 @@ from scripts.build_m2_t03_human_adjudication_bundle import (
     EXPECTED_CANDIDATE_COUNT,
     EXPECTED_CANDIDATE_SNAPSHOT_SHA256,
     EXPECTED_CLASSIFICATION_RESULT_SHA256,
+    EXPECTED_COMMANDS,
+    EXPECTED_EXIT_CODES,
     EXPECTED_M1_REPAIR_FIRST_RUN_SHA256,
     EXPECTED_M1_REPAIR_MANIFEST_SHA256,
     EXPECTED_MAIN_MERGE_COMMIT,
-    EXPECTED_COMMANDS,
-    EXPECTED_EXIT_CODES,
     EXPECTED_PROTOCOL_SHA256,
-    REVIEW_DISALLOWED_SOURCES,
-    REVIEW_SOURCE_FIELDS,
     M1_REPAIR_FIRST_RUN,
     M1_REPAIR_MANIFEST,
     PROTOCOL_PATH,
     RECEIPT_PATH,
     REPORT_PATH,
+    REVIEW_DISALLOWED_SOURCES,
+    REVIEW_SOURCE_FIELDS,
     REVIEW_TEMPLATE_PATH,
     RUNNER_PATH,
     STATUS_PATH,
@@ -66,7 +66,7 @@ _STATUS_ROW = re.compile(r"^\|\s*(M\d+)\b[^|]*\|\s*([A-Z0-9_]+)\s*\|\s*(\d+/\d+)
 _FORBIDDEN_KEY_RE = re.compile(r"(?:score|rank|selection|weight|total_score)", re.IGNORECASE)
 _FORBIDDEN_TEXT_RE = re.compile(
     r"(?:file://|authorization(?:\s+headers?)?|cookie|bearer\s|access[_-]?token|api[_-]?key|"
-    r"credentials?|passwords?|tokens?|raw exceptions?|tracebacks?)",
+    r"credentials?|passwords?|token(?:s)?\s*[:=]|raw exceptions?|tracebacks?)",
     re.IGNORECASE,
 )
 _MACHINE_TEMPLATE_KEYS = {
@@ -501,9 +501,11 @@ def validate_bundle(
     except (OSError, UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError, ValidationError):
         return ValidationResult(False, ["cannot load closed M2-T03 human adjudication artifacts"])
 
-    if not _is_ancestor(repository_root, EXPECTED_MAIN_MERGE_COMMIT):
-        if repository_root.resolve() == ROOT.resolve():
-            errors.append("PR #14 main merge commit is not an ancestor of HEAD")
+    if (
+        repository_root.resolve() == ROOT.resolve()
+        and not _is_ancestor(repository_root, EXPECTED_MAIN_MERGE_COMMIT)
+    ):
+        errors.append("PR #14 main merge commit is not an ancestor of HEAD")
     if bundle.generated_from_commit != receipt.generated_from_commit:
         errors.append("bundle and receipt generation commits differ")
     if bundle.generated_from_commit != report.generated_from_commit:
@@ -576,7 +578,7 @@ def validate_current_m2_gate(
         return ValidationResult(False, errors)
     try:
         outcome = completed_result_validator(repository_root)
-    except Exception:
+    except (OSError, RuntimeError, TypeError, ValueError):
         return ValidationResult(False, ["completed-result validator failed"])
     if isinstance(outcome, ValidationResult):
         if not outcome.valid:

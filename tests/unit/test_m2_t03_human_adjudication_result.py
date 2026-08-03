@@ -7,6 +7,7 @@ from pydantic import ValidationError
 
 from app.models.enums import EvidenceSlot, SupportLevel
 from app.models.evidence_classification import source_text_sha256
+from app.models.m2_t03_human_adjudication import ArtifactBinding
 from app.models.m2_t03_human_adjudication_result import (
     CompletedHumanAdjudicationResult,
     HumanJudgment,
@@ -105,3 +106,9 @@ def test_comparison_is_derived_after_human_judgment() -> None:
         )
         == "REVISE"
     )
+
+
+@pytest.mark.parametrize("path", ["/tmp/result.json", "C:/result.json", "\\\\server\\share", "../result.json", "result\\file.json"])
+def test_artifact_binding_rejects_absolute_and_non_posix_paths(path: str) -> None:
+    with pytest.raises(ValidationError):
+        ArtifactBinding(path=path, sha256="a" * 64)

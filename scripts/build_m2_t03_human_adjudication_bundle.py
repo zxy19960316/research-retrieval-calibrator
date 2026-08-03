@@ -32,13 +32,13 @@ from app.models.evidence_classification import (
 from app.models.first_round import FirstRoundRun
 from app.models.m1_replay_repair import M1ReplayRepairManifest
 from app.models.m2_t03_human_adjudication import (
+    M2_T03_HUMAN_ADJUDICATION_TEMPLATE_VERSION,
     ArtifactBinding,
     CandidateContext,
     HumanAdjudicationBundle,
     HumanAdjudicationFields,
     HumanAdjudicationReceipt,
     HumanAdjudicationReport,
-    M2_T03_HUMAN_ADJUDICATION_TEMPLATE_VERSION,
     HumanReviewItem,
     MachineAdvisoryClassification,
     ResearchIntentContext,
@@ -514,12 +514,15 @@ def _publish_conflict_safe(repository_root: Path, targets: Mapping[Path, bytes])
                 staged.append((destination, temporary, data))
 
             for destination, temporary, data in staged:
+                destination_metadata: os.stat_result | None
                 try:
-                    metadata = destination.lstat()
+                    destination_metadata = destination.lstat()
                 except FileNotFoundError:
-                    metadata = None
-                if metadata is not None:
-                    if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISREG(metadata.st_mode):
+                    destination_metadata = None
+                if destination_metadata is not None:
+                    if stat.S_ISLNK(destination_metadata.st_mode) or not stat.S_ISREG(
+                        destination_metadata.st_mode
+                    ):
                         raise BundleError("RESULT_CONFLICT")
                     if _regular_bytes(destination) != data:
                         raise BundleError("RESULT_CONFLICT")
@@ -530,7 +533,7 @@ def _publish_conflict_safe(repository_root: Path, targets: Mapping[Path, bytes])
             publish_succeeded = True
         except BundleError:
             raise
-        except Exception:
+        except (OSError, RuntimeError, TypeError, ValueError):
             raise BundleError("RESULT_PUBLISH_FAILED") from None
         finally:
             for temporary in owned_staging:
@@ -554,7 +557,7 @@ def _publish_conflict_safe(repository_root: Path, targets: Mapping[Path, bytes])
                         pass
     except BundleError:
         raise
-    except Exception:
+    except (OSError, RuntimeError, TypeError, ValueError):
         raise BundleError("RESULT_PUBLISH_FAILED") from None
 
 
