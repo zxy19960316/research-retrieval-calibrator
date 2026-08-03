@@ -11,7 +11,11 @@ from app.adapters.evidence_classification import (
     EvidenceClassifierProvider,
 )
 from app.core.evidence_classification import classify_evidence_batch
-from app.models.evidence_classification import EvidenceClassificationInput
+from app.models.enums import EvidenceSlot, SupportLevel
+from app.models.evidence_classification import (
+    EvidenceClassificationInput,
+    EvidenceClassificationState,
+)
 from tests.contract.test_m2_t03_evidence_classification import _input
 
 
@@ -66,6 +70,81 @@ def test_reordered_inputs_preserve_paper_id_keyed_outputs() -> None:
     first_by_id = {record.paper_id: record.model_dump(mode="json") for record in first.records}
     second_by_id = {record.paper_id: record.model_dump(mode="json") for record in second.records}
     assert first_by_id == second_by_id
+
+
+def test_title_only_marker_uses_title_excerpt() -> None:
+    item = _input(
+        title="Benchmark for graph retrieval",
+        abstract="This paper examines a scientific corpus.",
+    )
+
+    record = classify_evidence_batch([item], DeterministicFakeEvidenceClassifier()).records[0]
+
+    assert record.evidence_slot is EvidenceSlot.EVALUATION_BASIS
+    assert record.supporting_excerpt == item.title
+
+
+def test_title_marker_does_not_fallback_to_unrelated_abstract() -> None:
+    item = _input(
+        title="Pipeline for graph retrieval",
+        abstract="This paper concerns a broad research topic.",
+    )
+
+    record = classify_evidence_batch([item], DeterministicFakeEvidenceClassifier()).records[0]
+
+    assert record.evidence_slot is EvidenceSlot.IMPLEMENTATION_PATH
+    assert record.supporting_excerpt == item.title
+    assert record.supporting_excerpt not in (item.abstract or "")
+
+
+@pytest.mark.parametrize(
+    "title",
+    [
+        "A system for research",
+        "A dataset for science",
+        "Results from a study",
+        "An application for research",
+    ],
+)
+def test_generic_system_dataset_results_application_words_do_not_classify_alone(
+    title: str,
+) -> None:
+    item = _input(title=title, abstract="A broad resource is described.")
+
+    record = classify_evidence_batch([item], DeterministicFakeEvidenceClassifier()).records[0]
+
+    assert record.state is EvidenceClassificationState.REJECTED
+    assert record.evidence_slot is None
+    assert record.support_level is None
+    assert record.supporting_excerpt is None
+
+
+def test_support_level_is_bound_to_the_selected_sentence() -> None:
+    item = _input(
+        title="Cross-domain retrieval method",
+        abstract="It demonstrates a generic property in a separate sentence.",
+    )
+
+    record = classify_evidence_batch([item], DeterministicFakeEvidenceClassifier()).records[0]
+
+    assert record.evidence_slot is EvidenceSlot.METHOD_TRANSFERABILITY
+    assert record.support_level is SupportLevel.INDIRECT
+    assert record.supporting_excerpt == item.title
+    assert record.supporting_excerpt not in (item.abstract or "")
+
+
+def test_equal_low_specificity_matches_are_rejected() -> None:
+    item = _input(
+        title="A system and dataset",
+        abstract="A broad resource is described.",
+    )
+
+    record = classify_evidence_batch([item], DeterministicFakeEvidenceClassifier()).records[0]
+
+    assert record.state is EvidenceClassificationState.REJECTED
+    assert record.evidence_slot is None
+    assert record.support_level is None
+    assert record.supporting_excerpt is None
 
 
 def test_provider_exception_is_an_explicit_failure_without_partial_output() -> None:
