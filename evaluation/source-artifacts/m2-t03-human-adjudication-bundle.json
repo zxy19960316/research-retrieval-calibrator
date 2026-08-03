@@ -1,0 +1,1542 @@
+{
+  "bundle_version": "m2-t03-human-adjudication.v1",
+  "candidate_count": 33,
+  "candidate_snapshot": {
+    "path": "evaluation/snapshots/m2/m1-candidates.v1.json",
+    "sha256": "4a2aec0fd0a1d22adc801fd3bc506e5da89895d1276cd572e2ac64014c162448"
+  },
+  "classification_result": {
+    "path": "evaluation/source-artifacts/m2-t03-evidence-classification-run.json",
+    "sha256": "2bd80d2b6a10bfe531ea2ca3b7570768fd1a78e5d05efca96fc28464d72baee8"
+  },
+  "generated_at_utc": "2026-08-03T12:30:00Z",
+  "generated_from_commit": "b51fb5e3de86b0c1c49ebf5cbf02be227b1e9651",
+  "intent_context": {
+    "canonical_intent_sha256": "3bb7c50d4993eb217979333eae192c2a3c8d5ca1099ecc60c137e4efecdbe5fe",
+    "repair_manifest": {
+      "path": "evaluation/source-artifacts/m1-intent-replay-repair-2026-08-03/repair-manifest.json",
+      "sha256": "fb9b0f2db164f6b40b24802e2466f5a744589ee64e9bc65a77295c8444236df3"
+    },
+    "research_intent": {
+      "accepted_paper_roles": [
+        "method"
+      ],
+      "exclusions": [],
+      "frozen_at": "2026-07-28T07:08:40.329494Z",
+      "method_constraint": "PREFERRED",
+      "method_terms": [
+        "graph-based retrieval",
+        "graph-based",
+        "retrieval"
+      ],
+      "object_terms": [
+        "scientific literature",
+        "scientific",
+        "literature"
+      ],
+      "revision": 1,
+      "scope_terms": [
+        "support",
+        "scientific literature discovery"
+      ],
+      "task_terms": [
+        "discovery"
+      ]
+    },
+    "source_artifact": {
+      "path": "evaluation/source-artifacts/m1-intent-replay-repair-2026-08-03/first-run/first-round.json",
+      "sha256": "ed4a4d89a247c535e6138644069094d3c59a046bdefd44a79e48a4f861f95afa"
+    }
+  },
+  "items": [
+    {
+      "context": {
+        "abstract": "Multimedia collections are more than ever growing in size and diversity. Effective multimedia retrieval systems are thus critical to access these datasets from the end-user perspective and in a scalable way. We are interested in repositories of image/text multimedia objects and we study multimodal information fusion techniques in the context of content based multimedia information retrieval. We focus on graph based methods which have proven to provide state-of-the-art performances. We particularly examine two of such methods : cross-media similarities and random walk based scores. From a theoretical viewpoint, we propose a unifying graph based framework which encompasses the two aforementioned approaches. Our proposal allows us to highlight the core features one should consider when using a graph based technique for the combination of visual and textual information. We compare cross-media and random walk based results using three different real-world datasets. From a practical standpoint, our extended empirical analysis allow us to provide insights and guidelines about the use of graph based methods for multimodal information fusion in content based multimedia information retrieval.",
+        "paper_id": "arxiv:1401.6891",
+        "source_identity": {
+          "source": "arxiv",
+          "source_id": "1401.6891",
+          "url": "http://arxiv.org/abs/1401.6891v1"
+        },
+        "source_text_sha256": "33efe764db3896c299711f10e6e849a9cf2bc42e746286b4bdc3f8c13fa87a65",
+        "title": "Unsupervised Visual and Textual Information Fusion in Multimedia Retrieval - A Graph-based Point of View"
+      },
+      "human_adjudication": {
+        "decision": null,
+        "evidence_slot": null,
+        "grounded_reason": null,
+        "notes": null,
+        "reviewed_at_utc": null,
+        "reviewer_id": null,
+        "support_level": null,
+        "supporting_excerpt": null
+      },
+      "machine_advisory": {
+        "advisory_only": true,
+        "classification_version": "m2-t03-evidence-classification.v1",
+        "classifier_descriptor": {
+          "classifier_id": "m2-t03-lexical-evidence-slot",
+          "classifier_revision": "fake-v2-grounded-fragment",
+          "evidence_type": "deterministic_fake",
+          "prompt_revision": "none",
+          "provider_name": "deterministic_fake",
+          "schema_version": "m2-t03-evidence-classification.v1"
+        },
+        "evidence_slot": "CURRENT_METHODS",
+        "evidence_type": "deterministic_fake",
+        "paper_id": "arxiv:1401.6891",
+        "reason": "来源摘录直接支持该证据槽位：From a theoretical viewpoint, we propose a unifying graph based framework which encompasses the two aforementioned approaches.。",
+        "source_text_sha256": "33efe764db3896c299711f10e6e849a9cf2bc42e746286b4bdc3f8c13fa87a65",
+        "state": "CLASSIFIED",
+        "support_level": "DIRECT",
+        "supporting_excerpt": "From a theoretical viewpoint, we propose a unifying graph based framework which encompasses the two aforementioned approaches."
+      }
+    },
+    {
+      "context": {
+        "abstract": "\"Open access\" has become a central theme of journal reform in academic publishing. In this article, I examine the relationship between open access publishing and an important infrastructural element of a modern research enterprise, scientific literature text mining, or the use of data analytic techniques to conduct meta-analyses and investigations into the scientific corpus. I give a brief history of the open access movement, discuss novel journalistic practices, and an overview of data-driven investigation of the scientific corpus. I argue that particularly in an era where the veracity of many research studies has been called into question, scientific literature text mining should be one of the key motivations for open access publishing, not only in the basic sciences, but in the engineering and applied sciences as well. The enormous benefits of unrestricted access to the research literature should prompt scholars from all disciplines to lend their vocal support to enabling legal, wholesale access to the scientific literature as part of a data science pipeline.",
+        "paper_id": "arxiv:1611.00097",
+        "source_identity": {
+          "source": "arxiv",
+          "source_id": "1611.00097",
+          "url": "http://arxiv.org/abs/1611.00097v3"
+        },
+        "source_text_sha256": "476a8a050b6287dbb68b6d155230a7b024105b5d580245d611cdaacf5242802a",
+        "title": "Scientific Literature Text Mining and the Case for Open Access"
+      },
+      "human_adjudication": {
+        "decision": null,
+        "evidence_slot": null,
+        "grounded_reason": null,
+        "notes": null,
+        "reviewed_at_utc": null,
+        "reviewer_id": null,
+        "support_level": null,
+        "supporting_excerpt": null
+      },
+      "machine_advisory": {
+        "advisory_only": true,
+        "classification_version": "m2-t03-evidence-classification.v1",
+        "classifier_descriptor": {
+          "classifier_id": "m2-t03-lexical-evidence-slot",
+          "classifier_revision": "fake-v2-grounded-fragment",
+          "evidence_type": "deterministic_fake",
+          "prompt_revision": "none",
+          "provider_name": "deterministic_fake",
+          "schema_version": "m2-t03-evidence-classification.v1"
+        },
+        "evidence_slot": "IMPLEMENTATION_PATH",
+        "evidence_type": "deterministic_fake",
+        "paper_id": "arxiv:1611.00097",
+        "reason": "来源摘录直接支持该证据槽位：The enormous benefits of unrestricted access to the research literature should prompt scholars from all disciplines to lend their vocal support to enabling legal, wholesale access to the scientific literature as part of a data science pipeline.。",
+        "source_text_sha256": "476a8a050b6287dbb68b6d155230a7b024105b5d580245d611cdaacf5242802a",
+        "state": "CLASSIFIED",
+        "support_level": "DIRECT",
+        "supporting_excerpt": "The enormous benefits of unrestricted access to the research literature should prompt scholars from all disciplines to lend their vocal support to enabling legal, wholesale access to the scientific literature as part of a data science pipeline."
+      }
+    },
+    {
+      "context": {
+        "abstract": "Word sense induction (WSI), which addresses polysemy by unsupervised discovery of multiple word senses, resolves ambiguities for downstream NLP tasks and also makes word representations more interpretable. This paper proposes an accurate and efficient graph-based method for WSI that builds a global non-negative vector embedding basis (which are interpretable like topics) and clusters the basis indexes in the ego network of each polysemous word. By adopting distributional inclusion vector embeddings as our basis formation model, we avoid the expensive step of nearest neighbor search that plagues other graph-based methods without sacrificing the quality of sense clusters. Experiments on three datasets show that our proposed method produces similar or better sense clusters and embeddings compared with previous state-of-the-art methods while being significantly more efficient.",
+        "paper_id": "arxiv:1804.03257",
+        "source_identity": {
+          "source": "arxiv",
+          "source_id": "1804.03257",
+          "url": "http://arxiv.org/abs/1804.03257v2"
+        },
+        "source_text_sha256": "72a8655b51939d98d05effc12e93cd82ec46dfab46e32fe9b8d0eb956a244c45",
+        "title": "Efficient Graph-based Word Sense Induction by Distributional Inclusion Vector Embeddings"
+      },
+      "human_adjudication": {
+        "decision": null,
+        "evidence_slot": null,
+        "grounded_reason": null,
+        "notes": null,
+        "reviewed_at_utc": null,
+        "reviewer_id": null,
+        "support_level": null,
+        "supporting_excerpt": null
+      },
+      "machine_advisory": {
+        "advisory_only": true,
+        "classification_version": "m2-t03-evidence-classification.v1",
+        "classifier_descriptor": {
+          "classifier_id": "m2-t03-lexical-evidence-slot",
+          "classifier_revision": "fake-v2-grounded-fragment",
+          "evidence_type": "deterministic_fake",
+          "prompt_revision": "none",
+          "provider_name": "deterministic_fake",
+          "schema_version": "m2-t03-evidence-classification.v1"
+        },
+        "evidence_slot": "EVALUATION_BASIS",
+        "evidence_type": "deterministic_fake",
+        "paper_id": "arxiv:1804.03257",
+        "reason": "来源摘录直接支持该证据槽位：Experiments on three datasets show that our proposed method produces similar or better sense clusters and embeddings compared with previous state-of-the-art methods while being significantly more efficient.。",
+        "source_text_sha256": "72a8655b51939d98d05effc12e93cd82ec46dfab46e32fe9b8d0eb956a244c45",
+        "state": "CLASSIFIED",
+        "support_level": "DIRECT",
+        "supporting_excerpt": "Experiments on three datasets show that our proposed method produces similar or better sense clusters and embeddings compared with previous state-of-the-art methods while being significantly more efficient."
+      }
+    },
+    {
+      "context": {
+        "abstract": "Each claim in a research paper requires all relevant prior knowledge to be discovered, assimilated, and appropriately cited. However, despite the availability of powerful search engines and sophisticated text editing software, discovering relevant papers and integrating the knowledge into a manuscript remain complex tasks associated with high cognitive load. To define comprehensive search queries requires strong motivation from authors, irrespective of their familiarity with the research field. Moreover, switching between independent applications for literature discovery, bibliography management, reading papers, and writing text burdens authors further and interrupts their creative process. Here, we present a web application that combines text editing and literature discovery in an interactive user interface. The application is equipped with a search engine that couples Boolean keyword filtering with nearest neighbor search over text embeddings, providing a discovery experience tuned to an author's manuscript and his interests. Our application aims to take a step towards more enjoyable and effortless academic writing. The demo of the application (https://SciEditorDemo2020.herokuapp.com/) and a short video tutorial (https://youtu.be/pkdVU60IcRc) are available online.",
+        "paper_id": "arxiv:2005.04961",
+        "source_identity": {
+          "source": "arxiv",
+          "source_id": "2005.04961",
+          "url": "http://arxiv.org/abs/2005.04961v1"
+        },
+        "source_text_sha256": "9b0e51568b1c475676cf16f3fbb5231bb00abd0c551e636d927d897d713f274d",
+        "title": "Embedding-based Scientific Literature Discovery in a Text Editor Application"
+      },
+      "human_adjudication": {
+        "decision": null,
+        "evidence_slot": null,
+        "grounded_reason": null,
+        "notes": null,
+        "reviewed_at_utc": null,
+        "reviewer_id": null,
+        "support_level": null,
+        "supporting_excerpt": null
+      },
+      "machine_advisory": {
+        "advisory_only": true,
+        "classification_version": "m2-t03-evidence-classification.v1",
+        "classifier_descriptor": {
+          "classifier_id": "m2-t03-lexical-evidence-slot",
+          "classifier_revision": "fake-v2-grounded-fragment",
+          "evidence_type": "deterministic_fake",
+          "prompt_revision": "none",
+          "provider_name": "deterministic_fake",
+          "schema_version": "m2-t03-evidence-classification.v1"
+        },
+        "evidence_slot": "PROBLEM_EXISTENCE",
+        "evidence_type": "deterministic_fake",
+        "paper_id": "arxiv:2005.04961",
+        "reason": "来源摘录直接支持该证据槽位：However, despite the availability of powerful search engines and sophisticated text editing software, discovering relevant papers and integrating the knowledge into a manuscript remain complex tasks associated with high cognitive load.。",
+        "source_text_sha256": "9b0e51568b1c475676cf16f3fbb5231bb00abd0c551e636d927d897d713f274d",
+        "state": "CLASSIFIED",
+        "support_level": "DIRECT",
+        "supporting_excerpt": "However, despite the availability of powerful search engines and sophisticated text editing software, discovering relevant papers and integrating the knowledge into a manuscript remain complex tasks associated with high cognitive load."
+      }
+    },
+    {
+      "context": {
+        "abstract": "The coronavirus disease (COVID-19) has claimed the lives of over 350,000 people and infected more than 6 million people worldwide. Several search engines have surfaced to provide researchers with additional tools to find and retrieve information from the rapidly growing corpora on COVID-19. These engines lack extraction and visualization tools necessary to retrieve and interpret complex relations inherent to scientific literature. Moreover, because these engines mainly rely upon semantic information, their ability to capture complex global relationships across documents is limited, which reduces the quality of similarity-based article recommendations for users. In this work, we present the COVID-19 Knowledge Graph (CKG), a heterogeneous graph for extracting and visualizing complex relationships between COVID-19 scientific articles. The CKG combines semantic information with document topological information for the application of similar document retrieval. The CKG is constructed using the latent schema of the data, and then enriched with biomedical entity information extracted from the unstructured text of articles using scalable AWS technologies to form relations in the graph. Finally, we propose a document similarity engine that leverages low-dimensional graph embeddings from the CKG with semantic embeddings for similar article retrieval. Analysis demonstrates the quality of relationships in the CKG and shows that it can be used to uncover meaningful information in COVID-19 scientific articles. The CKG helps power www.cord19.aws and is publicly available.",
+        "paper_id": "arxiv:2007.12731",
+        "source_identity": {
+          "source": "arxiv",
+          "source_id": "2007.12731",
+          "url": "http://arxiv.org/abs/2007.12731v1"
+        },
+        "source_text_sha256": "a2390e7980d14e6d12573d66556a30d18668606a85581cb7791416f288657c8e",
+        "title": "COVID-19 Knowledge Graph: Accelerating Information Retrieval and Discovery for Scientific Literature"
+      },
+      "human_adjudication": {
+        "decision": null,
+        "evidence_slot": null,
+        "grounded_reason": null,
+        "notes": null,
+        "reviewed_at_utc": null,
+        "reviewer_id": null,
+        "support_level": null,
+        "supporting_excerpt": null
+      },
+      "machine_advisory": {
+        "advisory_only": true,
+        "classification_version": "m2-t03-evidence-classification.v1",
+        "classifier_descriptor": {
+          "classifier_id": "m2-t03-lexical-evidence-slot",
+          "classifier_revision": "fake-v2-grounded-fragment",
+          "evidence_type": "deterministic_fake",
+          "prompt_revision": "none",
+          "provider_name": "deterministic_fake",
+          "schema_version": "m2-t03-evidence-classification.v1"
+        },
+        "evidence_slot": "PROBLEM_EXISTENCE",
+        "evidence_type": "deterministic_fake",
+        "paper_id": "arxiv:2007.12731",
+        "reason": "来源摘录直接支持该证据槽位：These engines lack extraction and visualization tools necessary to retrieve and interpret complex relations inherent to scientific literature.。",
+        "source_text_sha256": "a2390e7980d14e6d12573d66556a30d18668606a85581cb7791416f288657c8e",
+        "state": "CLASSIFIED",
+        "support_level": "DIRECT",
+        "supporting_excerpt": "These engines lack extraction and visualization tools necessary to retrieve and interpret complex relations inherent to scientific literature."
+      }
+    },
+    {
+      "context": {
+        "abstract": "Research misconduct and frauds pollute the scientific literature. Honest errors and malevolent data fabrication, image manipulation, journal hijacking, and plagiarism passed peer review unnoticed. Problematic papers deceive readers, authors citing them, and AI-powered literature-based discovery. Flagship publishers accepted hundreds flawed papers despite claiming to enforce peer review. This application ambitions to decontaminate the scientific literature using curative and preventive actions.",
+        "paper_id": "arxiv:2210.15912",
+        "source_identity": {
+          "source": "arxiv",
+          "source_id": "2210.15912",
+          "url": "http://arxiv.org/abs/2210.15912v1"
+        },
+        "source_text_sha256": "e25c5d301ba35508307deddeeebe5482f2ed1069acb4e23d5ffed166320e1715",
+        "title": "Decontamination of the scientific literature"
+      },
+      "human_adjudication": {
+        "decision": null,
+        "evidence_slot": null,
+        "grounded_reason": null,
+        "notes": null,
+        "reviewed_at_utc": null,
+        "reviewer_id": null,
+        "support_level": null,
+        "supporting_excerpt": null
+      },
+      "machine_advisory": {
+        "advisory_only": true,
+        "classification_version": "m2-t03-evidence-classification.v1",
+        "classifier_descriptor": {
+          "classifier_id": "m2-t03-lexical-evidence-slot",
+          "classifier_revision": "fake-v2-grounded-fragment",
+          "evidence_type": "deterministic_fake",
+          "prompt_revision": "none",
+          "provider_name": "deterministic_fake",
+          "schema_version": "m2-t03-evidence-classification.v1"
+        },
+        "evidence_slot": null,
+        "evidence_type": "deterministic_fake",
+        "paper_id": "arxiv:2210.15912",
+        "reason": "The source contains only generic markers and does not provide a reliable evidence-slot basis.",
+        "source_text_sha256": "e25c5d301ba35508307deddeeebe5482f2ed1069acb4e23d5ffed166320e1715",
+        "state": "REJECTED",
+        "support_level": null,
+        "supporting_excerpt": null
+      }
+    },
+    {
+      "context": {
+        "abstract": "Scientific writing involves retrieving, summarizing, and citing relevant papers, which can be time-consuming processes in large and rapidly evolving fields. By making these processes inter-operable, natural language processing (NLP) provides opportunities for creating end-to-end assistive writing tools. We propose SciLit, a pipeline that automatically recommends relevant papers, extracts highlights, and suggests a reference sentence as a citation of a paper, taking into consideration the user-provided context and keywords. SciLit efficiently recommends papers from large databases of hundreds of millions of papers using a two-stage pre-fetching and re-ranking literature search system that flexibly deals with addition and removal of a paper database. We provide a convenient user interface that displays the recommended papers as extractive summaries and that offers abstractively-generated citing sentences which are aligned with the provided context and which mention the chosen keyword(s). Our assistive tool for literature discovery and scientific writing is available at https://scilit.vercel.app",
+        "paper_id": "arxiv:2306.03535",
+        "source_identity": {
+          "source": "arxiv",
+          "source_id": "2306.03535",
+          "url": "http://arxiv.org/abs/2306.03535v2"
+        },
+        "source_text_sha256": "8d4a20466db2ebe5cbb06496a896fc2bcb4e7b787bb72a0584fb0288fe67bd48",
+        "title": "SciLit: A Platform for Joint Scientific Literature Discovery, Summarization and Citation Generation"
+      },
+      "human_adjudication": {
+        "decision": null,
+        "evidence_slot": null,
+        "grounded_reason": null,
+        "notes": null,
+        "reviewed_at_utc": null,
+        "reviewer_id": null,
+        "support_level": null,
+        "supporting_excerpt": null
+      },
+      "machine_advisory": {
+        "advisory_only": true,
+        "classification_version": "m2-t03-evidence-classification.v1",
+        "classifier_descriptor": {
+          "classifier_id": "m2-t03-lexical-evidence-slot",
+          "classifier_revision": "fake-v2-grounded-fragment",
+          "evidence_type": "deterministic_fake",
+          "prompt_revision": "none",
+          "provider_name": "deterministic_fake",
+          "schema_version": "m2-t03-evidence-classification.v1"
+        },
+        "evidence_slot": "IMPLEMENTATION_PATH",
+        "evidence_type": "deterministic_fake",
+        "paper_id": "arxiv:2306.03535",
+        "reason": "来源摘录直接支持该证据槽位：We propose SciLit, a pipeline that automatically recommends relevant papers, extracts highlights, and suggests a reference sentence as a citation of a paper, taking into consideration the user-provided context and keywords.。",
+        "source_text_sha256": "8d4a20466db2ebe5cbb06496a896fc2bcb4e7b787bb72a0584fb0288fe67bd48",
+        "state": "CLASSIFIED",
+        "support_level": "DIRECT",
+        "supporting_excerpt": "We propose SciLit, a pipeline that automatically recommends relevant papers, extracts highlights, and suggests a reference sentence as a citation of a paper, taking into consideration the user-provided context and keywords."
+      }
+    },
+    {
+      "context": {
+        "abstract": "Entity linking is an important step towards constructing knowledge graphs that facilitate advanced question answering over scientific documents, including the retrieval of relevant information included in tables within these documents. This paper introduces a general-purpose system for linking entities to items in the Wikidata knowledge base. It describes how we adapt this system for linking domain-specific entities, especially for those entities embedded within tables drawn from COVID-19-related scientific literature. We describe the setup of an efficient offline instance of the system that enables our entity-linking approach to be more feasible in practice. As part of a broader approach to infer the semantic meaning of scientific tables, we leverage the structural and semantic characteristics of the tables to improve overall entity linking performance.",
+        "paper_id": "arxiv:2306.10044",
+        "source_identity": {
+          "source": "arxiv",
+          "source_id": "2306.10044",
+          "url": "http://arxiv.org/abs/2306.10044v1"
+        },
+        "source_text_sha256": "16b57c3c93e40f5a61ffab151e32b853e585098733c1abbd976c94f74169468d",
+        "title": "A Practical Entity Linking System for Tables in Scientific Literature"
+      },
+      "human_adjudication": {
+        "decision": null,
+        "evidence_slot": null,
+        "grounded_reason": null,
+        "notes": null,
+        "reviewed_at_utc": null,
+        "reviewer_id": null,
+        "support_level": null,
+        "supporting_excerpt": null
+      },
+      "machine_advisory": {
+        "advisory_only": true,
+        "classification_version": "m2-t03-evidence-classification.v1",
+        "classifier_descriptor": {
+          "classifier_id": "m2-t03-lexical-evidence-slot",
+          "classifier_revision": "fake-v2-grounded-fragment",
+          "evidence_type": "deterministic_fake",
+          "prompt_revision": "none",
+          "provider_name": "deterministic_fake",
+          "schema_version": "m2-t03-evidence-classification.v1"
+        },
+        "evidence_slot": null,
+        "evidence_type": "deterministic_fake",
+        "paper_id": "arxiv:2306.10044",
+        "reason": "The source contains only generic markers and does not provide a reliable evidence-slot basis.",
+        "source_text_sha256": "16b57c3c93e40f5a61ffab151e32b853e585098733c1abbd976c94f74169468d",
+        "state": "REJECTED",
+        "support_level": null,
+        "supporting_excerpt": null
+      }
+    },
+    {
+      "context": {
+        "abstract": "The quickly-expanding nature of published medical literature makes it challenging for clinicians and researchers to keep up with and summarize recent, relevant findings in a timely manner. While several closed-source summarization tools based on large language models (LLMs) now exist, rigorous and systematic evaluations of their outputs are lacking. Furthermore, there is a paucity of high-quality datasets and appropriate benchmark tasks with which to evaluate these tools. We address these issues with four contributions: we release Clinfo.ai, an open-source WebApp that answers clinical questions based on dynamically retrieved scientific literature; we specify an information retrieval and abstractive summarization task to evaluate the performance of such retrieval-augmented LLM systems; we release a dataset of 200 questions and corresponding answers derived from published systematic reviews, which we name PubMed Retrieval and Synthesis (PubMedRS-200); and report benchmark results for Clinfo.ai and other publicly available OpenQA systems on PubMedRS-200.",
+        "paper_id": "arxiv:2310.16146",
+        "source_identity": {
+          "source": "arxiv",
+          "source_id": "2310.16146",
+          "url": "http://arxiv.org/abs/2310.16146v1"
+        },
+        "source_text_sha256": "fe31ff77ffe9182b3eca651a0d725db297461bba3072fd901f58a3e426523e20",
+        "title": "Clinfo.ai: An Open-Source Retrieval-Augmented Large Language Model System for Answering Medical Questions using Scientific Literature"
+      },
+      "human_adjudication": {
+        "decision": null,
+        "evidence_slot": null,
+        "grounded_reason": null,
+        "notes": null,
+        "reviewed_at_utc": null,
+        "reviewer_id": null,
+        "support_level": null,
+        "supporting_excerpt": null
+      },
+      "machine_advisory": {
+        "advisory_only": true,
+        "classification_version": "m2-t03-evidence-classification.v1",
+        "classifier_descriptor": {
+          "classifier_id": "m2-t03-lexical-evidence-slot",
+          "classifier_revision": "fake-v2-grounded-fragment",
+          "evidence_type": "deterministic_fake",
+          "prompt_revision": "none",
+          "provider_name": "deterministic_fake",
+          "schema_version": "m2-t03-evidence-classification.v1"
+        },
+        "evidence_slot": "EVALUATION_BASIS",
+        "evidence_type": "deterministic_fake",
+        "paper_id": "arxiv:2310.16146",
+        "reason": "来源摘录直接支持该证据槽位：We address these issues with four contributions: we release Clinfo.ai, an open-source WebApp that answers clinical questions based on dynamically retrieved scientific literature; we specify an information retrieval and abstractive summarization task to evaluate the performance of such retrieval-augmented LLM systems; we release a dataset of 200 questions and corresponding answers derived from published systematic reviews, which we name PubMed Retrieval and Synthesis (PubMedRS-200); and report benchmark results for Clinfo.ai and other publicly available OpenQA systems on PubMedRS-200.。",
+        "source_text_sha256": "fe31ff77ffe9182b3eca651a0d725db297461bba3072fd901f58a3e426523e20",
+        "state": "CLASSIFIED",
+        "support_level": "DIRECT",
+        "supporting_excerpt": "We address these issues with four contributions: we release Clinfo.ai, an open-source WebApp that answers clinical questions based on dynamically retrieved scientific literature; we specify an information retrieval and abstractive summarization task to evaluate the performance of such retrieval-augmented LLM systems; we release a dataset of 200 questions and corresponding answers derived from published systematic reviews, which we name PubMed Retrieval and Synthesis (PubMedRS-200); and report benchmark results for Clinfo.ai and other publicly available OpenQA systems on PubMedRS-200."
+      }
+    },
+    {
+      "context": {
+        "abstract": "Large language models (LLMs) are transforming the way information is retrieved with vast amounts of knowledge being summarized and presented via natural language conversations. Yet, LLMs are prone to highlight the most frequently seen pieces of information from the training set and to neglect the rare ones. In the field of biomedical research, latest discoveries are key to academic and industrial actors and are obscured by the abundance of an ever-increasing literature corpus (the information overload problem). Surfacing new associations between biomedical entities, e.g., drugs, genes, diseases, with LLMs becomes a challenge of capturing the long-tail knowledge of the biomedical scientific production. To overcome this challenge, Retrieval Augmented Generation (RAG) has been proposed to alleviate some of the shortcomings of LLMs by augmenting the prompts with context retrieved from external datasets. RAG methods typically select the context via maximum similarity search over text embeddings. In this study, we show that RAG methods leave out a significant proportion of relevant information due to clusters of over-represented concepts in the biomedical literature. We introduce a novel information-retrieval method that leverages a knowledge graph to downsample these clusters and mitigate the information overload problem. Its retrieval performance is about twice better than embedding similarity alternatives on both precision and recall. Finally, we demonstrate that both embedding similarity and knowledge graph retrieval methods can be advantageously combined into a hybrid model that outperforms both, enabling potential improvements to biomedical question-answering models.",
+        "paper_id": "arxiv:2402.12352",
+        "source_identity": {
+          "source": "arxiv",
+          "source_id": "2402.12352",
+          "url": "http://arxiv.org/abs/2402.12352v1"
+        },
+        "source_text_sha256": "0954376763d5d8fa455e7119c2292f3af9979e37667a7c3c85438f425b847f4c",
+        "title": "Graph-Based Retriever Captures the Long Tail of Biomedical Knowledge"
+      },
+      "human_adjudication": {
+        "decision": null,
+        "evidence_slot": null,
+        "grounded_reason": null,
+        "notes": null,
+        "reviewed_at_utc": null,
+        "reviewer_id": null,
+        "support_level": null,
+        "supporting_excerpt": null
+      },
+      "machine_advisory": {
+        "advisory_only": true,
+        "classification_version": "m2-t03-evidence-classification.v1",
+        "classifier_descriptor": {
+          "classifier_id": "m2-t03-lexical-evidence-slot",
+          "classifier_revision": "fake-v2-grounded-fragment",
+          "evidence_type": "deterministic_fake",
+          "prompt_revision": "none",
+          "provider_name": "deterministic_fake",
+          "schema_version": "m2-t03-evidence-classification.v1"
+        },
+        "evidence_slot": "EVALUATION_BASIS",
+        "evidence_type": "deterministic_fake",
+        "paper_id": "arxiv:2402.12352",
+        "reason": "来源摘录直接支持该证据槽位：Its retrieval performance is about twice better than embedding similarity alternatives on both precision and recall.。",
+        "source_text_sha256": "0954376763d5d8fa455e7119c2292f3af9979e37667a7c3c85438f425b847f4c",
+        "state": "CLASSIFIED",
+        "support_level": "DIRECT",
+        "supporting_excerpt": "Its retrieval performance is about twice better than embedding similarity alternatives on both precision and recall."
+      }
+    },
+    {
+      "context": {
+        "abstract": "Optical Music Recognition (OMR) automates the transcription of musical notation from images into machine-readable formats like MusicXML, MEI, or MIDI, significantly reducing the costs and time of manual transcription. This study explores knowledge discovery in OMR by applying instance segmentation using Mask R-CNN to enhance the detection and delineation of musical symbols in sheet music. Unlike Optical Character Recognition (OCR), OMR must handle the intricate semantics of Common Western Music Notation (CWMN), where symbol meanings depend on shape, position, and context. Our approach leverages instance segmentation to manage the density and overlap of musical symbols, facilitating more precise information retrieval from music scores. Evaluations on the DoReMi and MUSCIMA++ datasets demonstrate substantial improvements, with our method achieving a mean Average Precision (mAP) of up to 59.70\\% in dense symbol environments, achieving comparable results to object detection. Furthermore, using traditional computer vision techniques, we add a parallel step for staff detection to infer the pitch for the recognised symbols. This study emphasises the role of pixel-wise segmentation in advancing accurate music symbol recognition, contributing to knowledge discovery in OMR. Our findings indicate that instance segmentation provides more precise representations of musical symbols, particularly in densely populated scores, advancing OMR technology. We make our implementation, pre-processing scripts, trained models, and evaluation results publicly available to support further research and development.",
+        "paper_id": "arxiv:2408.15002",
+        "source_identity": {
+          "source": "arxiv",
+          "source_id": "2408.15002",
+          "url": "http://arxiv.org/abs/2408.15002v2"
+        },
+        "source_text_sha256": "31115921c11d538f9123279803b77d23f8dc227d3bec61e626cf5648d4e42c19",
+        "title": "Knowledge Discovery in Optical Music Recognition: Enhancing Information Retrieval with Instance Segmentation"
+      },
+      "human_adjudication": {
+        "decision": null,
+        "evidence_slot": null,
+        "grounded_reason": null,
+        "notes": null,
+        "reviewed_at_utc": null,
+        "reviewer_id": null,
+        "support_level": null,
+        "supporting_excerpt": null
+      },
+      "machine_advisory": {
+        "advisory_only": true,
+        "classification_version": "m2-t03-evidence-classification.v1",
+        "classifier_descriptor": {
+          "classifier_id": "m2-t03-lexical-evidence-slot",
+          "classifier_revision": "fake-v2-grounded-fragment",
+          "evidence_type": "deterministic_fake",
+          "prompt_revision": "none",
+          "provider_name": "deterministic_fake",
+          "schema_version": "m2-t03-evidence-classification.v1"
+        },
+        "evidence_slot": "EVALUATION_BASIS",
+        "evidence_type": "deterministic_fake",
+        "paper_id": "arxiv:2408.15002",
+        "reason": "来源摘录直接支持该证据槽位：Evaluations on the DoReMi and MUSCIMA++ datasets demonstrate substantial improvements, with our method achieving a mean Average Precision (mAP) of up to 59.70\\% in dense symbol environments, achieving comparable results to object detection.。",
+        "source_text_sha256": "31115921c11d538f9123279803b77d23f8dc227d3bec61e626cf5648d4e42c19",
+        "state": "CLASSIFIED",
+        "support_level": "DIRECT",
+        "supporting_excerpt": "Evaluations on the DoReMi and MUSCIMA++ datasets demonstrate substantial improvements, with our method achieving a mean Average Precision (mAP) of up to 59.70\\% in dense symbol environments, achieving comparable results to object detection."
+      }
+    },
+    {
+      "context": {
+        "abstract": "Scientific literature understanding is crucial for extracting targeted information and garnering insights, thereby significantly advancing scientific discovery. Despite the remarkable success of Large Language Models (LLMs), they face challenges in scientific literature understanding, primarily due to (1) a lack of scientific knowledge and (2) unfamiliarity with specialized scientific tasks. To develop an LLM specialized in scientific literature understanding, we propose a hybrid strategy that integrates continual pre-training (CPT) and supervised fine-tuning (SFT), to simultaneously infuse scientific domain knowledge and enhance instruction-following capabilities for domain-specific tasks.cIn this process, we identify two key challenges: (1) constructing high-quality CPT corpora, and (2) generating diverse SFT instructions. We address these challenges through a meticulous pipeline, including PDF text extraction, parsing content error correction, quality filtering, and synthetic instruction creation. Applying this strategy, we present a suite of LLMs: SciLitLLM, specialized in scientific literature understanding. These models demonstrate promising performance on scientific literature understanding benchmarks. Our contributions are threefold: (1) We present an effective framework that integrates CPT and SFT to adapt LLMs to scientific literature understanding, which can also be easily adapted to other domains. (2) We propose an LLM-based synthesis method to generate diverse and high-quality scientific instructions, resulting in a new instruction set -- SciLitIns -- for supervised fine-tuning in less-represented scientific domains. (3) SciLitLLM achieves promising performance improvements on scientific literature understanding benchmarks.",
+        "paper_id": "arxiv:2408.15545",
+        "source_identity": {
+          "source": "arxiv",
+          "source_id": "2408.15545",
+          "url": "http://arxiv.org/abs/2408.15545v5"
+        },
+        "source_text_sha256": "f9df3f2905841f1608023adc121c710143a0088097497f44a845d339ca0a3faa",
+        "title": "SciLitLLM: How to Adapt LLMs for Scientific Literature Understanding"
+      },
+      "human_adjudication": {
+        "decision": null,
+        "evidence_slot": null,
+        "grounded_reason": null,
+        "notes": null,
+        "reviewed_at_utc": null,
+        "reviewer_id": null,
+        "support_level": null,
+        "supporting_excerpt": null
+      },
+      "machine_advisory": {
+        "advisory_only": true,
+        "classification_version": "m2-t03-evidence-classification.v1",
+        "classifier_descriptor": {
+          "classifier_id": "m2-t03-lexical-evidence-slot",
+          "classifier_revision": "fake-v2-grounded-fragment",
+          "evidence_type": "deterministic_fake",
+          "prompt_revision": "none",
+          "provider_name": "deterministic_fake",
+          "schema_version": "m2-t03-evidence-classification.v1"
+        },
+        "evidence_slot": "CURRENT_METHODS",
+        "evidence_type": "deterministic_fake",
+        "paper_id": "arxiv:2408.15545",
+        "reason": "来源摘录直接支持该证据槽位：(2) We propose an LLM-based synthesis method to generate diverse and high-quality scientific instructions, resulting in a new instruction set -- SciLitIns -- for supervised fine-tuning in less-represented scientific domains.。",
+        "source_text_sha256": "f9df3f2905841f1608023adc121c710143a0088097497f44a845d339ca0a3faa",
+        "state": "CLASSIFIED",
+        "support_level": "DIRECT",
+        "supporting_excerpt": "(2) We propose an LLM-based synthesis method to generate diverse and high-quality scientific instructions, resulting in a new instruction set -- SciLitIns -- for supervised fine-tuning in less-represented scientific domains."
+      }
+    },
+    {
+      "context": {
+        "abstract": "Retrieval-Augmented Generation (RAG) is one of the leading and most widely used techniques for enhancing LLM retrieval capabilities, but it still faces significant limitations in commercial use cases. RAG primarily relies on the query-chunk text-to-text similarity in the embedding space for retrieval and can fail to capture deeper semantic relationships across chunks, is highly sensitive to chunking strategies, and is prone to hallucinations. To address these challenges, we propose TOBUGraph, a graph-based retrieval framework that first constructs the knowledge graph from unstructured data dynamically and automatically. Using LLMs, TOBUGraph extracts structured knowledge and diverse relationships among data, going beyond RAG's text-to-text similarity. Retrieval is achieved through graph traversal, leveraging the extracted relationships and structures to enhance retrieval accuracy, eliminating the need for chunking configurations while reducing hallucination. We demonstrate TOBUGraph's effectiveness in TOBU, a real-world application in production for personal memory organization and retrieval. Our evaluation using real user data demonstrates that TOBUGraph outperforms multiple RAG implementations in both precision and recall, significantly improving user experience through improved retrieval accuracy.",
+        "paper_id": "arxiv:2412.05447",
+        "source_identity": {
+          "source": "arxiv",
+          "source_id": "2412.05447",
+          "url": "http://arxiv.org/abs/2412.05447v3"
+        },
+        "source_text_sha256": "61f3d473a3553b7ea389a8cbcfce94773c958890280caaeded954b7ae9e1f8ee",
+        "title": "TOBUGraph: Knowledge Graph-Based Retrieval for Enhanced LLM Performance Beyond RAG"
+      },
+      "human_adjudication": {
+        "decision": null,
+        "evidence_slot": null,
+        "grounded_reason": null,
+        "notes": null,
+        "reviewed_at_utc": null,
+        "reviewer_id": null,
+        "support_level": null,
+        "supporting_excerpt": null
+      },
+      "machine_advisory": {
+        "advisory_only": true,
+        "classification_version": "m2-t03-evidence-classification.v1",
+        "classifier_descriptor": {
+          "classifier_id": "m2-t03-lexical-evidence-slot",
+          "classifier_revision": "fake-v2-grounded-fragment",
+          "evidence_type": "deterministic_fake",
+          "prompt_revision": "none",
+          "provider_name": "deterministic_fake",
+          "schema_version": "m2-t03-evidence-classification.v1"
+        },
+        "evidence_slot": "EVALUATION_BASIS",
+        "evidence_type": "deterministic_fake",
+        "paper_id": "arxiv:2412.05447",
+        "reason": "来源摘录直接支持该证据槽位：Our evaluation using real user data demonstrates that TOBUGraph outperforms multiple RAG implementations in both precision and recall, significantly improving user experience through improved retrieval accuracy.。",
+        "source_text_sha256": "61f3d473a3553b7ea389a8cbcfce94773c958890280caaeded954b7ae9e1f8ee",
+        "state": "CLASSIFIED",
+        "support_level": "DIRECT",
+        "supporting_excerpt": "Our evaluation using real user data demonstrates that TOBUGraph outperforms multiple RAG implementations in both precision and recall, significantly improving user experience through improved retrieval accuracy."
+      }
+    },
+    {
+      "context": {
+        "abstract": "Keyword-based searches are today's standard in digital libraries. Yet, complex retrieval scenarios like in scientific knowledge bases, need more sophisticated access paths. Although each document somewhat contributes to a domain's body of knowledge, the exact structure between keywords, i.e., their possible relationships, and the contexts spanned within each single document will be crucial for effective retrieval. Following this logic, individual documents can be seen as small-scale knowledge graphs on which graph queries can provide focused document retrieval. We implemented a full-fledged graph-based discovery system for the biomedical domain and demonstrated its benefits in the past. Unfortunately, graph-based retrieval methods generally follow an 'exact match' paradigm, which severely hampers search efficiency, since exact match results are hard to rank by relevance. This paper extends our existing discovery system and contributes effective graph-based unsupervised ranking methods, a new query relaxation paradigm, and ontological rewriting. These extensions improve the system further so that users can retrieve results with higher precision and higher recall due to partial matching and ontological rewriting.",
+        "paper_id": "arxiv:2412.15232",
+        "source_identity": {
+          "source": "arxiv",
+          "source_id": "2412.15232",
+          "url": "http://arxiv.org/abs/2412.15232v1"
+        },
+        "source_text_sha256": "a82e4879891365b7ade60242cf15893ca91ec22043576c9e36629c36e3f95bc6",
+        "title": "Ranking Narrative Query Graphs for Biomedical Document Retrieval (Technical Report)"
+      },
+      "human_adjudication": {
+        "decision": null,
+        "evidence_slot": null,
+        "grounded_reason": null,
+        "notes": null,
+        "reviewed_at_utc": null,
+        "reviewer_id": null,
+        "support_level": null,
+        "supporting_excerpt": null
+      },
+      "machine_advisory": {
+        "advisory_only": true,
+        "classification_version": "m2-t03-evidence-classification.v1",
+        "classifier_descriptor": {
+          "classifier_id": "m2-t03-lexical-evidence-slot",
+          "classifier_revision": "fake-v2-grounded-fragment",
+          "evidence_type": "deterministic_fake",
+          "prompt_revision": "none",
+          "provider_name": "deterministic_fake",
+          "schema_version": "m2-t03-evidence-classification.v1"
+        },
+        "evidence_slot": "EVALUATION_BASIS",
+        "evidence_type": "deterministic_fake",
+        "paper_id": "arxiv:2412.15232",
+        "reason": "来源摘录直接支持该证据槽位：These extensions improve the system further so that users can retrieve results with higher precision and higher recall due to partial matching and ontological rewriting.。",
+        "source_text_sha256": "a82e4879891365b7ade60242cf15893ca91ec22043576c9e36629c36e3f95bc6",
+        "state": "CLASSIFIED",
+        "support_level": "DIRECT",
+        "supporting_excerpt": "These extensions improve the system further so that users can retrieve results with higher precision and higher recall due to partial matching and ontological rewriting."
+      }
+    },
+    {
+      "context": {
+        "abstract": "As large language models (LLMs) evolve, their ability to deliver personalized and context-aware responses offers transformative potential for improving user experiences. Existing personalization approaches, however, often rely solely on user history to augment the prompt, limiting their effectiveness in generating tailored outputs, especially in cold-start scenarios with sparse data. To address these limitations, we propose Personalized Graph-based Retrieval-Augmented Generation (PGraphRAG), a framework that leverages user-centric knowledge graphs to enrich personalization. By directly integrating structured user knowledge into the retrieval process and augmenting prompts with user-relevant context, PGraphRAG enhances contextual understanding and output quality. We also introduce the Personalized Graph-based Benchmark for Text Generation, designed to evaluate personalized text generation tasks in real-world settings where user history is sparse or unavailable. Experimental results show that PGraphRAG significantly outperforms state-of-the-art personalization methods across diverse tasks, demonstrating the unique advantages of graph-based retrieval for personalization.",
+        "paper_id": "arxiv:2501.02157",
+        "source_identity": {
+          "source": "arxiv",
+          "source_id": "2501.02157",
+          "url": "http://arxiv.org/abs/2501.02157v2"
+        },
+        "source_text_sha256": "fd34ce739501db68c8f4098c1600e419eadff9be342f1a518929be81187f8e51",
+        "title": "Personalized Graph-Based Retrieval for Large Language Models"
+      },
+      "human_adjudication": {
+        "decision": null,
+        "evidence_slot": null,
+        "grounded_reason": null,
+        "notes": null,
+        "reviewed_at_utc": null,
+        "reviewer_id": null,
+        "support_level": null,
+        "supporting_excerpt": null
+      },
+      "machine_advisory": {
+        "advisory_only": true,
+        "classification_version": "m2-t03-evidence-classification.v1",
+        "classifier_descriptor": {
+          "classifier_id": "m2-t03-lexical-evidence-slot",
+          "classifier_revision": "fake-v2-grounded-fragment",
+          "evidence_type": "deterministic_fake",
+          "prompt_revision": "none",
+          "provider_name": "deterministic_fake",
+          "schema_version": "m2-t03-evidence-classification.v1"
+        },
+        "evidence_slot": "CURRENT_METHODS",
+        "evidence_type": "deterministic_fake",
+        "paper_id": "arxiv:2501.02157",
+        "reason": "来源摘录直接支持该证据槽位：To address these limitations, we propose Personalized Graph-based Retrieval-Augmented Generation (PGraphRAG), a framework that leverages user-centric knowledge graphs to enrich personalization.。",
+        "source_text_sha256": "fd34ce739501db68c8f4098c1600e419eadff9be342f1a518929be81187f8e51",
+        "state": "CLASSIFIED",
+        "support_level": "DIRECT",
+        "supporting_excerpt": "To address these limitations, we propose Personalized Graph-based Retrieval-Augmented Generation (PGraphRAG), a framework that leverages user-centric knowledge graphs to enrich personalization."
+      }
+    },
+    {
+      "context": {
+        "abstract": "In this work, we benchmark various graph-based retrieval-augmented generation (RAG) systems across a broad spectrum of query types, including OLTP-style (fact-based) and OLAP-style (thematic) queries, to address the complex demands of open-domain question answering (QA). Traditional RAG methods often fall short in handling nuanced, multi-document synthesis tasks. By structuring knowledge as graphs, we can facilitate the retrieval of context that captures greater semantic depth and enhances language model operations. We explore graph-based RAG methodologies and introduce TREX, a novel, cost-effective alternative that combines graph-based and vector-based retrieval techniques. Our benchmarking across four diverse datasets highlights the strengths of different RAG methodologies, demonstrates TREX's ability to handle multiple open-domain QA types, and reveals the limitations of current evaluation methods. In a real-world technical support case study, we demonstrate how TREX solutions can surpass conventional vector-based RAG in efficiently synthesizing data from heterogeneous sources. Our findings underscore the potential of augmenting large language models with advanced retrieval and orchestration capabilities, advancing scalable, graph-based AI solutions.",
+        "paper_id": "arxiv:2503.02922",
+        "source_identity": {
+          "source": "arxiv",
+          "source_id": "2503.02922",
+          "url": "http://arxiv.org/abs/2503.02922v1"
+        },
+        "source_text_sha256": "c08d5920087fb169187df25fddcc9695ac02ac39896137506920cb6ae9bdeb4b",
+        "title": "Optimizing open-domain question answering with graph-based retrieval augmented generation"
+      },
+      "human_adjudication": {
+        "decision": null,
+        "evidence_slot": null,
+        "grounded_reason": null,
+        "notes": null,
+        "reviewed_at_utc": null,
+        "reviewer_id": null,
+        "support_level": null,
+        "supporting_excerpt": null
+      },
+      "machine_advisory": {
+        "advisory_only": true,
+        "classification_version": "m2-t03-evidence-classification.v1",
+        "classifier_descriptor": {
+          "classifier_id": "m2-t03-lexical-evidence-slot",
+          "classifier_revision": "fake-v2-grounded-fragment",
+          "evidence_type": "deterministic_fake",
+          "prompt_revision": "none",
+          "provider_name": "deterministic_fake",
+          "schema_version": "m2-t03-evidence-classification.v1"
+        },
+        "evidence_slot": "EVALUATION_BASIS",
+        "evidence_type": "deterministic_fake",
+        "paper_id": "arxiv:2503.02922",
+        "reason": "来源摘录直接支持该证据槽位：Our benchmarking across four diverse datasets highlights the strengths of different RAG methodologies, demonstrates TREX's ability to handle multiple open-domain QA types, and reveals the limitations of current evaluation methods.。",
+        "source_text_sha256": "c08d5920087fb169187df25fddcc9695ac02ac39896137506920cb6ae9bdeb4b",
+        "state": "CLASSIFIED",
+        "support_level": "DIRECT",
+        "supporting_excerpt": "Our benchmarking across four diverse datasets highlights the strengths of different RAG methodologies, demonstrates TREX's ability to handle multiple open-domain QA types, and reveals the limitations of current evaluation methods."
+      }
+    },
+    {
+      "context": {
+        "abstract": "The causal relationships between biomarkers are essential for disease diagnosis and medical treatment planning. One notable application is Alzheimer's disease (AD) diagnosis, where certain biomarkers may influence the presence of others, enabling early detection, precise disease staging, targeted treatments, and improved monitoring of disease progression. However, understanding these causal relationships is complex and requires extensive research. Constructing a comprehensive causal network of biomarkers demands significant effort from human experts, who must analyze a vast number of research papers, and have bias in understanding diseases' biomarkers and their relation. This raises an important question: Can advanced large language models (LLMs), such as those utilizing retrieval-augmented generation (RAG), assist in building causal networks of biomarkers for further medical analysis? To explore this, we collected 200 AD-related research papers published over the past 25 years and then integrated scientific literature with RAG to extract AD biomarkers and generate causal relations among them. Given the high-risk nature of the medical diagnosis, we applied uncertainty estimation to assess the reliability of the generated causal edges and examined the faithfulness and scientificness of LLM reasoning using both automatic and human evaluation. We find that RAG enhances the ability of LLMs to generate more accurate causal networks from scientific papers. However, the overall performance of LLMs in identifying causal relations of AD biomarkers is still limited. We hope this study will inspire further foundational research on AI-driven analysis of AD biomarkers causal network discovery.",
+        "paper_id": "arxiv:2504.08768",
+        "source_identity": {
+          "source": "arxiv",
+          "source_id": "2504.08768",
+          "url": "http://arxiv.org/abs/2504.08768v2"
+        },
+        "source_text_sha256": "f3441f17f2269eabe038af16442706167cf2d979cf0c406942fb68a029ff3fdf",
+        "title": "Accelerating Causal Network Discovery of Alzheimer Disease Biomarkers via Scientific Literature-based Retrieval Augmented Generation"
+      },
+      "human_adjudication": {
+        "decision": null,
+        "evidence_slot": null,
+        "grounded_reason": null,
+        "notes": null,
+        "reviewed_at_utc": null,
+        "reviewer_id": null,
+        "support_level": null,
+        "supporting_excerpt": null
+      },
+      "machine_advisory": {
+        "advisory_only": true,
+        "classification_version": "m2-t03-evidence-classification.v1",
+        "classifier_descriptor": {
+          "classifier_id": "m2-t03-lexical-evidence-slot",
+          "classifier_revision": "fake-v2-grounded-fragment",
+          "evidence_type": "deterministic_fake",
+          "prompt_revision": "none",
+          "provider_name": "deterministic_fake",
+          "schema_version": "m2-t03-evidence-classification.v1"
+        },
+        "evidence_slot": "EVALUATION_BASIS",
+        "evidence_type": "deterministic_fake",
+        "paper_id": "arxiv:2504.08768",
+        "reason": "来源摘录直接支持该证据槽位：Given the high-risk nature of the medical diagnosis, we applied uncertainty estimation to assess the reliability of the generated causal edges and examined the faithfulness and scientificness of LLM reasoning using both automatic and human evaluation.。",
+        "source_text_sha256": "f3441f17f2269eabe038af16442706167cf2d979cf0c406942fb68a029ff3fdf",
+        "state": "CLASSIFIED",
+        "support_level": "DIRECT",
+        "supporting_excerpt": "Given the high-risk nature of the medical diagnosis, we applied uncertainty estimation to assess the reliability of the generated causal edges and examined the faithfulness and scientificness of LLM reasoning using both automatic and human evaluation."
+      }
+    },
+    {
+      "context": {
+        "abstract": "Conventional Retrieval Augmented Generation (RAG) approaches are common in text-based applications. However, they struggle with structured, interconnected datasets like knowledge graphs, where understanding underlying relationships is crucial for accurate retrieval. A common direction in graph-based retrieval employs iterative, rule-based traversal guided by Large Language Models (LLMs). Such existing iterative methods typically combine reasoning with single hop traversal at each step, making them vulnerable to LLM reasoning errors and hallucinations that ultimately hinder the retrieval of relevant information. To address these limitations, we propose GraphRunner, a novel graph-based retrieval framework that operates in three distinct stages: planning, verification, and execution. This introduces high-level traversal actions that enable multi-hop exploration in a single step. It also generates a holistic traversal plan, which is verified against the graph structure and pre-defined traversal actions, reducing reasoning errors and detecting hallucinations before execution. GraphRunner significantly reduces LLM reasoning errors and detects hallucinations through validation. Our evaluation using the GRBench dataset shows that GraphRunner consistently outperforms existing approaches, achieving 10-50% performance improvements over the strongest baseline while reducing inference cost by 3.0-12.9x and response generation time by 2.5-7.1x, making it significantly more robust and efficient for graph-based retrieval tasks.",
+        "paper_id": "arxiv:2507.08945",
+        "source_identity": {
+          "source": "arxiv",
+          "source_id": "2507.08945",
+          "url": "http://arxiv.org/abs/2507.08945v1"
+        },
+        "source_text_sha256": "f25554fb7f3b0abfe9ce859c9592f93cc18c5b9a70738d496b5876d04bc395c2",
+        "title": "GraphRunner: A Multi-Stage Framework for Efficient and Accurate Graph-Based Retrieval"
+      },
+      "human_adjudication": {
+        "decision": null,
+        "evidence_slot": null,
+        "grounded_reason": null,
+        "notes": null,
+        "reviewed_at_utc": null,
+        "reviewer_id": null,
+        "support_level": null,
+        "supporting_excerpt": null
+      },
+      "machine_advisory": {
+        "advisory_only": true,
+        "classification_version": "m2-t03-evidence-classification.v1",
+        "classifier_descriptor": {
+          "classifier_id": "m2-t03-lexical-evidence-slot",
+          "classifier_revision": "fake-v2-grounded-fragment",
+          "evidence_type": "deterministic_fake",
+          "prompt_revision": "none",
+          "provider_name": "deterministic_fake",
+          "schema_version": "m2-t03-evidence-classification.v1"
+        },
+        "evidence_slot": "CURRENT_METHODS",
+        "evidence_type": "deterministic_fake",
+        "paper_id": "arxiv:2507.08945",
+        "reason": "来源摘录直接支持该证据槽位：To address these limitations, we propose GraphRunner, a novel graph-based retrieval framework that operates in three distinct stages: planning, verification, and execution.。",
+        "source_text_sha256": "f25554fb7f3b0abfe9ce859c9592f93cc18c5b9a70738d496b5876d04bc395c2",
+        "state": "CLASSIFIED",
+        "support_level": "DIRECT",
+        "supporting_excerpt": "To address these limitations, we propose GraphRunner, a novel graph-based retrieval framework that operates in three distinct stages: planning, verification, and execution."
+      }
+    },
+    {
+      "context": {
+        "abstract": "The rapid expansion of enzyme kinetics literature has outpaced the curation capabilities of major biochemical databases, creating a substantial barrier to AI-driven modeling and knowledge discovery. We present zERExtractor, an automated and extensible platform for comprehensive extraction of enzyme-catalyzed reaction and activity data from scientific literature. zERExtractor features a unified, modular architecture that supports plug-and-play integration of state-of-the-art models, including large language models (LLMs), as interchangeable components, enabling continuous system evolution alongside advances in AI. Our pipeline combines domain-adapted deep learning, advanced OCR, semantic entity recognition, and prompt-driven LLM modules, together with human expert corrections, to extract kinetic parameters (e.g., kcat, Km), enzyme sequences, substrate SMILES, experimental conditions, and molecular diagrams from heterogeneous document formats. Through active learning strategies integrating AI-assisted annotation, expert validation, and iterative refinement, the system adapts rapidly to new data sources. We also release a large benchmark dataset comprising over 1,000 annotated tables and 5,000 biological fields from 270 P450-related enzymology publications. Benchmarking demonstrates that zERExtractor consistently outperforms existing baselines in table recognition (Acc 89.9%), molecular image interpretation (up to 99.1%), and relation extraction (accuracy 94.2%). zERExtractor bridges the longstanding data gap in enzyme kinetics with a flexible, plugin-ready framework and high-fidelity extraction, laying the groundwork for future AI-powered enzyme modeling and biochemical knowledge discovery.",
+        "paper_id": "arxiv:2508.09995",
+        "source_identity": {
+          "source": "arxiv",
+          "source_id": "2508.09995",
+          "url": "http://arxiv.org/abs/2508.09995v1"
+        },
+        "source_text_sha256": "0682883af2f400b24ea09d0c72e86a6c8b1e0760b514f3feabb64e233c656dd9",
+        "title": "zERExtractor:An Automated Platform for Enzyme-Catalyzed Reaction Data Extraction from Scientific Literature"
+      },
+      "human_adjudication": {
+        "decision": null,
+        "evidence_slot": null,
+        "grounded_reason": null,
+        "notes": null,
+        "reviewed_at_utc": null,
+        "reviewer_id": null,
+        "support_level": null,
+        "supporting_excerpt": null
+      },
+      "machine_advisory": {
+        "advisory_only": true,
+        "classification_version": "m2-t03-evidence-classification.v1",
+        "classifier_descriptor": {
+          "classifier_id": "m2-t03-lexical-evidence-slot",
+          "classifier_revision": "fake-v2-grounded-fragment",
+          "evidence_type": "deterministic_fake",
+          "prompt_revision": "none",
+          "provider_name": "deterministic_fake",
+          "schema_version": "m2-t03-evidence-classification.v1"
+        },
+        "evidence_slot": "EVALUATION_BASIS",
+        "evidence_type": "deterministic_fake",
+        "paper_id": "arxiv:2508.09995",
+        "reason": "来源摘录直接支持该证据槽位：Benchmarking demonstrates that zERExtractor consistently outperforms existing baselines in table recognition (Acc 89.9%), molecular image interpretation (up to 99.1%), and relation extraction (accuracy 94.2%).。",
+        "source_text_sha256": "0682883af2f400b24ea09d0c72e86a6c8b1e0760b514f3feabb64e233c656dd9",
+        "state": "CLASSIFIED",
+        "support_level": "DIRECT",
+        "supporting_excerpt": "Benchmarking demonstrates that zERExtractor consistently outperforms existing baselines in table recognition (Acc 89.9%), molecular image interpretation (up to 99.1%), and relation extraction (accuracy 94.2%)."
+      }
+    },
+    {
+      "context": {
+        "abstract": "Topic discovery in scientific literature provides valuable insights for researchers to identify emerging trends and explore new avenues for investigation, facilitating easier scientific information retrieval. Many machine learning methods, particularly deep embedding techniques, have been applied to discover research topics. However, most existing topic discovery methods rely on word embedding to capture the semantics and lack a comprehensive understanding of scientific publications, struggling with complex, high-dimensional text relationships. Inspired by the exceptional comprehension of textual information by large language models (LLMs), we propose an advanced topic discovery method enhanced by LLMs to improve scientific topic identification, namely SciTopic. Specifically, we first build a textual encoder to capture the content from scientific publications, including metadata, title, and abstract. Next, we construct a space optimization module that integrates entropy-based sampling and triplet tasks guided by LLMs, enhancing the focus on thematic relevance and contextual intricacies between ambiguous instances. Then, we propose to fine-tune the textual encoder based on the guidance from the LLMs by optimizing the contrastive loss of the triplets, forcing the text encoder to better discriminate instances of different topics. Finally, extensive experiments conducted on three real-world datasets of scientific publications demonstrate that SciTopic outperforms the state-of-the-art (SOTA) scientific topic discovery methods, enabling researchers to gain deeper and faster insights.",
+        "paper_id": "arxiv:2508.20514",
+        "source_identity": {
+          "source": "arxiv",
+          "source_id": "2508.20514",
+          "url": "http://arxiv.org/abs/2508.20514v2"
+        },
+        "source_text_sha256": "ade1e059941f95215f95a89997dca38fa4299a83499394240a378e8a66b08092",
+        "title": "SciTopic: Enhancing Topic Discovery in Scientific Literature through Advanced LLM"
+      },
+      "human_adjudication": {
+        "decision": null,
+        "evidence_slot": null,
+        "grounded_reason": null,
+        "notes": null,
+        "reviewed_at_utc": null,
+        "reviewer_id": null,
+        "support_level": null,
+        "supporting_excerpt": null
+      },
+      "machine_advisory": {
+        "advisory_only": true,
+        "classification_version": "m2-t03-evidence-classification.v1",
+        "classifier_descriptor": {
+          "classifier_id": "m2-t03-lexical-evidence-slot",
+          "classifier_revision": "fake-v2-grounded-fragment",
+          "evidence_type": "deterministic_fake",
+          "prompt_revision": "none",
+          "provider_name": "deterministic_fake",
+          "schema_version": "m2-t03-evidence-classification.v1"
+        },
+        "evidence_slot": "PROBLEM_EXISTENCE",
+        "evidence_type": "deterministic_fake",
+        "paper_id": "arxiv:2508.20514",
+        "reason": "来源摘录直接支持该证据槽位：However, most existing topic discovery methods rely on word embedding to capture the semantics and lack a comprehensive understanding of scientific publications, struggling with complex, high-dimensional text relationships.。",
+        "source_text_sha256": "ade1e059941f95215f95a89997dca38fa4299a83499394240a378e8a66b08092",
+        "state": "CLASSIFIED",
+        "support_level": "DIRECT",
+        "supporting_excerpt": "However, most existing topic discovery methods rely on word embedding to capture the semantics and lack a comprehensive understanding of scientific publications, struggling with complex, high-dimensional text relationships."
+      }
+    },
+    {
+      "context": {
+        "abstract": "Synthesis procedures play a critical role in materials research, as they directly affect material properties. With data-driven approaches increasingly accelerating materials discovery, there is growing interest in extracting synthesis procedures from scientific literature as structured data. However, existing studies often rely on rigid, domain-specific schemas with predefined fields for structuring synthesis procedures or assume that synthesis procedures are linear sequences of operations, which limits their ability to capture the structural complexity of real-world procedures. To address these limitations, we adopt PROV-DM, an international standard for provenance information, which supports flexible, graph-based modeling of procedures. We present MatPROV, a dataset of PROV-DM-compliant synthesis procedures extracted from scientific literature using large language models. MatPROV captures structural complexities and causal relationships among materials, operations, and conditions through visually intuitive directed graphs. This representation enables machine-interpretable synthesis knowledge, opening opportunities for future research such as automated synthesis planning and optimization.",
+        "paper_id": "arxiv:2509.01042",
+        "source_identity": {
+          "source": "arxiv",
+          "source_id": "2509.01042",
+          "url": "http://arxiv.org/abs/2509.01042v3"
+        },
+        "source_text_sha256": "39e3e5ebee89be217fdd06f58c6ba11d819097ec9e878d2900f0215b8dd88b38",
+        "title": "MatPROV: A Provenance Graph Dataset of Material Synthesis Extracted from Scientific Literature"
+      },
+      "human_adjudication": {
+        "decision": null,
+        "evidence_slot": null,
+        "grounded_reason": null,
+        "notes": null,
+        "reviewed_at_utc": null,
+        "reviewer_id": null,
+        "support_level": null,
+        "supporting_excerpt": null
+      },
+      "machine_advisory": {
+        "advisory_only": true,
+        "classification_version": "m2-t03-evidence-classification.v1",
+        "classifier_descriptor": {
+          "classifier_id": "m2-t03-lexical-evidence-slot",
+          "classifier_revision": "fake-v2-grounded-fragment",
+          "evidence_type": "deterministic_fake",
+          "prompt_revision": "none",
+          "provider_name": "deterministic_fake",
+          "schema_version": "m2-t03-evidence-classification.v1"
+        },
+        "evidence_slot": "CURRENT_METHODS",
+        "evidence_type": "deterministic_fake",
+        "paper_id": "arxiv:2509.01042",
+        "reason": "来源摘录直接支持该证据槽位：We present MatPROV, a dataset of PROV-DM-compliant synthesis procedures extracted from scientific literature using large language models.。",
+        "source_text_sha256": "39e3e5ebee89be217fdd06f58c6ba11d819097ec9e878d2900f0215b8dd88b38",
+        "state": "CLASSIFIED",
+        "support_level": "DIRECT",
+        "supporting_excerpt": "We present MatPROV, a dataset of PROV-DM-compliant synthesis procedures extracted from scientific literature using large language models."
+      }
+    },
+    {
+      "context": {
+        "abstract": "Scientific literature is growing exponentially, creating a critical bottleneck for researchers to efficiently synthesize knowledge. While general-purpose Large Language Models (LLMs) show potential in text processing, they often fail to capture scientific domain-specific nuances (e.g., technical jargon, methodological rigor) and struggle with complex scientific tasks, limiting their utility for interdisciplinary research. To address these gaps, this paper presents SciGPT, a domain-adapted foundation model for scientific literature understanding and ScienceBench, an open source benchmark tailored to evaluate scientific LLMs. Built on the Qwen3 architecture, SciGPT incorporates three key innovations: (1) low-cost domain distillation via a two-stage pipeline to balance performance and efficiency; (2) a Sparse Mixture-of-Experts (SMoE) attention mechanism that cuts memory consumption by 55\\% for 32,000-token long-document reasoning; and (3) knowledge-aware adaptation integrating domain ontologies to bridge interdisciplinary knowledge gaps. Experimental results on ScienceBench show that SciGPT outperforms GPT-4o in core scientific tasks including sequence labeling, generation, and inference. It also exhibits strong robustness in unseen scientific tasks, validating its potential to facilitate AI-augmented scientific discovery.",
+        "paper_id": "arxiv:2509.08032",
+        "source_identity": {
+          "source": "arxiv",
+          "source_id": "2509.08032",
+          "url": "http://arxiv.org/abs/2509.08032v1"
+        },
+        "source_text_sha256": "61bcffa7514030b659a5389158057e71a57933e6ec1f4a5c55d03e38ddd700e1",
+        "title": "SciGPT: A Large Language Model for Scientific Literature Understanding and Knowledge Discovery"
+      },
+      "human_adjudication": {
+        "decision": null,
+        "evidence_slot": null,
+        "grounded_reason": null,
+        "notes": null,
+        "reviewed_at_utc": null,
+        "reviewer_id": null,
+        "support_level": null,
+        "supporting_excerpt": null
+      },
+      "machine_advisory": {
+        "advisory_only": true,
+        "classification_version": "m2-t03-evidence-classification.v1",
+        "classifier_descriptor": {
+          "classifier_id": "m2-t03-lexical-evidence-slot",
+          "classifier_revision": "fake-v2-grounded-fragment",
+          "evidence_type": "deterministic_fake",
+          "prompt_revision": "none",
+          "provider_name": "deterministic_fake",
+          "schema_version": "m2-t03-evidence-classification.v1"
+        },
+        "evidence_slot": "IMPLEMENTATION_PATH",
+        "evidence_type": "deterministic_fake",
+        "paper_id": "arxiv:2509.08032",
+        "reason": "来源摘录直接支持该证据槽位：Built on the Qwen3 architecture, SciGPT incorporates three key innovations: (1) low-cost domain distillation via a two-stage pipeline to balance performance and efficiency; (2) a Sparse Mixture-of-Experts (SMoE) attention mechanism that cuts memory consumption by 55\\% for 32,000-token long-document reasoning; and (3) knowledge-aware adaptation integrating domain ontologies to bridge interdisciplinary knowledge gaps.。",
+        "source_text_sha256": "61bcffa7514030b659a5389158057e71a57933e6ec1f4a5c55d03e38ddd700e1",
+        "state": "CLASSIFIED",
+        "support_level": "DIRECT",
+        "supporting_excerpt": "Built on the Qwen3 architecture, SciGPT incorporates three key innovations: (1) low-cost domain distillation via a two-stage pipeline to balance performance and efficiency; (2) a Sparse Mixture-of-Experts (SMoE) attention mechanism that cuts memory consumption by 55\\% for 32,000-token long-document reasoning; and (3) knowledge-aware adaptation integrating domain ontologies to bridge interdisciplinary knowledge gaps."
+      }
+    },
+    {
+      "context": {
+        "abstract": "The development of synthesis procedures remains a fundamental challenge in materials discovery, with procedural knowledge scattered across decades of scientific literature in unstructured formats that are challenging for systematic analysis. In this paper, we propose a multi-modal toolbox that employs large language models (LLMs) and vision language models (VLMs) to automatically extract and organize synthesis procedures and performance data from materials science publications, covering text and figures. We curated 81k open-access papers, yielding LeMat-Synth (v 1.0): a dataset containing synthesis procedures spanning 35 synthesis methods and 16 material classes, structured according to an ontology specific to materials science. The extraction quality is rigorously evaluated on a subset of 2.5k synthesis procedures through a combination of expert annotations and a scalable LLM-as-a-judge framework. Beyond the dataset, we release a modular, open-source software library designed to support community-driven extension to new corpora and synthesis domains. Altogether, this work provides an extensible infrastructure to transform unstructured literature into machine-readable information. This lays the groundwork for predictive modeling of synthesis procedures as well as modeling synthesis--structure--property relationships.",
+        "paper_id": "arxiv:2510.26824",
+        "source_identity": {
+          "source": "arxiv",
+          "source_id": "2510.26824",
+          "url": "http://arxiv.org/abs/2510.26824v1"
+        },
+        "source_text_sha256": "c40e54129cb70efcc9071fd6757c1324d2464615a71b4c8f931e7c6d7be53def",
+        "title": "LeMat-Synth: a multi-modal toolbox to curate broad synthesis procedure databases from scientific literature"
+      },
+      "human_adjudication": {
+        "decision": null,
+        "evidence_slot": null,
+        "grounded_reason": null,
+        "notes": null,
+        "reviewed_at_utc": null,
+        "reviewer_id": null,
+        "support_level": null,
+        "supporting_excerpt": null
+      },
+      "machine_advisory": {
+        "advisory_only": true,
+        "classification_version": "m2-t03-evidence-classification.v1",
+        "classifier_descriptor": {
+          "classifier_id": "m2-t03-lexical-evidence-slot",
+          "classifier_revision": "fake-v2-grounded-fragment",
+          "evidence_type": "deterministic_fake",
+          "prompt_revision": "none",
+          "provider_name": "deterministic_fake",
+          "schema_version": "m2-t03-evidence-classification.v1"
+        },
+        "evidence_slot": "EVALUATION_BASIS",
+        "evidence_type": "deterministic_fake",
+        "paper_id": "arxiv:2510.26824",
+        "reason": "来源摘录直接支持该证据槽位：The extraction quality is rigorously evaluated on a subset of 2.5k synthesis procedures through a combination of expert annotations and a scalable LLM-as-a-judge framework.。",
+        "source_text_sha256": "c40e54129cb70efcc9071fd6757c1324d2464615a71b4c8f931e7c6d7be53def",
+        "state": "CLASSIFIED",
+        "support_level": "DIRECT",
+        "supporting_excerpt": "The extraction quality is rigorously evaluated on a subset of 2.5k synthesis procedures through a combination of expert annotations and a scalable LLM-as-a-judge framework."
+      }
+    },
+    {
+      "context": {
+        "abstract": "We introduce an explainability method for biomedical hypothesis generation systems, built on top of the novel Hypothesis Generation Context Retriever framework. Our approach combines semantic graph-based retrieval and relevant data-restrictive training to simulate real-world discovery constraints. Integrated with large language models (LLMs) via retrieval-augmented generation, the system explains hypotheses with contextual evidence using published scientific literature. We also propose a novel feedback loop approach, which iteratively identifies and corrects flawed parts of LLM-generated explanations, refining both the evidence paths and supporting context. We demonstrate the performance of our method with multiple large language models and evaluate the explanation and context retrieval quality through both expert-curated assessment and large-scale automated analysis. Our code is available at: https://github.com/IlyaTyagin/HGCR.",
+        "paper_id": "arxiv:2511.05498",
+        "source_identity": {
+          "source": "arxiv",
+          "source_id": "2511.05498",
+          "url": "http://arxiv.org/abs/2511.05498v1"
+        },
+        "source_text_sha256": "2df067a90968b90b240f3a9bb79da4f4d1027de1a2cf8e279bb31109159e3f94",
+        "title": "Biomedical Hypothesis Explainability with Graph-Based Context Retrieval"
+      },
+      "human_adjudication": {
+        "decision": null,
+        "evidence_slot": null,
+        "grounded_reason": null,
+        "notes": null,
+        "reviewed_at_utc": null,
+        "reviewer_id": null,
+        "support_level": null,
+        "supporting_excerpt": null
+      },
+      "machine_advisory": {
+        "advisory_only": true,
+        "classification_version": "m2-t03-evidence-classification.v1",
+        "classifier_descriptor": {
+          "classifier_id": "m2-t03-lexical-evidence-slot",
+          "classifier_revision": "fake-v2-grounded-fragment",
+          "evidence_type": "deterministic_fake",
+          "prompt_revision": "none",
+          "provider_name": "deterministic_fake",
+          "schema_version": "m2-t03-evidence-classification.v1"
+        },
+        "evidence_slot": "CURRENT_METHODS",
+        "evidence_type": "deterministic_fake",
+        "paper_id": "arxiv:2511.05498",
+        "reason": "来源摘录直接支持该证据槽位：We introduce an explainability method for biomedical hypothesis generation systems, built on top of the novel Hypothesis Generation Context Retriever framework.。",
+        "source_text_sha256": "2df067a90968b90b240f3a9bb79da4f4d1027de1a2cf8e279bb31109159e3f94",
+        "state": "CLASSIFIED",
+        "support_level": "DIRECT",
+        "supporting_excerpt": "We introduce an explainability method for biomedical hypothesis generation systems, built on top of the novel Hypothesis Generation Context Retriever framework."
+      }
+    },
+    {
+      "context": {
+        "abstract": "Large language models (LLMs) are rapidly transforming various domains, including biomedicine and healthcare, and demonstrate remarkable potential from scientific research to new drug discovery. Graph-based retrieval-augmented generation (RAG) systems, as a useful application of LLMs, can improve contextual reasoning through structured entity and relationship identification from long-context knowledge, e.g. biomedical literature. Even though many advantages over naive RAGs, most of graph-based RAGs are computationally intensive, which limits their application to large-scale dataset. To address this issue, we introduce fastbmRAG, an fast graph-based RAG optimized for biomedical literature. Utilizing well organized structure of biomedical papers, fastbmRAG divides the construction of knowledge graph into two stages, first drafting graphs using abstracts; and second, refining them using main texts guided by vector-based entity linking, which minimizes redundancy and computational load. Our evaluations demonstrate that fastbmRAG is over 10x faster than existing graph-RAG tools and achieve superior coverage and accuracy to input knowledge. FastbmRAG provides a fast solution for quickly understanding, summarizing, and answering questions about biomedical literature on a large scale. FastbmRAG is public available in https://github.com/menggf/fastbmRAG.",
+        "paper_id": "arxiv:2511.10014",
+        "source_identity": {
+          "source": "arxiv",
+          "source_id": "2511.10014",
+          "url": "http://arxiv.org/abs/2511.10014v1"
+        },
+        "source_text_sha256": "d6e4f197dab3faf4eecb48f19046420c08dc2eb28bc8ae4124dc4196301487a9",
+        "title": "fastbmRAG: A Fast Graph-Based RAG Framework for Efficient Processing of Large-Scale Biomedical Literature"
+      },
+      "human_adjudication": {
+        "decision": null,
+        "evidence_slot": null,
+        "grounded_reason": null,
+        "notes": null,
+        "reviewed_at_utc": null,
+        "reviewer_id": null,
+        "support_level": null,
+        "supporting_excerpt": null
+      },
+      "machine_advisory": {
+        "advisory_only": true,
+        "classification_version": "m2-t03-evidence-classification.v1",
+        "classifier_descriptor": {
+          "classifier_id": "m2-t03-lexical-evidence-slot",
+          "classifier_revision": "fake-v2-grounded-fragment",
+          "evidence_type": "deterministic_fake",
+          "prompt_revision": "none",
+          "provider_name": "deterministic_fake",
+          "schema_version": "m2-t03-evidence-classification.v1"
+        },
+        "evidence_slot": "EVALUATION_BASIS",
+        "evidence_type": "deterministic_fake",
+        "paper_id": "arxiv:2511.10014",
+        "reason": "来源摘录直接支持该证据槽位：Our evaluations demonstrate that fastbmRAG is over 10x faster than existing graph-RAG tools and achieve superior coverage and accuracy to input knowledge.。",
+        "source_text_sha256": "d6e4f197dab3faf4eecb48f19046420c08dc2eb28bc8ae4124dc4196301487a9",
+        "state": "CLASSIFIED",
+        "support_level": "DIRECT",
+        "supporting_excerpt": "Our evaluations demonstrate that fastbmRAG is over 10x faster than existing graph-RAG tools and achieve superior coverage and accuracy to input knowledge."
+      }
+    },
+    {
+      "context": {
+        "abstract": "The accelerating growth of scientific publications has intensified the need for scalable, trustworthy systems to synthesize knowledge across diverse literature. While recent retrieval-augmented generation (RAG) methods have improved access to scientific information, they often overlook citation graph structure, adapt poorly to complex queries, and yield fragmented, hard-to-verify syntheses. We introduce SciRAG, an open-source framework for scientific literature exploration that addresses these gaps through three key innovations: (1) adaptive retrieval that flexibly alternates between sequential and parallel evidence gathering; (2) citation-aware symbolic reasoning that leverages citation graphs to organize and filter supporting documents; and (3) outline-guided synthesis that plans, critiques, and refines answers to ensure coherence and transparent attribution. Extensive experiments across multiple benchmarks such as QASA and ScholarQA demonstrate that SciRAG outperforms prior systems in factual accuracy and synthesis quality, establishing a new foundation for reliable, large-scale scientific knowledge aggregation.",
+        "paper_id": "arxiv:2511.14362",
+        "source_identity": {
+          "source": "arxiv",
+          "source_id": "2511.14362",
+          "url": "http://arxiv.org/abs/2511.14362v1"
+        },
+        "source_text_sha256": "32bc36148927e99eb8a12a6450562c56753cae0108bd8cf592695958140ec7d0",
+        "title": "SciRAG: Adaptive, Citation-Aware, and Outline-Guided Retrieval and Synthesis for Scientific Literature"
+      },
+      "human_adjudication": {
+        "decision": null,
+        "evidence_slot": null,
+        "grounded_reason": null,
+        "notes": null,
+        "reviewed_at_utc": null,
+        "reviewer_id": null,
+        "support_level": null,
+        "supporting_excerpt": null
+      },
+      "machine_advisory": {
+        "advisory_only": true,
+        "classification_version": "m2-t03-evidence-classification.v1",
+        "classifier_descriptor": {
+          "classifier_id": "m2-t03-lexical-evidence-slot",
+          "classifier_revision": "fake-v2-grounded-fragment",
+          "evidence_type": "deterministic_fake",
+          "prompt_revision": "none",
+          "provider_name": "deterministic_fake",
+          "schema_version": "m2-t03-evidence-classification.v1"
+        },
+        "evidence_slot": "EVALUATION_BASIS",
+        "evidence_type": "deterministic_fake",
+        "paper_id": "arxiv:2511.14362",
+        "reason": "来源摘录直接支持该证据槽位：Extensive experiments across multiple benchmarks such as QASA and ScholarQA demonstrate that SciRAG outperforms prior systems in factual accuracy and synthesis quality, establishing a new foundation for reliable, large-scale scientific knowledge aggregation.。",
+        "source_text_sha256": "32bc36148927e99eb8a12a6450562c56753cae0108bd8cf592695958140ec7d0",
+        "state": "CLASSIFIED",
+        "support_level": "DIRECT",
+        "supporting_excerpt": "Extensive experiments across multiple benchmarks such as QASA and ScholarQA demonstrate that SciRAG outperforms prior systems in factual accuracy and synthesis quality, establishing a new foundation for reliable, large-scale scientific knowledge aggregation."
+      }
+    },
+    {
+      "context": {
+        "abstract": "The rapid acceleration of scientific publishing has created substantial challenges for researchers attempting to discover, contextualize, and interpret relevant literature. Traditional keyword-based search systems provide limited semantic understanding, while existing AI-driven tools typically focus on isolated tasks such as retrieval, clustering, or bibliometric visualization. This paper presents an integrated system for scientific literature exploration that combines large-scale data acquisition, hybrid retrieval, semantic topic modeling, and heterogeneous knowledge graph construction. The system builds a comprehensive corpus by merging full-text data from arXiv with structured metadata from OpenAlex. A hybrid retrieval architecture fuses BM25 lexical search with embedding-based semantic search using Reciprocal Rank Fusion. Topic modeling is performed on retrieved results using BERTopic or non-negative matrix factorization depending on computational resources. A knowledge graph unifies papers, authors, institutions, countries, and extracted topics into an interpretable structure. The system provides a multi-layered exploration environment that reveals not only relevant publications but also the conceptual and relational landscape surrounding a query. Evaluation across multiple queries demonstrates improvements in retrieval relevance, topic coherence, and interpretability. The proposed framework contributes an extensible foundation for AI-assisted scientific discovery.",
+        "paper_id": "arxiv:2512.12760",
+        "source_identity": {
+          "source": "arxiv",
+          "source_id": "2512.12760",
+          "url": "http://arxiv.org/abs/2512.12760v1"
+        },
+        "source_text_sha256": "c2fd99dfa12cbd0db05feed00a597c126e6b4b9ba3cf622fa2f38b26a9c87514",
+        "title": "Intelligent Scientific Literature Explorer using Machine Learning (ISLE)"
+      },
+      "human_adjudication": {
+        "decision": null,
+        "evidence_slot": null,
+        "grounded_reason": null,
+        "notes": null,
+        "reviewed_at_utc": null,
+        "reviewer_id": null,
+        "support_level": null,
+        "supporting_excerpt": null
+      },
+      "machine_advisory": {
+        "advisory_only": true,
+        "classification_version": "m2-t03-evidence-classification.v1",
+        "classifier_descriptor": {
+          "classifier_id": "m2-t03-lexical-evidence-slot",
+          "classifier_revision": "fake-v2-grounded-fragment",
+          "evidence_type": "deterministic_fake",
+          "prompt_revision": "none",
+          "provider_name": "deterministic_fake",
+          "schema_version": "m2-t03-evidence-classification.v1"
+        },
+        "evidence_slot": "IMPLEMENTATION_PATH",
+        "evidence_type": "deterministic_fake",
+        "paper_id": "arxiv:2512.12760",
+        "reason": "来源摘录直接支持该证据槽位：A hybrid retrieval architecture fuses BM25 lexical search with embedding-based semantic search using Reciprocal Rank Fusion.。",
+        "source_text_sha256": "c2fd99dfa12cbd0db05feed00a597c126e6b4b9ba3cf622fa2f38b26a9c87514",
+        "state": "CLASSIFIED",
+        "support_level": "DIRECT",
+        "supporting_excerpt": "A hybrid retrieval architecture fuses BM25 lexical search with embedding-based semantic search using Reciprocal Rank Fusion."
+      }
+    },
+    {
+      "context": {
+        "abstract": "Graph-based retrieval-augmented generation (GraphRAG) systems construct knowledge graphs over document collections to support multi-hop reasoning. While prior work shows that GraphRAG responses may leak retrieved subgraphs, the feasibility of query-efficient reconstruction of the hidden graph structure remains unexplored under realistic query budgets. We study a budget-constrained black-box setting where an adversary adaptively queries the system to steal its latent entity-relation graph. We propose AGEA (Agentic Graph Extraction Attack), a framework that leverages a novelty-guided exploration-exploitation strategy, external graph memory modules, and a two-stage graph extraction pipeline combining lightweight discovery with LLM-based filtering. We evaluate AGEA on medical, agriculture, and literary datasets across Microsoft-GraphRAG and LightRAG systems. Under identical query budgets, AGEA significantly outperforms prior attack baselines, recovering up to 90% of entities and relationships while maintaining high precision. These results demonstrate that modern GraphRAG systems are highly vulnerable to structured, agentic extraction attacks, even under strict query limits. The code is available at https://github.com/shuashua0608/AGEA.",
+        "paper_id": "arxiv:2601.14662",
+        "source_identity": {
+          "source": "arxiv",
+          "source_id": "2601.14662",
+          "url": "http://arxiv.org/abs/2601.14662v2"
+        },
+        "source_text_sha256": "376a07a67ca76fdd0c4ab7e5197906c242d9cd3c55e858d946d01fa583ee3026",
+        "title": "Query-Efficient Agentic Graph Extraction Attacks on GraphRAG Systems"
+      },
+      "human_adjudication": {
+        "decision": null,
+        "evidence_slot": null,
+        "grounded_reason": null,
+        "notes": null,
+        "reviewed_at_utc": null,
+        "reviewer_id": null,
+        "support_level": null,
+        "supporting_excerpt": null
+      },
+      "machine_advisory": {
+        "advisory_only": true,
+        "classification_version": "m2-t03-evidence-classification.v1",
+        "classifier_descriptor": {
+          "classifier_id": "m2-t03-lexical-evidence-slot",
+          "classifier_revision": "fake-v2-grounded-fragment",
+          "evidence_type": "deterministic_fake",
+          "prompt_revision": "none",
+          "provider_name": "deterministic_fake",
+          "schema_version": "m2-t03-evidence-classification.v1"
+        },
+        "evidence_slot": "CURRENT_METHODS",
+        "evidence_type": "deterministic_fake",
+        "paper_id": "arxiv:2601.14662",
+        "reason": "来源摘录直接支持该证据槽位：We propose AGEA (Agentic Graph Extraction Attack), a framework that leverages a novelty-guided exploration-exploitation strategy, external graph memory modules, and a two-stage graph extraction pipeline combining lightweight discovery with LLM-based filtering.。",
+        "source_text_sha256": "376a07a67ca76fdd0c4ab7e5197906c242d9cd3c55e858d946d01fa583ee3026",
+        "state": "CLASSIFIED",
+        "support_level": "DIRECT",
+        "supporting_excerpt": "We propose AGEA (Agentic Graph Extraction Attack), a framework that leverages a novelty-guided exploration-exploitation strategy, external graph memory modules, and a two-stage graph extraction pipeline combining lightweight discovery with LLM-based filtering."
+      }
+    },
+    {
+      "context": {
+        "abstract": "This paper investigates the enhancement of scientific literature chatbots through retrieval-augmented generation (RAG), with a focus on evaluating vector- and graph-based retrieval systems. The proposed chatbot leverages both structured (graph) and unstructured (vector) databases to access scientific articles and gray literature, enabling efficient triage of sources according to research objectives. To systematically assess performance, we examine two use-case scenarios: retrieval from a single uploaded document and retrieval from a large-scale corpus. Benchmark test sets were generated using a GPT model, with selected outputs annotated for evaluation. The comparative analysis emphasizes retrieval accuracy and response relevance, providing insight into the strengths and limitations of each approach. The findings demonstrate the potential of hybrid RAG systems to improve accessibility to scientific knowledge and to support evidence-based decision making.",
+        "paper_id": "arxiv:2602.17856",
+        "source_identity": {
+          "source": "arxiv",
+          "source_id": "2602.17856",
+          "url": "http://arxiv.org/abs/2602.17856v1"
+        },
+        "source_text_sha256": "498889bdd99abb3cc708c4430311d92a627879c8cdd34fcccb4e6418dee2d1bd",
+        "title": "Enhancing Scientific Literature Chatbots with Retrieval-Augmented Generation: A Performance Evaluation of Vector and Graph-Based Systems"
+      },
+      "human_adjudication": {
+        "decision": null,
+        "evidence_slot": null,
+        "grounded_reason": null,
+        "notes": null,
+        "reviewed_at_utc": null,
+        "reviewer_id": null,
+        "support_level": null,
+        "supporting_excerpt": null
+      },
+      "machine_advisory": {
+        "advisory_only": true,
+        "classification_version": "m2-t03-evidence-classification.v1",
+        "classifier_descriptor": {
+          "classifier_id": "m2-t03-lexical-evidence-slot",
+          "classifier_revision": "fake-v2-grounded-fragment",
+          "evidence_type": "deterministic_fake",
+          "prompt_revision": "none",
+          "provider_name": "deterministic_fake",
+          "schema_version": "m2-t03-evidence-classification.v1"
+        },
+        "evidence_slot": "EVALUATION_BASIS",
+        "evidence_type": "deterministic_fake",
+        "paper_id": "arxiv:2602.17856",
+        "reason": "来源摘录直接支持该证据槽位：Benchmark test sets were generated using a GPT model, with selected outputs annotated for evaluation.。",
+        "source_text_sha256": "498889bdd99abb3cc708c4430311d92a627879c8cdd34fcccb4e6418dee2d1bd",
+        "state": "CLASSIFIED",
+        "support_level": "DIRECT",
+        "supporting_excerpt": "Benchmark test sets were generated using a GPT model, with selected outputs annotated for evaluation."
+      }
+    },
+    {
+      "context": {
+        "abstract": "Urban data support a wide range of applications across multiple disciplines. However, at the global scale, there is no unified platform for urban data discovery. As a result, researchers often have to manually search through websites or scientific literature to identify relevant datasets. To address this problem, we curate an open urban data discovery portal, \\textit{UrbanDataMiner}, which supports dataset-level search and filtering over more than 60{,}000 urban datasets extracted from over 15{,}000 Nature-affiliated publications. \\textit{UrbanDataMiner} is enabled by \\textit{Paper2Data}, a novel large-scale LLM-driven pipeline that automatically identifies dataset mentions in scientific papers and structures them using a unified urban data metadata schema. Human-annotated evaluation demonstrates that \\textit{Paper2Data} achieves high recall (approximately 90\\%) in dataset identification and high field-level precision (above 80\\%). In addition, \\textit{UrbanDataMiner} can retrieve over 9\\% of datasets that are not easily discoverable through general-purpose search engines such as Google. Overall, our work provides the first large-scale, literature-derived infrastructure for urban data discovery and enables more systematic and reusable data-driven research across disciplines. Our code and data are publicly available\\footnote{https://github.com/Yourunwen/Paper2Data}.",
+        "paper_id": "arxiv:2604.16317",
+        "source_identity": {
+          "source": "arxiv",
+          "source_id": "2604.16317",
+          "url": "http://arxiv.org/abs/2604.16317v1"
+        },
+        "source_text_sha256": "d7d294a22f2b51500e9526a6d90b59b93274c8d539368a6fdb54bc2089eb0a2d",
+        "title": "Paper2Data: Large-Scale LLM Extraction and Metadata Structuring of Global Urban Data from Scientific Literature"
+      },
+      "human_adjudication": {
+        "decision": null,
+        "evidence_slot": null,
+        "grounded_reason": null,
+        "notes": null,
+        "reviewed_at_utc": null,
+        "reviewer_id": null,
+        "support_level": null,
+        "supporting_excerpt": null
+      },
+      "machine_advisory": {
+        "advisory_only": true,
+        "classification_version": "m2-t03-evidence-classification.v1",
+        "classifier_descriptor": {
+          "classifier_id": "m2-t03-lexical-evidence-slot",
+          "classifier_revision": "fake-v2-grounded-fragment",
+          "evidence_type": "deterministic_fake",
+          "prompt_revision": "none",
+          "provider_name": "deterministic_fake",
+          "schema_version": "m2-t03-evidence-classification.v1"
+        },
+        "evidence_slot": "EVALUATION_BASIS",
+        "evidence_type": "deterministic_fake",
+        "paper_id": "arxiv:2604.16317",
+        "reason": "来源摘录直接支持该证据槽位：Human-annotated evaluation demonstrates that \\textit{Paper2Data} achieves high recall (approximately 90\\%) in dataset identification and high field-level precision (above 80\\%).。",
+        "source_text_sha256": "d7d294a22f2b51500e9526a6d90b59b93274c8d539368a6fdb54bc2089eb0a2d",
+        "state": "CLASSIFIED",
+        "support_level": "DIRECT",
+        "supporting_excerpt": "Human-annotated evaluation demonstrates that \\textit{Paper2Data} achieves high recall (approximately 90\\%) in dataset identification and high field-level precision (above 80\\%)."
+      }
+    },
+    {
+      "context": {
+        "abstract": "The rapid development of large language models and AI agents has triggered a paradigm shift in academic literature retrieval, putting forward new demands for fine-grained, time-aware, and programmable retrieval. Existing graph-vector fusion methods still face bottlenecks such as matrix dependence, storage explosion, semantic dilution, and lack of AI-native support. This paper proposes a geometry-unified graph-vector fusion framework based on tensor manifold theory, which formally proves that an academic literature graph is a discrete projection of a tensor manifold, realizing the native unification of graph topology and vector geometric embedding. Based on this theoretical conclusion, we design four core modules: matrix-independent temporal diffusion signature update, hierarchical temporal manifold encoding, temporal Riemannian manifold indexing, and AI-agent programmable retrieval. Theoretical analysis and complexity proof show that all core algorithms have linear time and space complexity, which can adapt to large-scale dynamic academic literature graphs. This research provides a new theoretical framework and engineering solution for AI-native academic literature retrieval, promoting the industrial application of graph-vector fusion technology in the academic field.",
+        "paper_id": "arxiv:2604.16416",
+        "source_identity": {
+          "source": "arxiv",
+          "source_id": "2604.16416",
+          "url": "http://arxiv.org/abs/2604.16416v1"
+        },
+        "source_text_sha256": "b5b25c9a67160e06d3a01e6b9c33aa396496316eb260dcebd46e4036b5c6524f",
+        "title": "Tensor Manifold-Based Graph-Vector Fusion for AI-Native Academic Literature Retrieval"
+      },
+      "human_adjudication": {
+        "decision": null,
+        "evidence_slot": null,
+        "grounded_reason": null,
+        "notes": null,
+        "reviewed_at_utc": null,
+        "reviewer_id": null,
+        "support_level": null,
+        "supporting_excerpt": null
+      },
+      "machine_advisory": {
+        "advisory_only": true,
+        "classification_version": "m2-t03-evidence-classification.v1",
+        "classifier_descriptor": {
+          "classifier_id": "m2-t03-lexical-evidence-slot",
+          "classifier_revision": "fake-v2-grounded-fragment",
+          "evidence_type": "deterministic_fake",
+          "prompt_revision": "none",
+          "provider_name": "deterministic_fake",
+          "schema_version": "m2-t03-evidence-classification.v1"
+        },
+        "evidence_slot": "IMPLEMENTATION_PATH",
+        "evidence_type": "deterministic_fake",
+        "paper_id": "arxiv:2604.16416",
+        "reason": "来源摘录直接支持该证据槽位：This research provides a new theoretical framework and engineering solution for AI-native academic literature retrieval, promoting the industrial application of graph-vector fusion technology in the academic field.。",
+        "source_text_sha256": "b5b25c9a67160e06d3a01e6b9c33aa396496316eb260dcebd46e4036b5c6524f",
+        "state": "CLASSIFIED",
+        "support_level": "DIRECT",
+        "supporting_excerpt": "This research provides a new theoretical framework and engineering solution for AI-native academic literature retrieval, promoting the industrial application of graph-vector fusion technology in the academic field."
+      }
+    },
+    {
+      "context": {
+        "abstract": "Autonomous scientific research is significantly advanced thanks to the development of AI agents. One key step in this process is finding the right scientific literature, whether to explore existing knowledge for a research problem, or to acquire evidence for verifying assumptions and supporting claims. To assess AI agents' capability in driving this process, we present AutoResearchBench, a dedicated benchmark for autonomous scientific literature discovery. AutoResearchBench consists of two complementary task types: (1) Deep Research, which requires tracking down a specific target paper through a progressive, multi-step probing process, and (2) Wide Research, which requires comprehensively collecting a set of papers satisfying given conditions. Compared to previous benchmarks on agentic web browsing, AutoResearchBench is distinguished along three dimensions: it is research-oriented, calling for in-depth comprehension of scientific concepts; literature-focused, demanding fine-grained utilization of detailed information; and open-ended, involving an unknown number of qualified papers and thus requiring deliberate reasoning and search throughout. These properties make AutoResearchBench uniquely suited for evaluating autonomous research capabilities, and extraordinarily challenging. Even the most powerful LLMs, despite having largely conquered general agentic web-browsing benchmarks such as BrowseComp, achieve only 9.39% accuracy on Deep Research and 9.31% IoU on Wide Research, while many other strong baselines fall below 5%. We publicly release the dataset and evaluation pipeline to facilitate future research in this direction. We publicly release the dataset, evaluation pipeline, and code at https://github.com/CherYou/AutoResearchBench.",
+        "paper_id": "arxiv:2604.25256",
+        "source_identity": {
+          "source": "arxiv",
+          "source_id": "2604.25256",
+          "url": "http://arxiv.org/abs/2604.25256v1"
+        },
+        "source_text_sha256": "bd8c765863b3f77c429ceb3e209d2818055cf62d9337f0230a74014d2531cb43",
+        "title": "AutoResearchBench: Benchmarking AI Agents on Complex Scientific Literature Discovery"
+      },
+      "human_adjudication": {
+        "decision": null,
+        "evidence_slot": null,
+        "grounded_reason": null,
+        "notes": null,
+        "reviewed_at_utc": null,
+        "reviewer_id": null,
+        "support_level": null,
+        "supporting_excerpt": null
+      },
+      "machine_advisory": {
+        "advisory_only": true,
+        "classification_version": "m2-t03-evidence-classification.v1",
+        "classifier_descriptor": {
+          "classifier_id": "m2-t03-lexical-evidence-slot",
+          "classifier_revision": "fake-v2-grounded-fragment",
+          "evidence_type": "deterministic_fake",
+          "prompt_revision": "none",
+          "provider_name": "deterministic_fake",
+          "schema_version": "m2-t03-evidence-classification.v1"
+        },
+        "evidence_slot": "EVALUATION_BASIS",
+        "evidence_type": "deterministic_fake",
+        "paper_id": "arxiv:2604.25256",
+        "reason": "来源摘录直接支持该证据槽位：Even the most powerful LLMs, despite having largely conquered general agentic web-browsing benchmarks such as BrowseComp, achieve only 9.39% accuracy on Deep Research and 9.31% IoU on Wide Research, while many other strong baselines fall below 5%.。",
+        "source_text_sha256": "bd8c765863b3f77c429ceb3e209d2818055cf62d9337f0230a74014d2531cb43",
+        "state": "CLASSIFIED",
+        "support_level": "DIRECT",
+        "supporting_excerpt": "Even the most powerful LLMs, despite having largely conquered general agentic web-browsing benchmarks such as BrowseComp, achieve only 9.39% accuracy on Deep Research and 9.31% IoU on Wide Research, while many other strong baselines fall below 5%."
+      }
+    },
+    {
+      "context": {
+        "abstract": "Generative models have revolutionized the process of materials discovery, yet they often fail to satisfy underlying physical causality. Through an analysis of Large Language Models (LLMs) augmented with knowledge graphs derived from current literature, we uncover a phenomenon termed contextual tunneling, where models \"over-anchor\" on narrow, retrieved evidence while suppressing global physical reasoning. To address this problem, we introduce ARIA, a causal-aware framework that conditions knowledge use on mechanistic completeness. ARIA routes each query through a three-tier cascade: (i) direct causal reasoning when complete evidence chains of Process-Structure-Property (PSP) are available, (ii) physics-informed analogical transfer for sparse or novel material systems, and (iii) explicit parametric fallback when external evidence is incomplete. As a proof of concept, we construct a Knowledge Graph (KG) containing 2,839 extracted PSP relations from peer-reviewed articles in the materials literature and evaluate ARIA on forward prediction and inverse design tasks for two-dimensional (2D) materials. ARIA mitigates contextual tunneling, improves over unaugmented and naive KG-augmented baselines, and provides further gains when an online literature search is used for evidence enrichment. Crucially, ARIA produces auditable causal traces, enabling physically grounded and trustworthy AI-assisted materials discovery.",
+        "paper_id": "arxiv:2606.22375",
+        "source_identity": {
+          "source": "arxiv",
+          "source_id": "2606.22375",
+          "url": "http://arxiv.org/abs/2606.22375v1"
+        },
+        "source_text_sha256": "091a5a55edfb98bf53e34b25c4815c4be625d5578e9e4f73f20251e63b1625cc",
+        "title": "ARIA: A Causal-Aware Framework for Rescuing LLM Reasoning in Trustworthy Materials Discovery"
+      },
+      "human_adjudication": {
+        "decision": null,
+        "evidence_slot": null,
+        "grounded_reason": null,
+        "notes": null,
+        "reviewed_at_utc": null,
+        "reviewer_id": null,
+        "support_level": null,
+        "supporting_excerpt": null
+      },
+      "machine_advisory": {
+        "advisory_only": true,
+        "classification_version": "m2-t03-evidence-classification.v1",
+        "classifier_descriptor": {
+          "classifier_id": "m2-t03-lexical-evidence-slot",
+          "classifier_revision": "fake-v2-grounded-fragment",
+          "evidence_type": "deterministic_fake",
+          "prompt_revision": "none",
+          "provider_name": "deterministic_fake",
+          "schema_version": "m2-t03-evidence-classification.v1"
+        },
+        "evidence_slot": "CURRENT_METHODS",
+        "evidence_type": "deterministic_fake",
+        "paper_id": "arxiv:2606.22375",
+        "reason": "来源摘录直接支持该证据槽位：To address this problem, we introduce ARIA, a causal-aware framework that conditions knowledge use on mechanistic completeness.。",
+        "source_text_sha256": "091a5a55edfb98bf53e34b25c4815c4be625d5578e9e4f73f20251e63b1625cc",
+        "state": "CLASSIFIED",
+        "support_level": "DIRECT",
+        "supporting_excerpt": "To address this problem, we introduce ARIA, a causal-aware framework that conditions knowledge use on mechanistic completeness."
+      }
+    }
+  ],
+  "paper_id_order": [
+    "arxiv:1401.6891",
+    "arxiv:1611.00097",
+    "arxiv:1804.03257",
+    "arxiv:2005.04961",
+    "arxiv:2007.12731",
+    "arxiv:2210.15912",
+    "arxiv:2306.03535",
+    "arxiv:2306.10044",
+    "arxiv:2310.16146",
+    "arxiv:2402.12352",
+    "arxiv:2408.15002",
+    "arxiv:2408.15545",
+    "arxiv:2412.05447",
+    "arxiv:2412.15232",
+    "arxiv:2501.02157",
+    "arxiv:2503.02922",
+    "arxiv:2504.08768",
+    "arxiv:2507.08945",
+    "arxiv:2508.09995",
+    "arxiv:2508.20514",
+    "arxiv:2509.01042",
+    "arxiv:2509.08032",
+    "arxiv:2510.26824",
+    "arxiv:2511.05498",
+    "arxiv:2511.10014",
+    "arxiv:2511.14362",
+    "arxiv:2512.12760",
+    "arxiv:2601.14662",
+    "arxiv:2602.17856",
+    "arxiv:2604.16317",
+    "arxiv:2604.16416",
+    "arxiv:2604.25256",
+    "arxiv:2606.22375"
+  ],
+  "phase": "M2",
+  "review_policy": {
+    "disallowed_sources": [
+      "paper_full_text",
+      "citation_count",
+      "author_reputation",
+      "journal_rank",
+      "reranker_output",
+      "dense_output",
+      "selection_output",
+      "user_feedback",
+      "network_supplementation"
+    ],
+    "human_fields_initially_empty": true,
+    "human_review_status": "pending",
+    "m2_t04_started": false,
+    "machine_labels_are_advisory": true,
+    "network_forbidden": true,
+    "real_arxiv_requests": false,
+    "real_model_run": false,
+    "source_fields": [
+      "paper_id",
+      "title",
+      "abstract",
+      "source_identity"
+    ]
+  },
+  "status_boundary": {
+    "human_review": "pending",
+    "m2_progress": "IN_PROGRESS 2/5",
+    "m2_t04": "not_started",
+    "m3_progress": "BLOCKED_BY_M2 0/5",
+    "scoring_eligible": false
+  },
+  "task_id": "M2-T03"
+}

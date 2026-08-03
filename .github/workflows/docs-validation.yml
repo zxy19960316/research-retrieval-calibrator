@@ -53,3 +53,5 @@ jobs:
         run: python scripts/validate_m2_t02_evidence.py
       - name: Validate completed M2-T03 evidence
         run: python scripts/validate_m2_t03_evidence.py
+      - name: Validate pending M2-T03 human adjudication bundle
+        run: python scripts/validate_m2_t03_human_adjudication_bundle.py
