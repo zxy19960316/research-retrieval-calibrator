@@ -19,9 +19,23 @@ from app.models.planning import (
     QueryPlan,
     RetrievalTerm,
 )
+from app.models.evidence_classification import (
+    EvidenceClassificationBatch,
+    EvidenceClassificationError,
+    EvidenceClassificationInput,
+    EvidenceClassificationRecord,
+    EvidenceClassificationState,
+    EvidenceClassifierDescriptor,
+)
 
 __all__ = [
     "CandidateOutput",
+    "EvidenceClassificationBatch",
+    "EvidenceClassificationError",
+    "EvidenceClassificationInput",
+    "EvidenceClassificationRecord",
+    "EvidenceClassificationState",
+    "EvidenceClassifierDescriptor",
     "ClarificationQuestion",
     "ExclusionTerm",
     "FailureReport",

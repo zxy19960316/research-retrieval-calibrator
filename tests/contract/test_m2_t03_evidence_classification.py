@@ -80,9 +80,27 @@ def test_contracts_forbid_unknown_fields_and_blank_text() -> None:
             deterministic_fake_descriptor().model_dump(mode="python") | {"unexpected": True}
         )
     with pytest.raises(ValidationError):
-        _input(title=" ")
+        EvidenceClassificationInput.model_validate(
+            {
+                "paper_id": "arxiv:test-1",
+                "title": " ",
+                "abstract": "valid",
+                "source_text_sha256": "0" * 64,
+                "classifier_descriptor": deterministic_fake_descriptor(),
+                "classification_version": EVIDENCE_CLASSIFICATION_VERSION,
+            }
+        )
     with pytest.raises(ValidationError):
-        _input(abstract="\t")
+        EvidenceClassificationInput.model_validate(
+            {
+                "paper_id": "arxiv:test-1",
+                "title": "valid",
+                "abstract": "\t",
+                "source_text_sha256": "0" * 64,
+                "classifier_descriptor": deterministic_fake_descriptor(),
+                "classification_version": EVIDENCE_CLASSIFICATION_VERSION,
+            }
+        )
     with pytest.raises(ValidationError):
         _input(source_text_sha256="0" * 64)
     with pytest.raises(ValidationError):
@@ -149,7 +167,16 @@ def test_title_without_reliable_evidence_is_rejected_not_defaulted() -> None:
 
 def test_title_and_abstract_without_valid_text_fail_closed_at_input_boundary() -> None:
     with pytest.raises(ValidationError):
-        _input(title=" ", abstract=" ")
+        EvidenceClassificationInput.model_validate(
+            {
+                "paper_id": "arxiv:test-1",
+                "title": " ",
+                "abstract": " ",
+                "source_text_sha256": "0" * 64,
+                "classifier_descriptor": deterministic_fake_descriptor(),
+                "classification_version": EVIDENCE_CLASSIFICATION_VERSION,
+            }
+        )
 
 
 @pytest.mark.parametrize("field", ["evidence_slot", "support_level"])

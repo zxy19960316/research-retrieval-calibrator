@@ -25,7 +25,7 @@
 
 **Files:**
 - Create: `tests/contract/test_m2_t03_evidence_classification.py`
-- Create: `tests/unit/test_m2_t03_evidence_classification.py`
+- Create: `tests/unit/test_m2_t03_evidence_classification_provider.py`
 
 **Interfaces:**
 - Consumes: the existing `EvidenceSlot`, `SupportLevel`, Pydantic, and Protocol conventions.
@@ -58,7 +58,7 @@
   Run:
 
   ```powershell
-  python -m pytest -q tests/contract/test_m2_t03_evidence_classification.py tests/unit/test_m2_t03_evidence_classification.py
+  python -m pytest -q tests/contract/test_m2_t03_evidence_classification.py tests/unit/test_m2_t03_evidence_classification_provider.py
   ```
 
   Expected: collection or test failures because the M2-T03 modules and contracts do not yet exist. Do not weaken the tests to make the baseline pass.
@@ -100,7 +100,7 @@
 **Files:**
 - Create: `app/core/evidence_classification.py`
 - Modify: `tests/contract/test_m2_t03_evidence_classification.py`
-- Modify: `tests/unit/test_m2_t03_evidence_classification.py`
+- Modify: `tests/unit/test_m2_t03_evidence_classification_provider.py`
 
 **Interfaces:**
 - Consumes: the Task 2 contracts and `EvidenceClassifierProvider`.
@@ -123,7 +123,7 @@
   Run:
 
   ```powershell
-  python -m pytest -q tests/contract/test_m2_t03_evidence_classification.py tests/unit/test_m2_t03_evidence_classification.py
+  python -m pytest -q tests/contract/test_m2_t03_evidence_classification.py tests/unit/test_m2_t03_evidence_classification_provider.py
   ```
 
   Expected: green, including deterministic repeatability and reversed-input invariance.
