@@ -9,6 +9,7 @@ import pytest
 from app.adapters.evidence_classification import (
     DeterministicFakeEvidenceClassifier,
     EvidenceClassifierProvider,
+    _source_fragments,
 )
 from app.core.evidence_classification import classify_evidence_batch
 from app.models.enums import EvidenceSlot, SupportLevel
@@ -70,6 +71,94 @@ def test_reordered_inputs_preserve_paper_id_keyed_outputs() -> None:
     first_by_id = {record.paper_id: record.model_dump(mode="json") for record in first.records}
     second_by_id = {record.paper_id: record.model_dump(mode="json") for record in second.records}
     assert first_by_id == second_by_id
+
+
+def _fragment_texts(source: str) -> list[str]:
+    return [fragment for fragment, _, _ in _source_fragments(source, "abstract")]
+
+
+def test_dotted_identifier_is_one_fragment_and_selected_excerpt_preserves_prefix() -> None:
+    source = "Clinfo.ai: An Open-Source Retrieval-Augmented System"
+    fragments = _source_fragments(source, "abstract")
+
+    assert [fragment for fragment, _, _ in fragments] == [source]
+    assert source[fragments[0][2] : fragments[0][2] + len(fragments[0][0])] == fragments[0][0]
+
+    item = _input(title=source, abstract=None)
+    record = classify_evidence_batch([item], DeterministicFakeEvidenceClassifier()).records[0]
+    assert record.supporting_excerpt is not None
+    assert "Clinfo.ai" in record.supporting_excerpt
+
+
+def test_decimal_is_not_truncated_in_fragment_or_excerpt() -> None:
+    source = "The method achieves a mean Average Precision of 59.70%."
+    assert _fragment_texts(source) == [source]
+
+    item = _input(title="A scientific paper", abstract=source)
+    record = classify_evidence_batch([item], DeterministicFakeEvidenceClassifier()).records[0]
+    assert record.supporting_excerpt is not None
+    assert "59.70%" in record.supporting_excerpt
+    assert "59." not in record.supporting_excerpt.replace("59.70%", "")
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "We use e.g. a graph method. It is evaluated.",
+        "We use i.e. a graph method. It is evaluated.",
+        "The result follows et al. in the cited study. It is evaluated.",
+        "Fig. 2 shows the pipeline. It is evaluated.",
+        "Dr. Smith presents the method. It is evaluated.",
+        "The method is compared vs. a baseline. It is evaluated.",
+    ],
+)
+def test_common_abbreviations_do_not_create_internal_fragments(source: str) -> None:
+    fragments = _fragment_texts(source)
+
+    assert len(fragments) == 2
+    assert "It is evaluated." in fragments[1]
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "The contract targets v1.2. It is evaluated.",
+        "The runner uses Python 3.12. It is evaluated.",
+        "The identifier is 10.1000/example.doi. It is evaluated.",
+        "The endpoint is example.org/path. It is evaluated.",
+    ],
+)
+def test_versions_urls_and_dois_remain_inside_their_fragment(source: str) -> None:
+    fragments = _fragment_texts(source)
+
+    assert len(fragments) == 2
+    assert "It is evaluated." in fragments[1]
+
+
+def test_real_sentence_ending_still_splits_in_order() -> None:
+    source = "We implement a retrieval pipeline. It is evaluated on a benchmark."
+
+    assert _fragment_texts(source) == [
+        "We implement a retrieval pipeline.",
+        "It is evaluated on a benchmark.",
+    ]
+
+
+def test_scanner_preserves_order_offsets_and_exact_substrings() -> None:
+    source = "Python 3.12. We implement a pipeline."
+    fragments = _source_fragments(source, "abstract")
+
+    assert [fragment for fragment, _, _ in fragments] == [
+        "Python 3.12.",
+        "We implement a pipeline.",
+    ]
+    assert all(
+        source[offset : offset + len(fragment)] == fragment
+        for fragment, _, offset in fragments
+    )
+    assert [offset for _, _, offset in fragments] == sorted(
+        offset for _, _, offset in fragments
+    )
 
 
 def test_title_only_marker_uses_title_excerpt() -> None:
